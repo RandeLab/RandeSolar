@@ -674,3 +674,66 @@ body.theme-randen .btn-sm.active {
   .chart-canvas-wrap { height: 240px; }
   .studio-layout { grid-template-columns: 1fr; }
 }
+
+/* ==================== LED STATUS LEGEND ==================== */
+.led-legend-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.led-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--border-radius);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.led-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+
+.led-pip {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  border-radius: 50%;
+  margin-top: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 8px currentColor;
+}
+
+.led-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.led-name {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--text-color);
+}
+
+.led-desc {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+@keyframes ledWink {
+  0%, 82%, 100% { opacity: 0.45; transform: scale(0.95); }
+  88% { opacity: 1; transform: scale(1.25); filter: brightness(1.5); }
+}
+
+.led-wink {
+  animation: ledWink 4s infinite ease-in-out;
+}
+

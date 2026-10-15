@@ -166,7 +166,17 @@ const i18n = {
     load: "Lastanschluß",
     chartTitle1: "Solarmodul (W) & Batteriespeicher (V)",
     chartTitle2: "Ladestrom & Laststrom (A)",
-    states: { 0: "AUS", 2: "FEHLER", 3: "HAUPTLADUNG", 4: "NACHLADUNG", 5: "ERHALTUNG", 252: "EXT. STEUERUNG" }
+    states: { 0: "AUS", 2: "FEHLER", 3: "HAUPTLADUNG", 4: "NACHLADUNG", 5: "ERHALTUNG", 252: "EXT. STEUERUNG" },
+    ledTitle: "💡 ESP32-S3 Status-LED (WS2812 Farbcodes)",
+    ledSubtitle: "Die integrierte RGB-LED auf GPIO 48 zeigt den aktuellen Betriebszustand und die Funkübertragung in Echtzeit an:",
+    ledSolar: { name: "☀️ Sonnengelb / Gold", desc: "<b>Solar-Erzeugung aktiv (> 0W):</b> Photovoltaik produziert Strom. Helligkeit passt sich der Wattzahl an." },
+    ledFloat: { name: "🔋 Smaragdgrün", desc: "<b>Erhaltungsladung (Float):</b> Speicher ist vollständig geladen (100%). Erhaltungsspannung." },
+    ledAbs: { name: "⚡ Helles Türkis", desc: "<b>Nachladephase (Absorption):</b> Akku nähert sich Ladeschlussspannung. Konstantspannung." },
+    ledBulk: { name: "💜 Purpur / Violett", desc: "<b>Hauptladung (Bulk):</b> Maximal verfügbarer Solarstrom lädt die entladene Batterie." },
+    ledStandby: { name: "🌙 Dezentes Petrol", desc: "<b>Nachtbetrieb / Standby (0W):</b> Ruhemodus bei Dunkelheit. Ruhiges, unaufdringliches Glimmen." },
+    ledMqtt: { name: "📡 Cyan-Puls (40ms alle 5s)", desc: "<b>Heartbeat:</b> Kurzes Zwinkern alle 5 Sekunden bestätigt das erfolgreiche Senden des Live-Telemetriepakets." },
+    ledScan: { name: "⚠️ Warmes Bernstein", desc: "<b>Suchlauf:</b> Wartet auf Bluetooth Instant-Readout Beacons des Victron Reglers." },
+    ledOffline: { name: "🔴 Dezentes Rot", desc: "<b>WLAN getrennt:</b> ESP32 verbindet sich mit dem RandeLab WLAN oder arbeitet offline." }
   },
   en: {
     title: "RandeSolar Studio",
@@ -181,7 +191,17 @@ const i18n = {
     load: "Load Port",
     chartTitle1: "Solar Power (W) & Battery Voltage (V)",
     chartTitle2: "Charging & Load Current (A)",
-    states: { 0: "OFF", 2: "FAULT", 3: "BULK", 4: "ABSORPTION", 5: "FLOAT", 252: "EXT CONTROL" }
+    states: { 0: "OFF", 2: "FAULT", 3: "BULK", 4: "ABSORPTION", 5: "FLOAT", 252: "EXT CONTROL" },
+    ledTitle: "💡 ESP32-S3 Status LED (WS2812 Color Codes)",
+    ledSubtitle: "The onboard RGB LED on GPIO 48 displays real-time controller state and radio telemetry transmission:",
+    ledSolar: { name: "☀️ Solar Gold / Yellow", desc: "<b>Solar Power Active (> 0W):</b> Solar panel is generating power. Brightness scales with wattage." },
+    ledFloat: { name: "🔋 Emerald Green", desc: "<b>Float Charge:</b> Battery pack is fully charged (100%). Maintaining float voltage." },
+    ledAbs: { name: "⚡ Vivid Cyan", desc: "<b>Absorption Charge:</b> Battery approaching full charge. Constant absorption voltage." },
+    ledBulk: { name: "💜 Deep Violet / Purple", desc: "<b>Bulk Charge:</b> Maximum available solar current is charging the battery." },
+    ledStandby: { name: "🌙 Soft Petrol / Teal", desc: "<b>Night Standby (0W):</b> Idle night mode. Dim, calm ambient glow." },
+    ledMqtt: { name: "📡 Cyan Wink (40ms / 5s)", desc: "<b>Heartbeat Pip:</b> Brief 40ms pulse every 5 seconds confirms live packet sent to HiveMQ." },
+    ledScan: { name: "⚠️ Warm Amber", desc: "<b>Beacon Scan:</b> Scanning for Victron BLE Instant Readout advertisements." },
+    ledOffline: { name: "🔴 Soft Red", desc: "<b>Wi-Fi Offline:</b> Connecting to RandeLab Wi-Fi or operating offline." }
   }
 };
 
@@ -212,6 +232,27 @@ window.setTheme = function(theme) {
   if (el.lblLoad) el.lblLoad.textContent = l.load;
   if (el.lblChartTitle1) el.lblChartTitle1.textContent = l.chartTitle1;
   if (el.lblChartTitle2) el.lblChartTitle2.textContent = l.chartTitle2;
+
+  // LED Legend translation
+  const ledTitle = document.getElementById("lblLedTitle");
+  const ledSub = document.getElementById("lblLedSubtitle");
+  if (ledTitle && l.ledTitle) ledTitle.textContent = l.ledTitle;
+  if (ledSub && l.ledSubtitle) ledSub.textContent = l.ledSubtitle;
+  
+  const updateLedEl = (idName, idDesc, data) => {
+    const elN = document.getElementById(idName);
+    const elD = document.getElementById(idDesc);
+    if (elN && data) elN.textContent = data.name;
+    if (elD && data) elD.innerHTML = data.desc;
+  };
+  if (l.ledSolar) updateLedEl("ledNameSolar", "ledDescSolar", l.ledSolar);
+  if (l.ledFloat) updateLedEl("ledNameFloat", "ledDescFloat", l.ledFloat);
+  if (l.ledAbs) updateLedEl("ledNameAbs", "ledDescAbs", l.ledAbs);
+  if (l.ledBulk) updateLedEl("ledNameBulk", "ledDescBulk", l.ledBulk);
+  if (l.ledStandby) updateLedEl("ledNameStandby", "ledDescStandby", l.ledStandby);
+  if (l.ledMqtt) updateLedEl("ledNameMqtt", "ledDescMqtt", l.ledMqtt);
+  if (l.ledScan) updateLedEl("ledNameScan", "ledDescScan", l.ledScan);
+  if (l.ledOffline) updateLedEl("ledNameOffline", "ledDescOffline", l.ledOffline);
 
   const pal = studioThemePalettes[theme] || studioThemePalettes.pinkograph;
 

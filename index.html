@@ -202,6 +202,88 @@
       </section>
     </div>
 
+    <!-- ESP32-S3 Onboard NeoPixel LED Status Guide -->
+    <section class="panel" style="border-top-color:var(--accent-yellow); margin-top:10px;">
+      <h2 id="lblLedTitle">💡 ESP32-S3 Status-LED (WS2812 Farbcodes)</h2>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;" id="lblLedSubtitle">
+        Die integrierte RGB-LED auf GPIO 48 zeigt den aktuellen Betriebszustand und die Funkübertragung in Echtzeit an:
+      </p>
+
+      <div class="led-legend-grid">
+        <!-- 1. Solar Producing -->
+        <div class="led-card">
+          <div class="led-pip" style="background:#FFD400; box-shadow:0 0 10px #FFD400;"></div>
+          <div class="led-info">
+            <span class="led-name" style="color:#FFD400;" id="ledNameSolar">☀️ Sonnengelb / Gold</span>
+            <span class="led-desc" id="ledDescSolar"><b>Solar-Erzeugung aktiv (> 0W):</b> Photovoltaik produziert Strom. Helligkeit passt sich der Wattzahl an.</span>
+          </div>
+        </div>
+
+        <!-- 2. Float -->
+        <div class="led-card">
+          <div class="led-pip" style="background:#00E676; box-shadow:0 0 10px #00E676;"></div>
+          <div class="led-info">
+            <span class="led-name" style="color:#00E676;" id="ledNameFloat">🔋 Smaragdgrün</span>
+            <span class="led-desc" id="ledDescFloat"><b>Erhaltungsladung (Float):</b> Speicher ist vollständig geladen (100%). Erhaltungsspannung.</span>
+          </div>
+        </div>
+
+        <!-- 3. Absorption -->
+        <div class="led-card">
+          <div class="led-pip" style="background:#00F5FF; box-shadow:0 0 10px #00F5FF;"></div>
+          <div class="led-info">
+            <span class="led-name" style="color:#00F5FF;" id="ledNameAbs">⚡ Helles Türkis</span>
+            <span class="led-desc" id="ledDescAbs"><b>Nachladephase (Absorption):</b> Akku nähert sich Ladeschlussspannung. Konstantspannung.</span>
+          </div>
+        </div>
+
+        <!-- 4. Bulk -->
+        <div class="led-card">
+          <div class="led-pip" style="background:#B388FF; box-shadow:0 0 10px #B388FF;"></div>
+          <div class="led-info">
+            <span class="led-name" style="color:#B388FF;" id="ledNameBulk">💜 Purpur / Violett</span>
+            <span class="led-desc" id="ledDescBulk"><b>Hauptladung (Bulk):</b> Maximal verfügbarer Solarstrom lädt die entladene Batterie.</span>
+          </div>
+        </div>
+
+        <!-- 5. Standby / Night -->
+        <div class="led-card">
+          <div class="led-pip" style="background:#00838F; box-shadow:0 0 8px #00838F;"></div>
+          <div class="led-info">
+            <span class="led-name" style="color:#26C6DA;" id="ledNameStandby">🌙 Dezentes Petrol</span>
+            <span class="led-desc" id="ledDescStandby"><b>Nachtbetrieb / Standby (0W):</b> Ruhemodus bei Dunkelheit. Ruhiges, unaufdringliches Glimmen.</span>
+          </div>
+        </div>
+
+        <!-- 6. MQTT Transmission Heartbeat -->
+        <div class="led-card">
+          <div class="led-pip led-wink" style="background:#00E5FF; box-shadow:0 0 12px #00E5FF;"></div>
+          <div class="led-info">
+            <span class="led-name" style="color:#00E5FF;" id="ledNameMqtt">📡 Cyan-Puls (40ms alle 5s)</span>
+            <span class="led-desc" id="ledDescMqtt"><b>Heartbeat:</b> Kurzes Zwinkern alle 5 Sekunden bestätigt das erfolgreiche Senden des Live-Telemetriepakets.</span>
+          </div>
+        </div>
+
+        <!-- 7. BLE Scan -->
+        <div class="led-card">
+          <div class="led-pip" style="background:#FF9100; box-shadow:0 0 8px #FF9100;"></div>
+          <div class="led-info">
+            <span class="led-name" style="color:#FF9100;" id="ledNameScan">⚠️ Warmes Bernstein</span>
+            <span class="led-desc" id="ledDescScan"><b>Suchlauf:</b> Wartet auf Bluetooth Instant-Readout Beacons des Victron Reglers.</span>
+          </div>
+        </div>
+
+        <!-- 8. Offline / Wi-Fi -->
+        <div class="led-card">
+          <div class="led-pip" style="background:#FF1744; box-shadow:0 0 8px #FF1744;"></div>
+          <div class="led-info">
+            <span class="led-name" style="color:#FF5252;" id="ledNameOffline">🔴 Dezentes Rot</span>
+            <span class="led-desc" id="ledDescOffline"><b>WLAN getrennt:</b> ESP32 verbindet sich mit dem RandeLab WLAN oder arbeitet offline.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Architecture & Documentation Section -->
     <section class="panel" style="border-top-color:var(--accent-green); margin-top:10px;">
       <h2>Hardware & Mechatronik Übersicht</h2>
@@ -233,6 +315,6 @@
     </footer>
   </div>
 
-  <script src="./web/app.js?v=2.5"></script>
+  <script src="./web/app.js?v=2.6"></script>
 </body>
 </html>

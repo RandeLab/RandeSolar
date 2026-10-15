@@ -328,6 +328,36 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       </div>
     </div>
 
+    <div class="panel" style="border-top-color: var(--yellow)">
+      <h2 id="lblLedTitle">💡 Onboard Status-LED (WS2812 Farbcodes)</h2>
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:10px; margin-top:8px; font-size:0.8rem; line-height:1.4;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="display:inline-block; width:12px; height:12px; min-width:12px; border-radius:50%; background:#FFD400; box-shadow:0 0 6px #FFD400;"></span>
+          <span><b>Sonnengelb:</b> Solar-Erzeugung (>0W)</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="display:inline-block; width:12px; height:12px; min-width:12px; border-radius:50%; background:#00E676; box-shadow:0 0 6px #00E676;"></span>
+          <span><b>Smaragdgrün:</b> Erhaltungsladung (Float 100%)</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="display:inline-block; width:12px; height:12px; min-width:12px; border-radius:50%; background:#00F5FF; box-shadow:0 0 6px #00F5FF;"></span>
+          <span><b>Türkis:</b> Nachladung (Absorption)</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="display:inline-block; width:12px; height:12px; min-width:12px; border-radius:50%; background:#B388FF; box-shadow:0 0 6px #B388FF;"></span>
+          <span><b>Purpur:</b> Hauptladung (Bulk)</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="display:inline-block; width:12px; height:12px; min-width:12px; border-radius:50%; background:#00838F; box-shadow:0 0 6px #00838F;"></span>
+          <span><b>Dezentes Petrol:</b> Standby / Nacht (0W)</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="display:inline-block; width:12px; height:12px; min-width:12px; border-radius:50%; background:#00E5FF; box-shadow:0 0 8px #00E5FF;"></span>
+          <span><b>Cyan-Puls:</b> 40ms Heartbeat alle 5s (MQTT Tx)</span>
+        </div>
+      </div>
+    </div>
+
     <div class="panel">
       <h2 id="lblPanelDiag">Systemdiagnose & Funknetz</h2>
       <div class="sub" style="border:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:16px;">
