@@ -46,19 +46,8 @@ static const uint16_t VICTRON_MFG_ID = 0x02E1;
 #define RGB_BUILTIN 48
 #endif
 
-static uint32_t g_lastFlashMs = 0;
-static uint8_t g_flashR = 0, g_flashG = 0, g_flashB = 0;
-
 void setPixel(uint8_t r, uint8_t g, uint8_t b) {
     neopixelWrite(RGB_BUILTIN, r, g, b);
-}
-
-void triggerPixelFlash(uint8_t r, uint8_t g, uint8_t b) {
-    g_flashR = r;
-    g_flashG = g;
-    g_flashB = b;
-    g_lastFlashMs = millis();
-    setPixel(r, g, b);
 }
 
 void updateNeoPixel();
@@ -193,7 +182,6 @@ class VictronScanCallbacks : public NimBLEScanCallbacks {
         g_data.has_data = true;
         g_newDataAvailable = true;
         portEXIT_CRITICAL(&g_mux);
-        triggerPixelFlash(60, 15, 45); // Pinkograph neon heartbeat pulse on fresh beacon
 
         Serial.printf("[☀️ BEACON] Solar: %uW | Batt: %.2fV, %.1fA | State: %s (%s) | Yield: %uWh | RSSI: %ddBm\n",
             solarPower, batteryVoltage, batteryCurrent, getChargeStateName(chargeState), getChargeStateGerman(chargeState), yieldTodayWh, rssi);
@@ -508,16 +496,9 @@ void reconnectMQTT() {
 void updateNeoPixel() {
     uint32_t now = millis();
 
-    // Check if in 80ms heartbeat flash pulse
-    if (now - g_lastFlashMs < 80) {
-        setPixel(g_flashR, g_flashG, g_flashB);
-        return;
-    }
-
     if (WiFi.status() != WL_CONNECTED) {
-        // Red slow breathing pulse when Wi-Fi offline or connecting
-        float breathe = (sin(now / 300.0f) + 1.0f) * 0.5f;
-        setPixel((uint8_t)(10 + breathe * 35), 0, 0);
+        // Calm solid dim red when Wi-Fi offline or connecting
+        setPixel(10, 0, 0);
         return;
     }
 
@@ -527,33 +508,32 @@ void updateNeoPixel() {
     portEXIT_CRITICAL(&g_mux);
 
     if (!d.has_data || (now - d.last_seen_ms > 15000)) {
-        // Amber/Orange breathing pulse when searching for Victron BLE beacon
-        float breathe = (sin(now / 450.0f) + 1.0f) * 0.5f;
-        setPixel((uint8_t)(15 + breathe * 25), (uint8_t)(5 + breathe * 10), 0);
+        // Calm solid dim amber when searching for Victron BLE beacon
+        setPixel(8, 3, 0);
         return;
     }
 
-    // 1. Solar Producing (> 0W): Warm Solar Gold/Yellow proportional to generation wattage
+    // 1. Solar Producing (> 0W): Warm Solar Gold/Yellow proportional to generation wattage (calm & dim)
     if (d.solar_power > 0) {
         uint8_t pwr = constrain(d.solar_power, 1, 75);
-        uint8_t bright = map(pwr, 1, 75, 12, 65);
+        uint8_t bright = map(pwr, 1, 75, 6, 25);
         setPixel(bright, (uint8_t)(bright * 0.72f), 0);
         return;
     }
 
-    // 2. Battery / Charge State colors
+    // 2. Battery / Charge State colors (calm, solid, non-jarring)
     switch (d.charge_state) {
-        case 3: // Bulk charging -> Deep Violet/Purple
-            setPixel(18, 2, 35);
+        case 3: // Bulk charging -> Soft Violet/Purple
+            setPixel(10, 2, 16);
             break;
-        case 4: // Absorption -> Vivid Cyan
-            setPixel(0, 25, 30);
+        case 4: // Absorption -> Soft Cyan
+            setPixel(0, 12, 16);
             break;
-        case 5: // Float -> Emerald Green
-            setPixel(0, 30, 8);
+        case 5: // Float -> Soft Emerald Green
+            setPixel(0, 16, 5);
             break;
-        default: // Standby / Night / Off -> Gentle subtle Teal glow
-            setPixel(0, 8, 12);
+        default: // Standby / Night / Off -> Soft, subtle deep Teal glow
+            setPixel(0, 4, 8);
             break;
     }
 }
@@ -658,7 +638,6 @@ void loop() {
                 WiFi.RSSI()
             );
             mqttClient.publish(MQTT_TOPIC, json);
-            triggerPixelFlash(0, 80, 80); // Crisp Cyan flash on MQTT publish
             Serial.printf("[MQTT 📡] Published to %s: %s\n", MQTT_TOPIC, json);
         }
     }
