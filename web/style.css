@@ -624,9 +624,23 @@ body.theme-randen .btn-sm.active {
   background-color: var(--accent-pink);
 }
 
+/* Dual Charts Grid */
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+  gap: 18px;
+  width: 100%;
+}
+
+@media (max-width: 580px) {
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .chart-canvas-wrap {
   position: relative;
-  height: 310px;
+  height: 260px;
   width: 100%;
 }
 

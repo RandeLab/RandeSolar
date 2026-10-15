@@ -172,20 +172,33 @@
       </section>
     </main>
 
-    <!-- Chart Panel -->
-    <section class="panel panel-chart">
-      <div class="chart-header-row">
-        <h2 id="lblChartTitle">Echtzeit-Telemetrie</h2>
-        <div class="btn-group" id="timeframeSelector">
-          <button class="btn btn-sm active" data-limit="50">50 pts</button>
-          <button class="btn btn-sm" data-limit="150">150 pts</button>
-          <button class="btn btn-sm" data-limit="500">500 pts</button>
+    <!-- Dual Charts Section -->
+    <div class="charts-grid">
+      <!-- Plot 1: Solar Power & Battery Voltage -->
+      <section class="panel panel-chart">
+        <div class="chart-header-row">
+          <h2 id="lblChartTitle1">☀️ Solarmodul (W) & Batteriespeicher (V)</h2>
+          <div class="btn-group" id="timeframeSelector">
+            <button class="btn btn-sm active" data-limit="50">50 pts</button>
+            <button class="btn btn-sm" data-limit="150">150 pts</button>
+            <button class="btn btn-sm" data-limit="500">500 pts</button>
+          </div>
         </div>
-      </div>
-      <div class="chart-canvas-wrap">
-        <canvas id="solarChart"></canvas>
-      </div>
-    </section>
+        <div class="chart-canvas-wrap">
+          <canvas id="solarChart"></canvas>
+        </div>
+      </section>
+
+      <!-- Plot 2: Charging Current & Load Current -->
+      <section class="panel panel-chart">
+        <div class="chart-header-row">
+          <h2 id="lblChartTitle2">⚡ Ladestrom & Last (A)</h2>
+        </div>
+        <div class="chart-canvas-wrap">
+          <canvas id="chargeChart"></canvas>
+        </div>
+      </section>
+    </div>
 
     <!-- Architecture & Documentation Section -->
     <section class="panel" style="border-top-color:var(--accent-green); margin-top:10px;">

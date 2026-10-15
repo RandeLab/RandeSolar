@@ -542,15 +542,19 @@ void loop() {
     reconnectMQTT();
     mqttClient.loop();
 
-    // Publish to MQTT when new BLE beacon data arrives
-    if (g_newDataAvailable) {
+    // Publish to MQTT every 5 seconds when BLE data is active
+    static uint32_t lastMqttPublish = 0;
+    uint32_t now = millis();
+    if (now - lastMqttPublish >= 5000) {
+        lastMqttPublish = now;
+
         SolarData d;
         portENTER_CRITICAL(&g_mux);
         d = g_data;
         g_newDataAvailable = false;
         portEXIT_CRITICAL(&g_mux);
 
-        if (mqttClient.connected()) {
+        if (d.has_data && mqttClient.connected()) {
             char json[380];
             snprintf(json, sizeof(json),
                 "{\"solar_power\":%u,\"battery_voltage\":%.2f,\"battery_current\":%.2f,"

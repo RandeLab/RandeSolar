@@ -1,5 +1,8 @@
 // RandeSolar - openBrushograph Studio Edition
-let chartInstance = null;
+let solarChartInstance = null;
+let chargeChartInstance = null;
+let lastChartAppendTime = 0;
+const CHART_THROTTLE_MS = 4000; // Update charts every 4-5 seconds for calm reading
 let currentLimit = 50;
 let lastBeaconTime = null;
 let currentTheme = localStorage.getItem('openbrushograph-studio-theme') || 'pinkograph';
@@ -39,7 +42,8 @@ const el = {
   lblFlow: document.getElementById('lblFlow'),
   lblPanelState: document.getElementById('lblPanelState'),
   lblLoad: document.getElementById('lblLoad'),
-  lblChartTitle: document.getElementById('lblChartTitle'),
+  lblChartTitle1: document.getElementById('lblChartTitle1'),
+  lblChartTitle2: document.getElementById('lblChartTitle2'),
 };
 
 // Studio Theme Palettes for Chart.js
@@ -50,6 +54,8 @@ const studioThemePalettes = {
     volt: '#00F5FF',
     voltFill: 'rgba(0, 245, 255, 0.15)',
     curr: '#FF6BB5',
+    currFill: 'rgba(255, 107, 181, 0.2)',
+    load: '#39FF14',
     grid: 'rgba(255, 107, 181, 0.15)',
     text: '#E3A0C0'
   },
@@ -59,6 +65,8 @@ const studioThemePalettes = {
     volt: '#4A6B3D',
     voltFill: 'rgba(74, 107, 61, 0.15)',
     curr: '#8B0000',
+    currFill: 'rgba(139, 0, 0, 0.15)',
+    load: '#3d5a80',
     grid: 'rgba(92, 75, 58, 0.2)',
     text: '#7A6A58'
   },
@@ -68,6 +76,8 @@ const studioThemePalettes = {
     volt: '#dddddd',
     voltFill: 'rgba(221, 221, 221, 0.1)',
     curr: '#aaaaaa',
+    currFill: 'rgba(170, 170, 170, 0.15)',
+    load: '#eeeeee',
     grid: 'rgba(102, 102, 102, 0.25)',
     text: '#aaaaaa'
   },
@@ -77,6 +87,8 @@ const studioThemePalettes = {
     volt: '#4f4f4f',
     voltFill: 'rgba(79, 79, 79, 0.1)',
     curr: '#2b2b2b',
+    currFill: 'rgba(43, 43, 43, 0.15)',
+    load: '#616161',
     grid: 'rgba(140, 136, 126, 0.25)',
     text: '#5a574f'
   },
@@ -86,6 +98,8 @@ const studioThemePalettes = {
     volt: '#00ffcc',
     voltFill: 'rgba(0, 255, 204, 0.15)',
     curr: '#ff00ff',
+    currFill: 'rgba(255, 0, 255, 0.2)',
+    load: '#33ff66',
     grid: 'rgba(46, 139, 87, 0.25)',
     text: '#5ccc5c'
   },
@@ -95,6 +109,8 @@ const studioThemePalettes = {
     volt: '#4DFF88',
     voltFill: 'rgba(77, 255, 136, 0.15)',
     curr: '#33FF66',
+    currFill: 'rgba(51, 255, 102, 0.2)',
+    load: '#B8FFD0',
     grid: 'rgba(31, 107, 60, 0.25)',
     text: '#2E9455'
   },
@@ -104,6 +120,8 @@ const studioThemePalettes = {
     volt: '#2a9d8f',
     voltFill: 'rgba(42, 157, 143, 0.15)',
     curr: '#d90429',
+    currFill: 'rgba(217, 4, 41, 0.2)',
+    load: '#2a9d8f',
     grid: 'rgba(252, 163, 17, 0.25)',
     text: '#f3d596'
   },
@@ -113,6 +131,8 @@ const studioThemePalettes = {
     volt: '#8E00C9',
     voltFill: 'rgba(142, 0, 201, 0.15)',
     curr: '#E5006E',
+    currFill: 'rgba(229, 0, 110, 0.2)',
+    load: '#8E00C9',
     grid: 'rgba(255, 159, 213, 0.3)',
     text: '#9E5480'
   },
@@ -122,6 +142,8 @@ const studioThemePalettes = {
     volt: '#56bdff',
     voltFill: 'rgba(86, 189, 255, 0.15)',
     curr: '#005b96',
+    currFill: 'rgba(0, 91, 150, 0.15)',
+    load: '#32b643',
     grid: 'rgba(218, 222, 228, 0.6)',
     text: '#66758c'
   }
@@ -140,7 +162,8 @@ const i18n = {
     flow: "Leistung",
     panelState: "Regler-Zustand",
     load: "Lastanschluß",
-    chartTitle: "Echtzeit-Telemetrie",
+    chartTitle1: "Solarmodul (W) & Batteriespeicher (V)",
+    chartTitle2: "Ladestrom & Laststrom (A)",
     states: { 0: "AUS", 2: "FEHLER", 3: "HAUPTLADUNG", 4: "NACHLADUNG", 5: "ERHALTUNG", 252: "EXT. STEUERUNG" }
   },
   en: {
@@ -154,7 +177,8 @@ const i18n = {
     flow: "Pack Flow",
     panelState: "Controller State",
     load: "Load Port",
-    chartTitle: "Live Power Stream",
+    chartTitle1: "Solar Power (W) & Battery Voltage (V)",
+    chartTitle2: "Charging & Load Current (A)",
     states: { 0: "OFF", 2: "FAULT", 3: "BULK", 4: "ABSORPTION", 5: "FLOAT", 252: "EXT CONTROL" }
   }
 };
@@ -184,25 +208,40 @@ window.setTheme = function(theme) {
   if (el.lblFlow) el.lblFlow.textContent = l.flow;
   if (el.lblPanelState) el.lblPanelState.textContent = l.panelState;
   if (el.lblLoad) el.lblLoad.textContent = l.load;
-  if (el.lblChartTitle) el.lblChartTitle.textContent = l.chartTitle;
+  if (el.lblChartTitle1) el.lblChartTitle1.textContent = l.chartTitle1;
+  if (el.lblChartTitle2) el.lblChartTitle2.textContent = l.chartTitle2;
 
-  // Update Chart colors
-  if (chartInstance) {
-    const pal = studioThemePalettes[theme] || studioThemePalettes.pinkograph;
-    chartInstance.data.datasets[0].borderColor = pal.solar;
-    chartInstance.data.datasets[0].backgroundColor = pal.solarFill;
-    chartInstance.data.datasets[1].borderColor = pal.volt;
-    chartInstance.data.datasets[1].backgroundColor = pal.voltFill;
-    chartInstance.data.datasets[2].borderColor = pal.curr;
+  const pal = studioThemePalettes[theme] || studioThemePalettes.pinkograph;
 
-    chartInstance.options.scales.x.grid.color = pal.grid;
-    chartInstance.options.scales.x.ticks.color = pal.text;
-    chartInstance.options.scales.yPower.grid.color = pal.grid;
-    chartInstance.options.scales.yPower.ticks.color = pal.solar;
-    chartInstance.options.scales.yPower.title.color = pal.solar;
-    chartInstance.options.scales.yVoltage.ticks.color = pal.volt;
-    chartInstance.options.scales.yVoltage.title.color = pal.volt;
-    chartInstance.update();
+  // Update Solar & Battery Chart colors
+  if (solarChartInstance) {
+    solarChartInstance.data.datasets[0].borderColor = pal.solar;
+    solarChartInstance.data.datasets[0].backgroundColor = pal.solarFill;
+    solarChartInstance.data.datasets[1].borderColor = pal.volt;
+    solarChartInstance.data.datasets[1].backgroundColor = pal.voltFill;
+
+    solarChartInstance.options.scales.x.grid.color = pal.grid;
+    solarChartInstance.options.scales.x.ticks.color = pal.text;
+    solarChartInstance.options.scales.yPower.grid.color = pal.grid;
+    solarChartInstance.options.scales.yPower.ticks.color = pal.solar;
+    solarChartInstance.options.scales.yPower.title.color = pal.solar;
+    solarChartInstance.options.scales.yVoltage.ticks.color = pal.volt;
+    solarChartInstance.options.scales.yVoltage.title.color = pal.volt;
+    solarChartInstance.update();
+  }
+
+  // Update Charge & Current Chart colors
+  if (chargeChartInstance) {
+    chargeChartInstance.data.datasets[0].borderColor = pal.curr;
+    chargeChartInstance.data.datasets[0].backgroundColor = pal.currFill || 'rgba(255, 107, 181, 0.2)';
+    chargeChartInstance.data.datasets[1].borderColor = pal.load || '#39FF14';
+
+    chargeChartInstance.options.scales.x.grid.color = pal.grid;
+    chargeChartInstance.options.scales.x.ticks.color = pal.text;
+    chargeChartInstance.options.scales.yCurrent.grid.color = pal.grid;
+    chargeChartInstance.options.scales.yCurrent.ticks.color = pal.curr;
+    chargeChartInstance.options.scales.yCurrent.title.color = pal.curr;
+    chargeChartInstance.update();
   }
 };
 
@@ -214,112 +253,172 @@ window.connectToCustomEndpoint = function() {
   }
 };
 
-// Initialize Chart
+// Initialize Dual Charts (Plot 1: Solar W & Battery V, Plot 2: Charge A & Load A)
 function initChart() {
-  const canvas = document.getElementById('solarChart');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
   const pal = studioThemePalettes[currentTheme] || studioThemePalettes.pinkograph;
 
-  chartInstance = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: [],
-      datasets: [
-        {
-          label: 'Solar (W)',
-          data: [],
-          borderColor: pal.solar,
-          backgroundColor: pal.solarFill,
-          borderWidth: 2.5,
-          tension: 0.25,
-          fill: true,
-          yAxisID: 'yPower',
-          pointRadius: 2,
-          pointHoverRadius: 5,
-        },
-        {
-          label: 'Battery (V)',
-          data: [],
-          borderColor: pal.volt,
-          backgroundColor: pal.voltFill,
-          borderWidth: 2,
-          tension: 0.25,
-          fill: false,
-          yAxisID: 'yVoltage',
-          pointRadius: 2,
-          pointHoverRadius: 5,
-        },
-        {
-          label: 'Charging (A)',
-          data: [],
-          borderColor: pal.curr,
-          borderWidth: 1.5,
-          borderDash: [3, 3],
-          tension: 0.2,
-          fill: false,
-          yAxisID: 'yCurrent',
-          pointRadius: 1,
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: { duration: 300 },
-      interaction: {
-        mode: 'index',
-        intersect: false,
+  // Plot 1: Solar & Battery
+  const solarCanvas = document.getElementById('solarChart');
+  if (solarCanvas) {
+    const ctxSolar = solarCanvas.getContext('2d');
+    solarChartInstance = new Chart(ctxSolar, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: 'Solar (W)',
+            data: [],
+            borderColor: pal.solar,
+            backgroundColor: pal.solarFill,
+            borderWidth: 2.5,
+            tension: 0.25,
+            fill: true,
+            yAxisID: 'yPower',
+            pointRadius: 2,
+            pointHoverRadius: 5,
+          },
+          {
+            label: 'Batterie (V)',
+            data: [],
+            borderColor: pal.volt,
+            backgroundColor: pal.voltFill,
+            borderWidth: 2,
+            tension: 0.25,
+            fill: false,
+            yAxisID: 'yVoltage',
+            pointRadius: 2,
+            pointHoverRadius: 5,
+          }
+        ]
       },
-      plugins: {
-        legend: {
-          labels: {
-            color: pal.text,
-            font: { family: 'JetBrains Mono', size: 11, weight: '700' },
-            boxWidth: 12,
-            usePointStyle: true,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 250 },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            labels: {
+              color: pal.text,
+              font: { family: 'JetBrains Mono', size: 11, weight: '700' },
+              boxWidth: 12,
+              usePointStyle: true,
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(10, 0, 20, 0.95)',
+            titleFont: { family: 'Outfit', size: 12 },
+            bodyFont: { family: 'JetBrains Mono', size: 12 },
+            borderColor: 'rgba(255, 107, 181, 0.4)',
+            borderWidth: 1,
+            padding: 8,
           }
         },
-        tooltip: {
-          backgroundColor: 'rgba(10, 0, 20, 0.95)',
-          titleFont: { family: 'Outfit', size: 12 },
-          bodyFont: { family: 'JetBrains Mono', size: 12 },
-          borderColor: 'rgba(255, 107, 181, 0.4)',
-          borderWidth: 1,
-          padding: 8,
-        }
-      },
-      scales: {
-        x: {
-          grid: { color: pal.grid },
-          ticks: { color: pal.text, font: { family: 'JetBrains Mono', size: 10 }, maxTicksLimit: 7 }
-        },
-        yPower: {
-          type: 'linear',
-          position: 'left',
-          title: { display: true, text: 'Solar (W)', color: pal.solar, font: { family: 'Outfit', size: 11 } },
-          grid: { color: pal.grid },
-          ticks: { color: pal.solar, font: { family: 'JetBrains Mono', size: 10 } },
-          suggestedMin: 0,
-          suggestedMax: 50,
-        },
-        yVoltage: {
-          type: 'linear',
-          position: 'right',
-          title: { display: true, text: 'Battery (V)', color: pal.volt, font: { family: 'Outfit', size: 11 } },
-          grid: { drawOnChartArea: false },
-          ticks: { color: pal.volt, font: { family: 'JetBrains Mono', size: 10 } },
-          suggestedMin: 11.5,
-          suggestedMax: 14.5,
-        },
-        yCurrent: {
-          type: 'linear',
-          display: false,
-          suggestedMin: 0,
+        scales: {
+          x: {
+            grid: { color: pal.grid },
+            ticks: { color: pal.text, font: { family: 'JetBrains Mono', size: 10 }, maxTicksLimit: 6 }
+          },
+          yPower: {
+            type: 'linear',
+            position: 'left',
+            title: { display: true, text: 'Solar (W)', color: pal.solar, font: { family: 'Outfit', size: 11 } },
+            grid: { color: pal.grid },
+            ticks: { color: pal.solar, font: { family: 'JetBrains Mono', size: 10 } },
+            suggestedMin: 0,
+            suggestedMax: 50,
+          },
+          yVoltage: {
+            type: 'linear',
+            position: 'right',
+            title: { display: true, text: 'Batterie (V)', color: pal.volt, font: { family: 'Outfit', size: 11 } },
+            grid: { drawOnChartArea: false },
+            ticks: { color: pal.volt, font: { family: 'JetBrains Mono', size: 10 } },
+            suggestedMin: 11.5,
+            suggestedMax: 14.5,
+          }
         }
       }
-    }
-  });
+    });
+  }
+
+  // Plot 2: Charge & Current
+  const chargeCanvas = document.getElementById('chargeChart');
+  if (chargeCanvas) {
+    const ctxCharge = chargeCanvas.getContext('2d');
+    chargeChartInstance = new Chart(ctxCharge, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: 'Ladestrom (A)',
+            data: [],
+            borderColor: pal.curr,
+            backgroundColor: pal.currFill || 'rgba(255, 107, 181, 0.2)',
+            borderWidth: 2.2,
+            tension: 0.25,
+            fill: true,
+            yAxisID: 'yCurrent',
+            pointRadius: 2,
+            pointHoverRadius: 5,
+          },
+          {
+            label: 'Lastanschluss (A)',
+            data: [],
+            borderColor: pal.load || '#39FF14',
+            borderWidth: 1.8,
+            borderDash: [4, 4],
+            tension: 0.2,
+            fill: false,
+            yAxisID: 'yCurrent',
+            pointRadius: 1,
+            pointHoverRadius: 4,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 250 },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            labels: {
+              color: pal.text,
+              font: { family: 'JetBrains Mono', size: 11, weight: '700' },
+              boxWidth: 12,
+              usePointStyle: true,
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(10, 0, 20, 0.95)',
+            titleFont: { family: 'Outfit', size: 12 },
+            bodyFont: { family: 'JetBrains Mono', size: 12 },
+            borderColor: 'rgba(255, 107, 181, 0.4)',
+            borderWidth: 1,
+            padding: 8,
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: pal.grid },
+            ticks: { color: pal.text, font: { family: 'JetBrains Mono', size: 10 }, maxTicksLimit: 6 }
+          },
+          yCurrent: {
+            type: 'linear',
+            position: 'left',
+            title: { display: true, text: 'Strom (A)', color: pal.curr, font: { family: 'Outfit', size: 11 } },
+            grid: { color: pal.grid },
+            ticks: { color: pal.curr, font: { family: 'JetBrains Mono', size: 10 } },
+            suggestedMin: 0,
+            suggestedMax: 10,
+          }
+        }
+      }
+    });
+  }
 }
 
 // Update UI
@@ -389,23 +488,42 @@ function setOnlineStatus(online) {
   }
 }
 
-function appendChartPoint(item) {
-  if (!chartInstance) return;
+function appendChartPoint(item, force = false) {
+  const now = Date.now();
+  if (!force && (now - lastChartAppendTime < CHART_THROTTLE_MS)) {
+    return; // Calm update rate: only append points every 4-5s
+  }
+  lastChartAppendTime = now;
+
   const timeLabel = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-  chartInstance.data.labels.push(timeLabel);
-  chartInstance.data.datasets[0].data.push(item.solar_power || 0);
-  chartInstance.data.datasets[1].data.push(item.battery_voltage || 0);
-  chartInstance.data.datasets[2].data.push(item.battery_charging_current || item.battery_current || 0);
+  // 1. Solar Power (W) & Battery Voltage (V)
+  if (solarChartInstance) {
+    solarChartInstance.data.labels.push(timeLabel);
+    solarChartInstance.data.datasets[0].data.push(item.solar_power || 0);
+    solarChartInstance.data.datasets[1].data.push(item.battery_voltage || 0);
 
-  while (chartInstance.data.labels.length > currentLimit) {
-    chartInstance.data.labels.shift();
-    chartInstance.data.datasets[0].data.shift();
-    chartInstance.data.datasets[1].data.shift();
-    chartInstance.data.datasets[2].data.shift();
+    while (solarChartInstance.data.labels.length > currentLimit) {
+      solarChartInstance.data.labels.shift();
+      solarChartInstance.data.datasets[0].data.shift();
+      solarChartInstance.data.datasets[1].data.shift();
+    }
+    solarChartInstance.update('none');
   }
 
-  chartInstance.update('none');
+  // 2. Charging Current (A) & External Load (A)
+  if (chargeChartInstance) {
+    chargeChartInstance.data.labels.push(timeLabel);
+    chargeChartInstance.data.datasets[0].data.push(item.battery_charging_current || item.battery_current || 0);
+    chargeChartInstance.data.datasets[1].data.push(item.external_load || 0);
+
+    while (chargeChartInstance.data.labels.length > currentLimit) {
+      chargeChartInstance.data.labels.shift();
+      chargeChartInstance.data.datasets[0].data.shift();
+      chargeChartInstance.data.datasets[1].data.shift();
+    }
+    chargeChartInstance.update('none');
+  }
 }
 
 // Fetch live telemetry (try local API, custom endpoint, or demo mode)
@@ -461,7 +579,7 @@ async function fetchLiveTelemetry(explicit = false) {
 }
 
 // Live interactive simulation for public GitHub Pages visitors
-function runSimulationStep() {
+function runSimulationStep(force = false) {
   isDemoMode = true;
   if (el.diagSource) el.diagSource.textContent = 'Demo Mode (Sim)';
   if (el.statusText) el.statusText.textContent = 'Demo Modus';
@@ -486,7 +604,7 @@ function runSimulationStep() {
   };
 
   updateDashboard(demoData);
-  appendChartPoint(demoData);
+  appendChartPoint(demoData, force);
 }
 
 // Timer tick
@@ -583,7 +701,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Pre-seed chart with initial points
   for (let k = 0; k < 12; k++) {
-    runSimulationStep();
+    runSimulationStep(true);
   }
 
   // Connect to live MQTT stream from HiveMQ
