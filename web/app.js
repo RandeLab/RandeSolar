@@ -617,12 +617,78 @@ setInterval(() => {
   }
 }, 1000);
 
+// Supabase Cloud History Integration
+const SUPABASE_URL = "https://pakfuetvwpffwfrrxshz.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBha2Z1ZXR2d3BmZndmcnJ4c2h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwODkwNjIsImV4cCI6MjEwNzY2NTA2Mn0.J4HDEP28BF0fRkmfYqeeaM1urn29lYNUz9k4kQjXWhU";
+
+async function loadSupabaseHistory(limit = 50) {
+  try {
+    const url = `${SUPABASE_URL}/rest/v1/solar_telemetry?select=*&order=created_at.desc&limit=${limit}`;
+    const res = await fetch(url, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      }
+    });
+
+    if (!res.ok) return;
+    const rows = await res.json();
+    if (!Array.isArray(rows) || rows.length === 0) return;
+
+    // Sort chronologically (oldest to newest)
+    rows.reverse();
+
+    if (solarChartInstance) {
+      solarChartInstance.data.labels = [];
+      solarChartInstance.data.datasets[0].data = [];
+      solarChartInstance.data.datasets[1].data = [];
+    }
+
+    if (chargeChartInstance) {
+      chargeChartInstance.data.labels = [];
+      chargeChartInstance.data.datasets[0].data = [];
+      chargeChartInstance.data.datasets[1].data = [];
+    }
+
+    rows.forEach(item => {
+      const d = new Date(item.created_at);
+      const timeLabel = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      if (solarChartInstance) {
+        solarChartInstance.data.labels.push(timeLabel);
+        solarChartInstance.data.datasets[0].data.push(item.solar_power || 0);
+        solarChartInstance.data.datasets[1].data.push(item.battery_voltage || 0);
+      }
+
+      if (chargeChartInstance) {
+        chargeChartInstance.data.labels.push(timeLabel);
+        chargeChartInstance.data.datasets[0].data.push(item.battery_current || 0);
+        chargeChartInstance.data.datasets[1].data.push(item.external_load || 0);
+      }
+    });
+
+    if (solarChartInstance) solarChartInstance.update('none');
+    if (chargeChartInstance) chargeChartInstance.update('none');
+
+    // Populate dashboard cards with the latest record
+    const latest = rows[rows.length - 1];
+    if (latest && isDemoMode) {
+      isDemoMode = false;
+      updateDashboard(latest);
+    }
+    console.log(`[Supabase ⚡] Loaded ${rows.length} historical points!`);
+  } catch (err) {
+    console.warn('[Supabase] History fetch warning:', err);
+  }
+}
+
 // Setup Timeframe selector buttons
 document.querySelectorAll('#timeframeSelector button').forEach(btn => {
   btn.addEventListener('click', (e) => {
     document.querySelectorAll('#timeframeSelector button').forEach(b => b.classList.remove('active'));
     e.target.classList.add('active');
     currentLimit = parseInt(e.target.dataset.limit, 10);
+    loadSupabaseHistory(currentLimit);
   });
 });
 
@@ -691,6 +757,8 @@ window.addEventListener('DOMContentLoaded', () => {
   initChart();
   window.setTheme(currentTheme);
 
+  // Load cloud history from Supabase
+  loadSupabaseHistory(currentLimit);
 
   // Connect to live MQTT stream from HiveMQ
   initMQTT();
