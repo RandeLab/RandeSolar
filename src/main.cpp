@@ -17,6 +17,8 @@
 
 #include <Arduino.h>
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
 #include <WebServer.h>
 #include <ESPmDNS.h>
 #include <PubSubClient.h>
@@ -27,6 +29,11 @@
 static const char* WIFI_SSID     = "RandeLab";
 static const char* WIFI_PASS     = "sauhund13";
 static const char* MDNS_HOST     = "randesolar";
+
+// Telegram Bot Configuration
+static const char* TELEGRAM_BOT_TOKEN = "8600149990:AAGGHL_USsmi_PfzPFBDIvoFgQx-rmvXIkc";
+static const char* TELEGRAM_CHAT_ID   = "818690605";
+static int64_t g_lastTelegramUpdateId = 0;
 
 // HiveMQ Broker
 static const char* MQTT_BROKER   = "broker.hivemq.com";
@@ -580,6 +587,144 @@ void updateNeoPixel() {
     }
 }
 
+// ==================== TELEGRAM BOT CLIENT ====================
+String escapeJsonString(const String& s) {
+    String out = "";
+    out.reserve(s.length() + 32);
+    for (size_t i = 0; i < s.length(); i++) {
+        char c = s[i];
+        if (c == '"') out += "\\\"";
+        else if (c == '\\') out += "\\\\";
+        else if (c == '\n') out += "\\n";
+        else if (c == '\r') continue;
+        else out += c;
+    }
+    return out;
+}
+
+void sendTelegramMessage(const String& text, const char* targetChatId = TELEGRAM_CHAT_ID) {
+    if (WiFi.status() != WL_CONNECTED) return;
+
+    WiFiClientSecure secClient;
+    secClient.setInsecure();
+    secClient.setTimeout(4500);
+
+    HTTPClient http;
+    String url = "https://api.telegram.org/bot" + String(TELEGRAM_BOT_TOKEN) + "/sendMessage";
+    if (http.begin(secClient, url)) {
+        http.addHeader("Content-Type", "application/json");
+        String payload = "{\"chat_id\":\"" + String(targetChatId) + "\",\"text\":\"" + escapeJsonString(text) + "\",\"parse_mode\":\"Markdown\"}";
+        int code = http.POST(payload);
+        if (code > 0) {
+            Serial.printf("[Telegram ✈️] Message delivered (HTTP %d)\n", code);
+        } else {
+            Serial.printf("[Telegram ❌] Send failed: %s\n", http.errorToString(code).c_str());
+        }
+        http.end();
+    }
+}
+
+void checkTelegramUpdates() {
+    if (WiFi.status() != WL_CONNECTED) return;
+
+    WiFiClientSecure secClient;
+    secClient.setInsecure();
+    secClient.setTimeout(3500);
+
+    HTTPClient http;
+    String url = "https://api.telegram.org/bot" + String(TELEGRAM_BOT_TOKEN) + 
+                 "/getUpdates?offset=" + String((long long)(g_lastTelegramUpdateId + 1)) + 
+                 "&limit=5&timeout=0";
+
+    if (http.begin(secClient, url)) {
+        int code = http.GET();
+        if (code == 200) {
+            String response = http.getString();
+            
+            int idx = 0;
+            while ((idx = response.indexOf("\"update_id\":", idx)) != -1) {
+                int startId = idx + 12;
+                int endId = response.indexOf(",", startId);
+                if (endId != -1) {
+                    int64_t uid = atoll(response.substring(startId, endId).c_str());
+                    if (uid > g_lastTelegramUpdateId) g_lastTelegramUpdateId = uid;
+                }
+                
+                int chatIdx = response.indexOf("\"chat\":{\"id\":", idx);
+                String fromChatId = TELEGRAM_CHAT_ID;
+                if (chatIdx != -1) {
+                    int chatStart = chatIdx + 13;
+                    int chatEnd = response.indexOf(",", chatStart);
+                    if (chatEnd != -1) {
+                        fromChatId = response.substring(chatStart, chatEnd);
+                    }
+                }
+
+                int textIdx = response.indexOf("\"text\":\"", idx);
+                if (textIdx != -1) {
+                    int textStart = textIdx + 8;
+                    int textEnd = response.indexOf("\"", textStart);
+                    if (textEnd != -1) {
+                        String cmd = response.substring(textStart, textEnd);
+                        cmd.toLowerCase();
+                        
+                        if (cmd.startsWith("/status")) {
+                            SolarData d;
+                            portENTER_CRITICAL(&g_mux);
+                            d = g_data;
+                            portEXIT_CRITICAL(&g_mux);
+
+                            char msg[600];
+                            int soc = (int)constrain(((d.battery_voltage - 11.8f) / 1.0f) * 100.0f, 0.0f, 100.0f);
+                            unsigned long ageSec = d.has_data ? ((millis() - d.last_seen_ms) / 1000) : 999;
+
+                            snprintf(msg, sizeof(msg),
+                                "☀️ *RandeSolar Kraftwerk Status* ⚡\n"
+                                "━━━━━━━━━━━━━━━━━━━━\n"
+                                "☀️ *Solar-Leistung:* %u W\n"
+                                "🔋 *Batteriespeicher:* %.2f V (~%d%%)\n"
+                                "⚡ *Ladestrom:* %.1f A\n"
+                                "💡 *Lastanschluß:* %.1f A\n"
+                                "📊 *Tagesertrag:* %.2f kWh\n"
+                                "🏷️ *Zustand:* %s (%s)\n"
+                                "📶 *Signal:* BLE %d dBm | WiFi %d dBm\n"
+                                "⏱️ *Telegramm-Alter:* %lu Sek.\n"
+                                "━━━━━━━━━━━━━━━━━━━━\n"
+                                "📍 _ESP32-S3 Standalone Station_",
+                                d.solar_power,
+                                d.battery_voltage,
+                                soc,
+                                d.battery_current,
+                                d.external_load,
+                                d.yield_today_wh / 1000.0f,
+                                getChargeStateName(d.charge_state),
+                                getChargeStateGerman(d.charge_state),
+                                d.rssi,
+                                WiFi.RSSI(),
+                                ageSec
+                            );
+                            sendTelegramMessage(msg, fromChatId.c_str());
+                        } else if (cmd.startsWith("/ping")) {
+                            sendTelegramMessage("🏓 *Pong!* RandeSolar ESP32-S3 ist online und empfängt Bluetooth-Telemetrie.", fromChatId.c_str());
+                        } else if (cmd.startsWith("/start") || cmd.startsWith("/help") || cmd.startsWith("/hilfe")) {
+                            sendTelegramMessage(
+                                "☀️ *Willkommen beim RandeSolar Bot!* ⚡\n\n"
+                                "Verfügbare Befehle:\n"
+                                "• /status - Aktuelle Solar- & Akkudaten abrufen\n"
+                                "• /ping - Verbindungsstatus prüfen\n\n"
+                                "🌐 Live-Dashboard: https://randelab.github.io/RandeSolar/",
+                                fromChatId.c_str()
+                            );
+                        }
+                    }
+                }
+                idx = response.indexOf("\"update_id\":", idx + 12);
+            }
+        }
+        http.end();
+    }
+}
+
 void setup() {
     Serial.begin(115200);
     delay(1000);
@@ -613,6 +758,17 @@ void setup() {
             Serial.printf("[mDNS] http://%s.local\n", MDNS_HOST);
         }
         setPixel(0, 30, 15); // Green confirmation flash
+
+        // Send Telegram startup message to Marc
+        char bootMsg[240];
+        snprintf(bootMsg, sizeof(bootMsg),
+            "🚀 *RandeSolar ESP32-S3 online!* 🔌\n"
+            "Verbunden mit Wi-Fi *%s* (IP: `%s`).\n"
+            "Sende /status für Live-Telemetrie.",
+            WIFI_SSID,
+            WiFi.localIP().toString().c_str()
+        );
+        sendTelegramMessage(bootMsg);
     } else {
         Serial.println("\n[WiFi] Connection timed out. Running offline BLE logger mode.");
         setPixel(30, 0, 0); // Red warning
@@ -650,9 +806,17 @@ void loop() {
     // Update onboard NeoPixel state machine
     updateNeoPixel();
 
+    uint32_t now = millis();
+
+    // Check Telegram commands every 3.5 seconds
+    static uint32_t lastTelegramCheck = 0;
+    if (now - lastTelegramCheck >= 3500) {
+        lastTelegramCheck = now;
+        checkTelegramUpdates();
+    }
+
     // Publish to MQTT every 5 seconds when BLE data is active
     static uint32_t lastMqttPublish = 0;
-    uint32_t now = millis();
     if (now - lastMqttPublish >= 5000) {
         lastMqttPublish = now;
 
