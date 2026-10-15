@@ -210,7 +210,7 @@ window.connectToCustomEndpoint = function() {
   if (el.endpointInput) {
     activeEndpoint = el.endpointInput.value.trim().replace(/\/$/, '');
     localStorage.setItem('randesolar-endpoint', activeEndpoint);
-    fetchLiveTelemetry();
+    fetchLiveTelemetry(true);
   }
 };
 
@@ -409,12 +409,27 @@ function appendChartPoint(item) {
 }
 
 // Fetch live telemetry (try local API, custom endpoint, or demo mode)
-async function fetchLiveTelemetry() {
-  const endpointsToTry = [
-    '/api/live',                     // 1. Same-origin (when running on local server or ESP32)
-    `${activeEndpoint}/api/live`,     // 2. Custom lab endpoint (e.g. http://randesolar.local)
-    'http://192.168.1.101/api/live'  // 3. Known lab IP fallback
-  ];
+async function fetchLiveTelemetry(explicit = false) {
+  const isHttps = window.location.protocol === 'https:';
+
+  // When loaded over HTTPS (like GitHub Pages), do NOT automatically ping private HTTP network IPs
+  // because modern browsers will show a "Local Network Access" security prompt.
+  // MQTT over WebSocket handles live data seamlessly on HTTPS.
+  if (isHttps && !explicit) {
+    if (!mqttClient || !mqttClient.connected) {
+      runSimulationStep();
+    }
+    return;
+  }
+
+  const endpointsToTry = [];
+  if (!isHttps) {
+    endpointsToTry.push('/api/live');
+    if (activeEndpoint) endpointsToTry.push(`${activeEndpoint}/api/live`);
+    endpointsToTry.push('http://192.168.1.101/api/live');
+  } else if (explicit && activeEndpoint) {
+    endpointsToTry.push(activeEndpoint.endsWith('/api/live') ? activeEndpoint : `${activeEndpoint}/api/live`);
+  }
 
   for (const url of endpointsToTry) {
     try {
@@ -439,8 +454,10 @@ async function fetchLiveTelemetry() {
     }
   }
 
-  // If outside the lab network (e.g. visiting public GitHub Pages from elsewhere):
-  runSimulationStep();
+  // Fallback if no endpoint answered
+  if (!mqttClient || !mqttClient.connected) {
+    runSimulationStep();
+  }
 }
 
 // Live interactive simulation for public GitHub Pages visitors
@@ -550,8 +567,15 @@ function initMQTT() {
 
 // Startup
 window.addEventListener('DOMContentLoaded', () => {
+  const isHttps = window.location.protocol === 'https:';
+
   if (el.endpointInput) {
-    el.endpointInput.value = activeEndpoint;
+    if (isHttps) {
+      el.endpointInput.value = 'HiveMQ Cloud (WSS)';
+      el.endpointInput.title = 'Live telemetrie über HiveMQ WSS. Für lokales IP-Polling zu http wechseln.';
+    } else {
+      el.endpointInput.value = activeEndpoint;
+    }
   }
 
   initChart();
@@ -565,12 +589,14 @@ window.addEventListener('DOMContentLoaded', () => {
   // Connect to live MQTT stream from HiveMQ
   initMQTT();
 
-  // Poll local endpoint as fallback every 2 seconds
-  fetchLiveTelemetry();
-  setInterval(() => {
-    if (!mqttClient || !mqttClient.connected) {
-      fetchLiveTelemetry();
-    }
-  }, 2500);
+  // Only poll local network HTTP endpoints if NOT loaded over HTTPS
+  if (!isHttps) {
+    fetchLiveTelemetry();
+    setInterval(() => {
+      if (!mqttClient || !mqttClient.connected) {
+        fetchLiveTelemetry();
+      }
+    }, 2500);
+  }
 });
 
