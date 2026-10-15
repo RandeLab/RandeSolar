@@ -499,6 +499,55 @@ document.querySelectorAll('#timeframeSelector button').forEach(btn => {
   });
 });
 
+// HiveMQ MQTT over WebSocket (WSS) Client
+const MQTT_BROKER_URL = 'wss://broker.hivemq.com:8884/mqtt';
+const MQTT_TOPIC = 'randelab/solar/telemetry';
+let mqttClient = null;
+
+function initMQTT() {
+  if (typeof mqtt === 'undefined') {
+    console.warn('[MQTT] mqtt.js library not loaded.');
+    return;
+  }
+  try {
+    const clientId = 'RandeSolar-Web-' + Math.random().toString(16).substring(2, 8);
+    mqttClient = mqtt.connect(MQTT_BROKER_URL, {
+      clientId: clientId,
+      clean: true,
+      connectTimeout: 5000,
+      reconnectPeriod: 3000
+    });
+
+    mqttClient.on('connect', () => {
+      console.log('[MQTT] Connected to HiveMQ WebSocket Broker!');
+      if (el.statusText) el.statusText.textContent = 'Live MQTT (HiveMQ)';
+      if (el.diagSource) el.diagSource.textContent = 'HiveMQ Cloud WSS';
+      mqttClient.subscribe(MQTT_TOPIC, (err) => {
+        if (!err) console.log(`[MQTT] Subscribed to ${MQTT_TOPIC}`);
+      });
+    });
+
+    mqttClient.on('message', (topic, message) => {
+      try {
+        const payload = JSON.parse(message.toString());
+        isDemoMode = false;
+        if (el.diagSource) el.diagSource.textContent = 'HiveMQ Cloud Live';
+        if (el.statusText) el.statusText.textContent = 'Live MQTT (Hive)';
+        updateDashboard(payload);
+        appendChartPoint(payload);
+      } catch (err) {
+        console.error('MQTT parse error:', err);
+      }
+    });
+
+    mqttClient.on('offline', () => {
+      if (el.statusText && !isDemoMode) el.statusText.textContent = 'MQTT offline';
+    });
+  } catch (e) {
+    console.error('Failed to initialize MQTT:', e);
+  }
+}
+
 // Startup
 window.addEventListener('DOMContentLoaded', () => {
   if (el.endpointInput) {
@@ -508,12 +557,20 @@ window.addEventListener('DOMContentLoaded', () => {
   initChart();
   window.setTheme(currentTheme);
 
-  // Pre-seed chart with initial points for immediate beauty
+  // Pre-seed chart with initial points
   for (let k = 0; k < 12; k++) {
     runSimulationStep();
   }
 
-  // Poll every 2 seconds
+  // Connect to live MQTT stream from HiveMQ
+  initMQTT();
+
+  // Poll local endpoint as fallback every 2 seconds
   fetchLiveTelemetry();
-  setInterval(fetchLiveTelemetry, 2000);
+  setInterval(() => {
+    if (!mqttClient || !mqttClient.connected) {
+      fetchLiveTelemetry();
+    }
+  }, 2500);
 });
+

@@ -1,11 +1,13 @@
 /**
- * RandeSolar - Victron MPPT 75|15 ESP32-S3 BLE & Wi-Fi Station
+ * RandeSolar - Victron MPPT 75|15 ESP32-S3 BLE, Wi-Fi & MQTT Station
  *
  * Features:
  *  - Passive BLE scanner with hardware AES-128-CTR decryption
  *  - Connects to Wi-Fi "RandeLab"
+ *  - Publishes live telemetry to HiveMQ Public Broker (broker.hivemq.com)
+ *    Topic: randelab/solar/telemetry
  *  - Hosts standalone openBrushograph Studio Web Dashboard on Port 80
- *  - Includes Kongress Dresden (Nacht & Altpapier) in German!
+ *  - Kongress Dresden (Nacht & Altpapier) in German
  *  - mDNS: http://randesolar.local
  *  - REST API: /api/live & /api/status
  *  - USB Serial CDC output
@@ -17,6 +19,7 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <ESPmDNS.h>
+#include <PubSubClient.h>
 #include <NimBLEDevice.h>
 #include "mbedtls/aes.h"
 
@@ -24,6 +27,11 @@
 static const char* WIFI_SSID     = "RandeLab";
 static const char* WIFI_PASS     = "sauhund13";
 static const char* MDNS_HOST     = "randesolar";
+
+// HiveMQ Broker
+static const char* MQTT_BROKER   = "broker.hivemq.com";
+static const int   MQTT_PORT     = 1883;
+static const char* MQTT_TOPIC    = "randelab/solar/telemetry";
 
 static const char* TARGET_MAC    = "cb:06:61:60:5a:c2";
 static const uint8_t ENCRYPTION_KEY[16] = {
@@ -48,8 +56,11 @@ struct SolarData {
 };
 
 static SolarData g_data;
+static volatile bool g_newDataAvailable = false;
 static portMUX_TYPE g_mux = portMUX_INITIALIZER_UNLOCKED;
 
+WiFiClient espClient;
+PubSubClient mqttClient(espClient);
 WebServer server(80);
 
 // Solar Charger States (English & German)
@@ -115,8 +126,8 @@ class VictronScanCallbacks : public NimBLEScanCallbacks {
 
         uint16_t mfgId = data[0] | (data[1] << 8);
         if (mfgId != VICTRON_MFG_ID) return;
-        if (data[2] != 0x10) return;       // prefix
-        if (data[6] != 0x01) return;       // solar charger readout
+        if (data[2] != 0x10) return;
+        if (data[6] != 0x01) return;
 
         uint16_t iv = data[7] | (data[8] << 8);
         const uint8_t* encData = &data[9];
@@ -158,6 +169,7 @@ class VictronScanCallbacks : public NimBLEScanCallbacks {
         g_data.rssi = rssi;
         g_data.last_seen_ms = millis();
         g_data.has_data = true;
+        g_newDataAvailable = true;
         portEXIT_CRITICAL(&g_mux);
 
         Serial.printf("[☀️ BEACON] Solar: %uW | Batt: %.2fV, %.1fA | State: %s (%s) | Yield: %uWh | RSSI: %ddBm\n",
@@ -212,7 +224,6 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       --shadow: 0 0 10px rgba(77, 255, 136, 0.4);
     }
 
-    /* Dresden Gothic Typography rules */
     body.theme-dresden-dark h1,
     body.theme-dresden-dark h2,
     body.theme-dresden-dark .pill,
@@ -274,14 +285,12 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
     </div>
 
     <div class="grid">
-      <!-- Solar PV Panel -->
       <div class="panel" style="border-top-color: var(--yellow)">
         <h2 id="lblPanelSolar">Solarmodul (Photovoltaik)</h2>
         <div class="val"><span id="solarPower">--</span> <span class="unit">W</span></div>
         <div class="sub"><span id="lblYield">Tagesertrag:</span><b id="yieldToday" style="color:var(--text)">-- kWh</b></div>
       </div>
 
-      <!-- Battery Panel -->
       <div class="panel" style="border-top-color: var(--cyan)">
         <h2 id="lblPanelBattery">Batteriespeicher (12V)</h2>
         <div class="val"><span id="batteryVoltage">--</span> <span class="unit">V</span></div>
@@ -289,14 +298,12 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
         <div class="sub"><span id="lblSoc">Ladezustand:</span><b id="estSoc" style="color:var(--text)">-- %</b></div>
       </div>
 
-      <!-- Current Flow Panel -->
       <div class="panel" style="border-top-color: var(--pink)">
         <h2 id="lblPanelCurrent">Ladestrom & Fluß</h2>
         <div class="val"><span id="batteryCurrent">--</span> <span class="unit">A</span></div>
         <div class="sub"><span id="lblFlow">Leistung:</span><b id="flowWatts" style="color:var(--text)">-- W</b></div>
       </div>
 
-      <!-- State Panel -->
       <div class="panel" style="border-top-color: var(--green)">
         <h2 id="lblPanelState">Regler-Zustand</h2>
         <div style="margin: 6px 0;"><span class="pill" id="chargeState">--</span></div>
@@ -304,13 +311,13 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       </div>
     </div>
 
-    <!-- Diagnostics Panel -->
     <div class="panel">
-      <h2 id="lblPanelDiag">Systemdiagnose & Netzwerk</h2>
+      <h2 id="lblPanelDiag">Systemdiagnose & Funknetz</h2>
       <div class="sub" style="border:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:16px;">
         <span><b>Gerät:</b> cb:06:61:60:5a:c2</span>
         <span><b>Bluetooth:</b> <span id="bleRssi">--</span> dBm</span>
         <span><b>WLAN:</b> <span id="wifiRssi">--</span> dBm</span>
+        <span><b>MQTT:</b> broker.hivemq.com</span>
         <span><b>Netzwerk-IP:</b> <span id="ipAddr">--</span></span>
         <span><b>Telegramm:</b> <span id="beaconAge">--</span></span>
       </div>
@@ -360,7 +367,6 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       document.body.className = "theme-" + th;
       localStorage.setItem("randesolar-esp-theme", th);
 
-      // Switch language: Dresden themes are in German!
       curLang = (th.startsWith("dresden") || th === "randen") ? "de" : "en";
       const l = dict[curLang];
 
@@ -396,7 +402,6 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
         document.getElementById('batteryCurrent').textContent = d.battery_current.toFixed(1);
         document.getElementById('flowWatts').textContent = (d.battery_voltage * d.battery_current).toFixed(1) + ' W';
 
-        // State translation
         const stateMap = dict[curLang].states;
         const stStr = stateMap[d.charge_state] || d.state_str;
         document.getElementById('chargeState').textContent = stStr;
@@ -459,13 +464,32 @@ void handleLiveApi() {
     server.send(200, "application/json", json);
 }
 
+// Reconnect MQTT (non-blocking)
+void reconnectMQTT() {
+    if (WiFi.status() != WL_CONNECTED) return;
+    if (mqttClient.connected()) return;
+
+    static unsigned long lastAttempt = 0;
+    if (millis() - lastAttempt > 5000) {
+        lastAttempt = millis();
+        String clientId = "RandeSolar-ESP32-" + String((uint32_t)ESP.getEfuseMac(), HEX);
+        Serial.printf("[MQTT] Connecting to %s:%d...\n", MQTT_BROKER, MQTT_PORT);
+        if (mqttClient.connect(clientId.c_str())) {
+            Serial.println("[MQTT] Connected to HiveMQ Broker!");
+        } else {
+            Serial.printf("[MQTT] Connect failed, rc=%d\n", mqttClient.state());
+        }
+    }
+}
+
 void setup() {
     Serial.begin(115200);
     delay(2000);
 
     Serial.println("\n========================================");
-    Serial.println("  RandeSolar • ESP32-S3 BLE & Wi-Fi");
+    Serial.println("  RandeSolar • ESP32-S3 BLE & Wi-Fi & MQTT");
     Serial.printf("  Connecting to: %s\n", WIFI_SSID);
+    Serial.printf("  MQTT Broker:   %s:%d\n", MQTT_BROKER, MQTT_PORT);
     Serial.println("========================================\n");
 
     // Connect to Wi-Fi
@@ -489,6 +513,10 @@ void setup() {
         Serial.println("\n[WiFi] Connection timed out. Running offline BLE logger mode.");
     }
 
+    // Configure MQTT
+    mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
+    mqttClient.setBufferSize(512);
+
     // Setup Web Server
     server.on("/", handleRoot);
     server.on("/api/live", handleLiveApi);
@@ -511,5 +539,38 @@ void setup() {
 
 void loop() {
     server.handleClient();
+    reconnectMQTT();
+    mqttClient.loop();
+
+    // Publish to MQTT when new BLE beacon data arrives
+    if (g_newDataAvailable) {
+        SolarData d;
+        portENTER_CRITICAL(&g_mux);
+        d = g_data;
+        g_newDataAvailable = false;
+        portEXIT_CRITICAL(&g_mux);
+
+        if (mqttClient.connected()) {
+            char json[380];
+            snprintf(json, sizeof(json),
+                "{\"solar_power\":%u,\"battery_voltage\":%.2f,\"battery_current\":%.2f,"
+                "\"yield_today_wh\":%lu,\"external_load\":%.2f,\"charge_state\":%u,\"state_str\":\"%s\","
+                "\"charger_error\":%u,\"ble_rssi\":%d,\"wifi_rssi\":%d,\"age_sec\":0}",
+                d.solar_power,
+                d.battery_voltage,
+                d.battery_current,
+                (unsigned long)d.yield_today_wh,
+                d.external_load,
+                d.charge_state,
+                getChargeStateName(d.charge_state),
+                d.charger_error,
+                d.rssi,
+                WiFi.RSSI()
+            );
+            mqttClient.publish(MQTT_TOPIC, json);
+            Serial.printf("[MQTT 📡] Published to %s: %s\n", MQTT_TOPIC, json);
+        }
+    }
+
     delay(10);
 }
