@@ -1,73 +1,110 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RandeSolar • openBrushograph Studio</title>
+  <meta name="description" content="Geil ich gseh was lauft! Im Solarologie Panel • Victron MPPT 75|15 Bluetooth Telemetry Monitor">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="RandeSolar • openBrushograph Studio">
+  <meta property="og:description" content="Geil ich gseh was lauft! Im Solarologie Panel • Victron MPPT 75|15 BLE Monitor">
+  <meta property="og:type" content="website">
+
+  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&family=Noto+Sans+Kannada:wght@400;700&family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js and MQTT.js CDNs -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
+  <link rel="stylesheet" href="./style.css?v=2.1">
 </head>
 <body class="theme-pinkograph">
   <div class="studio-wrapper">
-    <!-- Header with openBrushograph Studio styling -->
+    <!-- Header Container -->
     <header class="header-container">
       <div class="brand-left">
-        <a href="https://openbrushograph.github.io/" target="_blank" title="openBrushograph">
-          <img src="/static/arai-icon.svg" alt="Arai Logo" class="logo-img" id="dynamic-logo">
+        <a href="https://github.com/RandeLab/RandeSolar" target="_blank" title="RandeLab/RandeSolar on GitHub">
+          <img src="./arai-icon.svg" alt="Arai Logo" class="logo-img" id="dynamic-logo">
         </a>
         <div class="title-group">
           <h1 id="main-title">RandeSolar Studio</h1>
           <div class="badge-sub-row">
             <span class="sub-chip">VICTRON MPPT 75|15</span>
+            <span class="sub-chip" style="color:var(--accent-yellow)">Solarologie Panel</span>
             <span class="sub-chip" id="deviceModel">BLE TELEMETRY</span>
           </div>
         </div>
       </div>
 
       <div class="header-right">
-        <!-- Exact Studio Theme Selector -->
+        <!-- Studio Theme Selector -->
         <div class="theme-select-wrap">
-          <label for="theme-selector">THEME:</label>
+          <label for="theme-selector" id="lblTheme">STIL:</label>
           <select id="theme-selector" autocomplete="off" onchange="setTheme(this.value)">
             <option value="pinkograph" selected>Pinkograph</option>
             <option value="randen">Randen</option>
+            <option value="dresden-dark">Kongreß Dresden (Nacht) 🇩🇪</option>
+            <option value="dresden">Kongreß Dresden (Altpapier) 🇩🇪</option>
             <option value="tropical">Deep Jungle Dark</option>
             <option value="coconut">Coconut Phosphor</option>
-            <option value="dresden-dark">Kongress Dresden (Nacht)</option>
             <option value="bengaluru">Bengaluru Fair</option>
             <option value="uwu">UwU Pink</option>
             <option value="light">Arai-eek Light</option>
           </select>
         </div>
 
-        <div class="status-indicator" id="connectionStatus">
+        <!-- Connection Source Pill -->
+        <div class="status-indicator" id="connectionStatus" title="Status">
           <span class="dot"></span>
-          <span class="status-text">BLE Active</span>
+          <span class="status-text" id="statusText">Verbinde...</span>
         </div>
 
-        <a href="/api/export" class="btn btn-export" download>
-          <span>Export CSV</span>
+        <a href="https://github.com/RandeLab/RandeSolar" target="_blank" class="btn" style="gap:6px;">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+          </svg>
+          GitHub
         </a>
       </div>
     </header>
 
-    <!-- Studio Layout Panels -->
+    <!-- Lab Connection Bar / Easter Egg Banner -->
+    <div style="background:var(--panel-bg); border:1px solid var(--border); border-radius:var(--border-radius); padding:8px 16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; font-size:0.8rem; font-family:var(--font-mono);">
+      <div>
+        <span style="color:var(--accent-yellow)">⚡ »Geil ich gseh was lauft! Im Solarologie Panel«</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <label for="endpointInput">Lab-IP:</label>
+        <input type="text" id="endpointInput" value="http://randesolar.local" style="background:var(--input-bg); color:var(--text-color); border:1px solid var(--border); padding:3px 8px; border-radius:4px; font-size:0.75rem; width:170px;">
+        <button class="btn btn-sm" onclick="connectToCustomEndpoint()">Verbinden</button>
+      </div>
+    </div>
+
+    <!-- Main Grid of Panels -->
     <main class="studio-layout">
-      <!-- Panel 1: Solar PV -->
+      <!-- Panel 1: Solar Array -->
       <section class="panel panel-solar">
-        <h2>Solar Array (PV)</h2>
+        <h2 id="lblPanelSolar">Solarmodul (Photovoltaik)</h2>
         <div class="panel-body">
           <div class="metric-row">
             <span class="metric-val" id="solarPower">0</span>
             <span class="metric-unit">W</span>
           </div>
-          <div class="metric-details">
+          <div class="metric-details" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
             <div class="detail-col">
-              <span class="detail-label">Yield Today</span>
+              <span class="detail-label" id="lblYield">Tagesertrag</span>
               <span class="detail-val" id="yieldToday">0.00 kWh</span>
+            </div>
+            <div class="detail-col align-right">
+              <span class="detail-label" id="lblPeak">Spitze heute</span>
+              <span class="detail-val" style="color:var(--accent-yellow);" id="peakSolarPower">-- W</span>
+            </div>
+            <div class="detail-col">
+              <span class="detail-label" id="lblYesterday">Gestern</span>
+              <span class="detail-val" id="yieldYesterday">-- kWh</span>
             </div>
             <div class="detail-col align-right">
               <span class="detail-label">Status</span>
@@ -79,7 +116,7 @@
 
       <!-- Panel 2: Battery Storage -->
       <section class="panel panel-battery">
-        <h2>Storage Pack (12V)</h2>
+        <h2 id="lblPanelBattery">Batteriespeicher (12V)</h2>
         <div class="panel-body">
           <div class="metric-row">
             <span class="metric-val" id="batteryVoltage">0.00</span>
@@ -88,22 +125,30 @@
           <div class="gauge-wrap">
             <div class="gauge-fill" id="batteryBar" style="width: 50%;"></div>
           </div>
-          <div class="metric-details">
+          <div class="metric-details" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
             <div class="detail-col">
-              <span class="detail-label">Est. SOC</span>
+              <span class="detail-label" id="lblSoc">Ladezustand</span>
               <span class="detail-val" id="estSoc">-- %</span>
             </div>
             <div class="detail-col align-right">
-              <span class="detail-label">Chemistry</span>
+              <span class="detail-label" id="lblMinMax">Min / Max</span>
+              <span class="detail-val val-blue" id="batteryMinMax">-- / -- V</span>
+            </div>
+            <div class="detail-col">
+              <span class="detail-label">Akkutyp</span>
               <span class="detail-val">12V Storage</span>
+            </div>
+            <div class="detail-col align-right">
+              <span class="detail-label">Chemie</span>
+              <span class="detail-val">Bleisäure / AGM</span>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- Panel 3: Charging Current -->
+      <!-- Panel 3: Charge Flow -->
       <section class="panel panel-current">
-        <h2>Charge Flow</h2>
+        <h2 id="lblPanelCurrent">Ladestrom & Fluß</h2>
         <div class="panel-body">
           <div class="metric-row">
             <span class="metric-val" id="batteryCurrent">0.0</span>
@@ -111,12 +156,12 @@
           </div>
           <div class="metric-details">
             <div class="detail-col">
-              <span class="detail-label">Pack Flow</span>
+              <span class="detail-label" id="lblFlow">Leistung</span>
               <span class="detail-val" id="batteryPowerFlow">0.0 W</span>
             </div>
             <div class="detail-col align-right">
-              <span class="detail-label">Direction</span>
-              <span class="detail-val val-blue">To Battery</span>
+              <span class="detail-label">Richtung</span>
+              <span class="detail-val val-blue">Zum Akku</span>
             </div>
           </div>
         </div>
@@ -124,52 +169,168 @@
 
       <!-- Panel 4: Controller State -->
       <section class="panel panel-state">
-        <h2>Controller State</h2>
+        <h2 id="lblPanelState">Regler-Zustand</h2>
         <div class="panel-body">
           <div class="state-pill-wrap">
             <span class="state-pill" id="chargeStatePill">OFF</span>
           </div>
           <div class="metric-details">
             <div class="detail-col">
-              <span class="detail-label">Load Port</span>
+              <span class="detail-label" id="lblLoad">Lastanschluß</span>
               <span class="detail-val" id="externalLoad">0.0 A</span>
             </div>
             <div class="detail-col align-right">
-              <span class="detail-label">Diagnostics</span>
-              <span class="detail-val" id="errorBadge">No Errors</span>
+              <span class="detail-label">Diagnose</span>
+              <span class="detail-val" id="errorBadge">Normal</span>
             </div>
           </div>
         </div>
       </section>
     </main>
 
-    <!-- Chart Panel -->
-    <section class="panel panel-chart">
-      <div class="chart-header-row">
-        <h2>Telemetry Stream</h2>
-        <div class="btn-group" id="timeframeSelector">
-          <button class="btn btn-sm active" data-limit="50">50 pts</button>
-          <button class="btn btn-sm" data-limit="150">150 pts</button>
-          <button class="btn btn-sm" data-limit="500">500 pts</button>
+    <!-- Dual Charts Section -->
+    <div class="charts-grid">
+      <!-- Plot 1: Solar Power & Battery Voltage -->
+      <section class="panel panel-chart">
+        <div class="chart-header-row">
+          <h2 id="lblChartTitle1">☀️ Solarmodul (W) & Batteriespeicher (V)</h2>
+          <div class="btn-group" id="timeframeSelector">
+            <button class="btn btn-sm active" data-hours="1" data-limit="240">1h</button>
+            <button class="btn btn-sm" data-hours="3" data-limit="720">3h</button>
+            <button class="btn btn-sm" data-hours="6" data-limit="1000">6h</button>
+            <button class="btn btn-sm" data-hours="12" data-limit="1000">12h</button>
+            <button class="btn btn-sm" data-hours="24" data-limit="1000">24h</button>
+          </div>
         </div>
-      </div>
-      <div class="chart-canvas-wrap">
-        <canvas id="solarChart"></canvas>
+        <div class="chart-canvas-wrap">
+          <canvas id="solarChart"></canvas>
+        </div>
+      </section>
+
+      <!-- Plot 2: Charging Current & Load Current -->
+      <section class="panel panel-chart">
+        <div class="chart-header-row">
+          <h2 id="lblChartTitle2">⚡ Ladestrom & Last (A)</h2>
+        </div>
+        <div class="chart-canvas-wrap">
+          <canvas id="chargeChart"></canvas>
+        </div>
+      </section>
+    </div>
+
+    <!-- ESP32-S3 Onboard NeoPixel LED Status Guide -->
+    <section class="panel" style="border-top-color:var(--accent-yellow); margin-top:10px;">
+      <h2 id="lblLedTitle">💡 ESP32-S3 Status-LED (WS2812 Farbcodes)</h2>
+      <p style="font-size:0.85rem; color:var(--text-muted); margin-top:4px;" id="lblLedSubtitle">
+        Die integrierte RGB-LED auf GPIO 48 zeigt den aktuellen Betriebszustand und die Funkübertragung in Echtzeit an:
+      </p>
+
+      <div class="led-legend-grid">
+        <!-- 1. Solar Producing -->
+        <div class="led-card">
+          <div class="led-pip" style="background:#FFD400; box-shadow:0 0 10px #FFD400;"></div>
+          <div class="led-info">
+            <span class="led-name" style="color:#FFD400;" id="ledNameSolar">☀️ Sonnengelb / Gold</span>
+            <span class="led-desc" id="ledDescSolar"><b>Solar-Erzeugung aktiv (> 0W):</b> Photovoltaik produziert Strom. Helligkeit passt sich der Wattzahl an.</span>
+          </div>
+        </div>
+
+        <!-- 2. Float -->
+        <div class="led-card">
+          <div class="led-pip" style="background:#00E676; box-shadow:0 0 10px #00E676;"></div>
+          <div class="led-info">
+            <span class="led-name" style="color:#00E676;" id="ledNameFloat">🔋 Smaragdgrün</span>
+            <span class="led-desc" id="ledDescFloat"><b>Erhaltungsladung (Float):</b> Speicher ist vollständig geladen (100%). Erhaltungsspannung.</span>
+          </div>
+        </div>
+
+        <!-- 3. Absorption -->
+        <div class="led-card">
+          <div class="led-pip" style="background:#00F5FF; box-shadow:0 0 10px #00F5FF;"></div>
+          <div class="led-info">
+            <span class="led-name" style="color:#00F5FF;" id="ledNameAbs">⚡ Helles Türkis</span>
+            <span class="led-desc" id="ledDescAbs"><b>Nachladephase (Absorption):</b> Akku nähert sich Ladeschlussspannung. Konstantspannung.</span>
+          </div>
+        </div>
+
+        <!-- 4. Bulk -->
+        <div class="led-card">
+          <div class="led-pip" style="background:#B388FF; box-shadow:0 0 10px #B388FF;"></div>
+          <div class="led-info">
+            <span class="led-name" style="color:#B388FF;" id="ledNameBulk">💜 Purpur / Violett</span>
+            <span class="led-desc" id="ledDescBulk"><b>Hauptladung (Bulk):</b> Maximal verfügbarer Solarstrom lädt die entladene Batterie.</span>
+          </div>
+        </div>
+
+        <!-- 5. Standby / Night -->
+        <div class="led-card">
+          <div class="led-pip" style="background:#00838F; box-shadow:0 0 8px #00838F;"></div>
+          <div class="led-info">
+            <span class="led-name" style="color:#26C6DA;" id="ledNameStandby">🌙 Dezentes Petrol</span>
+            <span class="led-desc" id="ledDescStandby"><b>Nachtbetrieb / Standby (0W):</b> Ruhemodus bei Dunkelheit. Ruhiges, unaufdringliches Glimmen.</span>
+          </div>
+        </div>
+
+        <!-- 6. MQTT Transmission Heartbeat -->
+        <div class="led-card">
+          <div class="led-pip led-wink" style="background:#00E5FF; box-shadow:0 0 12px #00E5FF;"></div>
+          <div class="led-info">
+            <span class="led-name" style="color:#00E5FF;" id="ledNameMqtt">📡 Cyan-Puls (40ms alle 5s)</span>
+            <span class="led-desc" id="ledDescMqtt"><b>Heartbeat:</b> Kurzes Zwinkern alle 5 Sekunden bestätigt das erfolgreiche Senden des Live-Telemetriepakets.</span>
+          </div>
+        </div>
+
+        <!-- 7. BLE Scan -->
+        <div class="led-card">
+          <div class="led-pip" style="background:#FF9100; box-shadow:0 0 8px #FF9100;"></div>
+          <div class="led-info">
+            <span class="led-name" style="color:#FF9100;" id="ledNameScan">⚠️ Warmes Bernstein</span>
+            <span class="led-desc" id="ledDescScan"><b>Suchlauf:</b> Wartet auf Bluetooth Instant-Readout Beacons des Victron Reglers.</span>
+          </div>
+        </div>
+
+        <!-- 8. Offline / Wi-Fi -->
+        <div class="led-card">
+          <div class="led-pip" style="background:#FF1744; box-shadow:0 0 8px #FF1744;"></div>
+          <div class="led-info">
+            <span class="led-name" style="color:#FF5252;" id="ledNameOffline">🔴 Dezentes Rot</span>
+            <span class="led-desc" id="ledDescOffline"><b>WLAN getrennt:</b> ESP32 verbindet sich mit dem RandeLab WLAN oder arbeitet offline.</span>
+          </div>
+        </div>
       </div>
     </section>
 
-    <!-- Footer / Diagnostics Panel -->
+    <!-- Architecture & Documentation Section -->
+    <section class="panel" style="border-top-color:var(--accent-green); margin-top:10px;">
+      <h2>Hardware & Mechatronik Übersicht</h2>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px; font-size:0.85rem; line-height:1.6; margin-top:10px;">
+        <div>
+          <h3 style="color:var(--accent-pink); margin-bottom:6px;">⚡ Victron MPPT 75 | 15</h3>
+          <p>Liest verschlüsselte <b>Instant Readout</b> BLE-Advertisements (Hersteller-ID <code>0x02E1</code>) ohne Bluetooth-Kopplung. Keine Blockierung der offiziellen VictronConnect App.</p>
+        </div>
+        <div>
+          <h3 style="color:var(--accent-blue); margin-bottom:6px;">📡 ESP32-S3 Standalone Station</h3>
+          <p>Autonomer ESP32-S3 im RandeLab-WLAN. Hardware-AES-128-CTR Entschlüsselung, integrierter Webserver auf Port 80 und mDNS-Erkennung unter <code>http://randesolar.local</code>.</p>
+        </div>
+        <div>
+          <h3 style="color:var(--accent-yellow); margin-bottom:6px;">🎨 openBrushograph Ästhetik</h3>
+          <p>Entwickelt im unverwechselbaren Stil der openBrushograph Studio Apps mit 8 umschaltbaren Farbschemata (Pinkograph, Randen, Kongreß Dresden, Deep Jungle, Coconut).</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Diagnostics Footer Strip -->
     <footer class="panel panel-footer">
       <div class="footer-strip">
-        <span><b>DONGLE:</b> <span class="font-mono" id="diagMac">cb:06:61:60:5a:c2</span></span>
-        <span><b>CIPHER:</b> AES-128-CTR</span>
-        <span><b>BEACON:</b> <span id="lastSeenTimer">Live</span></span>
-        <span><b>RSSI:</b> <span class="font-mono" id="rssiValue">-- dBm</span></span>
-        <span><b>BUFFER:</b> <span class="font-mono" id="diagTotalRecords">--</span> records</span>
+        <span><b>GERÄT:</b> <span class="font-mono" id="diagMac">cb:06:61:60:5a:c2</span></span>
+        <span><b>CHIPHER:</b> AES-128-CTR</span>
+        <span><b>TELEGRAMM:</b> <span id="lastSeenTimer">Live</span></span>
+        <span><b>RSSI:</b> <span class="font-mono" id="rssiValue">-76 dBm</span></span>
+        <span><b>QUELLE:</b> <span id="diagSource">Live Lab</span></span>
       </div>
     </footer>
   </div>
 
-  <script src="/static/app.js"></script>
+  <script src="./app.js?v=2.7"></script>
 </body>
 </html>
