@@ -71,14 +71,22 @@
       </div>
     </header>
 
-    <!-- Lab Connection Bar / Easter Egg Banner -->
-    <div style="background:var(--panel-bg); border:1px solid var(--border); border-radius:var(--border-radius); padding:8px 16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; font-size:0.8rem; font-family:var(--font-mono);">
-      <div>
-        <span style="color:var(--accent-yellow)">⚡ »Geil ich gseh was lauft! Im Solarologie Panel«</span>
+    <!-- Live Mechatronics Mood & Tagebuch Bubble -->
+    <div class="panel" style="border-left: 4px solid var(--accent-pink); padding: 10px 16px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+      <div style="display: flex; align-items: flex-start; gap: 12px; max-width: 820px;">
+        <span style="font-size: 1.6rem; line-height: 1.2;">💬</span>
+        <div>
+          <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: var(--accent-pink); font-family: var(--font-mono); font-weight: 700;" id="lblMoodHeading">
+            RandeSolar Tagebuch • Live-Gefühlslage
+          </div>
+          <div id="liveMoodText" style="font-size: 0.88rem; line-height: 1.45; color: var(--text-color); margin-top: 3px; font-style: italic;">
+            »Hier im RandeLab ist es mucksmäuschenstill und meine Solarzellen schlafen tief und fest (0W). Mein 12V-Akku fühlt sich mit gemächlichen 12.5V pudelwohl...«
+          </div>
+        </div>
       </div>
-      <div style="display:flex; align-items:center; gap:8px;">
+      <div style="display:flex; align-items:center; gap:8px; font-size:0.75rem; font-family:var(--font-mono);">
         <label for="endpointInput">Lab-IP:</label>
-        <input type="text" id="endpointInput" value="http://randesolar.local" style="background:var(--input-bg); color:var(--text-color); border:1px solid var(--border); padding:3px 8px; border-radius:4px; font-size:0.75rem; width:170px;">
+        <input type="text" id="endpointInput" value="http://randesolar.local" style="background:var(--input-bg); color:var(--text-color); border:1px solid var(--border); padding:3px 8px; border-radius:4px; font-size:0.75rem; width:150px;">
         <button class="btn btn-sm" onclick="connectToCustomEndpoint()">Verbinden</button>
       </div>
     </div>

@@ -223,6 +223,7 @@ let currentLang = "de";
 let peakWattsToday = 0;
 let minVoltsToday = 999;
 let maxVoltsToday = 0;
+let lastTelemetryData = null;
 
 function updateDerivedStats(power, volt) {
   if (power !== undefined && power > peakWattsToday) {
@@ -234,6 +235,43 @@ function updateDerivedStats(power, volt) {
     if (volt > maxVoltsToday) maxVoltsToday = volt;
     if (el.batteryMinMax && minVoltsToday < 900) {
       el.batteryMinMax.textContent = `${minVoltsToday.toFixed(2)} / ${maxVoltsToday.toFixed(2)} V`;
+    }
+  }
+}
+
+function getHumanMoodText(data, lang = 'de') {
+  if (!data) return '';
+  const w = Number(data.solar_power || 0);
+  const v = Number(data.battery_voltage || 0);
+  const kwh = Number(data.yield_today_wh || 0) / 1000.0;
+  const a = Number(data.battery_charging_current || data.battery_current || 0);
+  const load = Number(data.external_load || 0);
+  const state = Number(data.charge_state || 0);
+
+  if (lang === 'de') {
+    if (w === 0) {
+      if (v >= 12.45) {
+        return `»Entspannter Feierabend im RandeLab! 🌙 Meine Solarzellen schlafen tief und fest (0 W). Mein Akkumulator fühlt sich mit gemächlichen ${v.toFixed(2)} V pudelwohl – kein Stress, keine Hektik. Heute durfte ich ${kwh.toFixed(2)} kWh Sonnenlicht einfangen. Ich träume schon von der Morgensonne!«`;
+      } else {
+        return `»Puh, ganz schön geschlaucht... 🥱 Es ist finster draussen (0 W) und meine Batterie hat heute einiges leisten müssen (nur noch ${v.toFixed(2)} V). Meine Kondensatoren sehnen sich nach neuer Energie bei Sonnenaufgang!«`;
+      }
+    } else if (w >= 30) {
+      return `»Boah, mir ist herrlich warm! ☀️🔥 Die Sonne knallt gerade mit satten ${w} Watt auf mein Panel! Mein MPPT jagt den maximalen Arbeitspunkt und schaufelt fleissig ${a.toFixed(1)} A in den Akku (${v.toFixed(2)} V). So macht das mechatronische Leben Spass!«`;
+    } else {
+      return `»Gemütliches Schaffen im Halbschatten ⛅ Ein paar schüchterne Sonnenstrahlen schaffen es durch die Wolken (${w} W). Bei ${v.toFixed(2)} V nuckelt die Batterie entspannt an ${a.toFixed(1)} A. Bisher sind ${kwh.toFixed(2)} kWh im Kasten!«`;
+    }
+  } else {
+    // English
+    if (w === 0) {
+      if (v >= 12.45) {
+        return `»Peaceful night at RandeLab! 🌙 Solar cells are sleeping deeply (0 W). My battery pack is cruising comfortably at ${v.toFixed(2)} V – zero stress. Gathered ${kwh.toFixed(2)} kWh of sunlight today. Dreaming of morning photons!«`;
+      } else {
+        return `»Phew, feeling a bit drained... 🥱 It's dark outside (0 W) and my battery had a heavy day (${v.toFixed(2)} V). Resting quietly until tomorrow's sunrise brings fresh energy!«`;
+      }
+    } else if (w >= 30) {
+      return `»Blissfully warm! ☀️🔥 Sun is pounding with a solid ${w} Watts on my panels! MPPT is tracking the sweet spot and pushing ${a.toFixed(1)} A into storage (${v.toFixed(2)} V). Pure solar joy!«`;
+    } else {
+      return `»Cruising gently in the overcast shade ⛅ Catching stray photons through the clouds (${w} W). Battery is sipping ${a.toFixed(1)} A at ${v.toFixed(2)} V. ${kwh.toFixed(2)} kWh harvested so far!«`;
     }
   }
 }
@@ -266,6 +304,16 @@ window.setTheme = function(theme) {
   if (el.lblPeak && l.peak) el.lblPeak.textContent = l.peak;
   if (el.lblYesterday && l.yesterday) el.lblYesterday.textContent = l.yesterday;
   if (el.lblMinMax && l.minMax) el.lblMinMax.textContent = l.minMax;
+
+  // Mood Heading & Live Text
+  const headingEl = document.getElementById('lblMoodHeading');
+  if (headingEl) {
+    headingEl.textContent = currentLang === 'de' ? 'RandeSolar Tagebuch • Live-Gefühlslage' : 'RandeSolar Diary • Live Feelings';
+  }
+  const moodEl = document.getElementById('liveMoodText');
+  if (moodEl && lastTelemetryData) {
+    moodEl.textContent = getHumanMoodText(lastTelemetryData, currentLang);
+  }
 
   // LED Legend translation
   const ledTitle = document.getElementById("lblLedTitle");
@@ -551,7 +599,13 @@ function updateDashboard(data) {
     el.statusText.textContent = `Live: ${data.ip}`;
   }
 
+  lastTelemetryData = data;
   updateDerivedStats(solarW, v);
+
+  const moodEl = document.getElementById('liveMoodText');
+  if (moodEl) {
+    moodEl.textContent = getHumanMoodText(data, currentLang);
+  }
 
   setOnlineStatus(true);
 }
