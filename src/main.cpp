@@ -624,6 +624,60 @@ void sendTelegramMessage(const String& text, const char* targetChatId = TELEGRAM
     }
 }
 
+String generateHumanMoodReport(const SolarData& d) {
+    if (!d.has_data) {
+        return "🤖 *Ich fühle mich noch etwas einsam...* 📡\nIch suche gerade im Äther nach dem Bluetooth-Signal meines Victron MPPT 75|15. Sobald die ersten Funkpakete eintreffen, erzähle ich dir, wie es mir geht!";
+    }
+
+    float v = d.battery_voltage;
+    uint16_t w = d.solar_power;
+    float kwh = d.yield_today_wh / 1000.0f;
+    float a = d.battery_current;
+    float load = d.external_load;
+
+    String story = "🤖 *RandeSolar Tagebuch • Wie ich mich fühle* 💬\n━━━━━━━━━━━━━━━━━━━━\n";
+
+    if (w == 0) {
+        // Night / Evening / Dark
+        if (v >= 12.45f) {
+            story += "🌙 *Entspannter Feierabend!*\n";
+            story += "Hier im RandeLab ist es mucksmäuschenstill und meine Solarzellen schlafen tief und fest (0 W). ";
+            story += "Mein 12V-Akkumulator fühlt sich mit gemächlichen *" + String(v, 2) + " V* pudelwohl – kein Stress, keine Hektik. ";
+            if (kwh > 0.05f) {
+                story += "Heute durfte ich insgesamt *" + String(kwh, 2) + " kWh* Sonnenlicht einsammeln. ";
+            }
+            story += "Meine Platine kühlt ab und ich träume friedlich von den ersten Photonen der Morgensonne. 😴✨";
+        } else {
+            story += "🥱 *Puh, ganz schön geschlaucht...*\n";
+            story += "Es ist stockdunkel (0 W) und meine Batterie hat heute einiges einstecken müssen – steht gerade bei *" + String(v, 2) + " V*. ";
+            story += "Meine Kondensatoren sehnen sich nach neuer Energie. Lass mich etwas verschnaufen, morgen früh gibt's hoffentlich wieder Sonne! 🔋";
+        }
+    } else if (w >= 30) {
+        // High Solar Power
+        story += "☀️🔥 *Mir ist herrlich warm!*\n";
+        story += "Die Sonne knallt gerade mit satten *" + String(w) + " Watt* auf mein Panel! ";
+        story += "Mein Victron MPPT jagt den maximalen Arbeitspunkt und schaufelt fleissig *" + String(a, 1) + " A* pure Naturkraft in den Akku (*" + String(v, 2) + " V*). ";
+        story += "Heute haben wir schon *" + String(kwh, 2) + " kWh* im Kasten. So macht das mechatronische Leben Spass! 😎⚡";
+    } else {
+        // Moderate / Cloudy
+        story += "⛅ *Gemütliches Schaffen im Halbschatten*\n";
+        story += "Ein paar schüchterne Sonnenstrahlen schaffen es durch die Wolkendecke – gerade ernte ich *" + String(w) + " Watt*. ";
+        story += "Aber Kleinvieh macht auch Mist: Bei *" + String(v, 2) + " V* nuckelt die Batterie entspannt an *" + String(a, 1) + " A*. ";
+        story += "Tagesausbeute bisher: *" + String(kwh, 2) + " kWh*. Ich bleibe wachsam am Netz! 🧐";
+    }
+
+    if (d.charge_state == 5) {
+        story += "\n\n🔋 *Status:* Der Speicher ist randvoll (Float)! Ich chille im grünen NeoPixel-Licht.";
+    }
+
+    if (load > 0.1f) {
+        story += "\n💡 *Übrigens:* Am Lastanschluss saugt gerade jemand *" + String(load, 1) + " A* ab – schön, dass der Strom fliesst!";
+    }
+
+    story += "\n━━━━━━━━━━━━━━━━━━━━\n📍 _Direkt aus dem ESP32-S3 Silizium-Gehirn_";
+    return story;
+}
+
 void checkTelegramUpdates() {
     if (WiFi.status() != WL_CONNECTED) return;
 
@@ -704,14 +758,23 @@ void checkTelegramUpdates() {
                                 ageSec
                             );
                             sendTelegramMessage(msg, fromChatId.c_str());
+                        } else if (cmd.startsWith("/mood") || cmd.startsWith("/feel") || cmd.startsWith("/wiegehts") || cmd.startsWith("/story") || cmd.startsWith("/tagebuch")) {
+                            SolarData d;
+                            portENTER_CRITICAL(&g_mux);
+                            d = g_data;
+                            portEXIT_CRITICAL(&g_mux);
+
+                            String moodMsg = generateHumanMoodReport(d);
+                            sendTelegramMessage(moodMsg, fromChatId.c_str());
                         } else if (cmd.startsWith("/ping")) {
                             sendTelegramMessage("🏓 *Pong!* RandeSolar ESP32-S3 ist online und empfängt Bluetooth-Telemetrie.", fromChatId.c_str());
                         } else if (cmd.startsWith("/start") || cmd.startsWith("/help") || cmd.startsWith("/hilfe")) {
                             sendTelegramMessage(
                                 "☀️ *Willkommen beim RandeSolar Bot!* ⚡\n\n"
                                 "Verfügbare Befehle:\n"
-                                "• /status - Aktuelle Solar- & Akkudaten abrufen\n"
-                                "• /ping - Verbindungsstatus prüfen\n\n"
+                                "• /status - Technische Zahlen & Messwerte\n"
+                                "• /mood - Wie ich mich heute fühle (Tagebuch) 💬\n"
+                                "• /ping - Verbindungsstatus prüfen 🏓\n\n"
                                 "🌐 Live-Dashboard: https://randelab.github.io/RandeSolar/",
                                 fromChatId.c_str()
                             );
