@@ -46,8 +46,14 @@ static const uint16_t VICTRON_MFG_ID = 0x02E1;
 #define RGB_BUILTIN 48
 #endif
 
+static uint32_t g_lastTxFlashMs = 0;
+
 void setPixel(uint8_t r, uint8_t g, uint8_t b) {
     neopixelWrite(RGB_BUILTIN, r, g, b);
+}
+
+void triggerTxFlash() {
+    g_lastTxFlashMs = millis();
 }
 
 void updateNeoPixel();
@@ -496,6 +502,12 @@ void reconnectMQTT() {
 void updateNeoPixel() {
     uint32_t now = millis();
 
+    // Subtle 40ms heartbeat wink when an MQTT packet is transmitted (every 5s)
+    if (now - g_lastTxFlashMs < 40) {
+        setPixel(0, 40, 40); // Soft Cyan TX pip
+        return;
+    }
+
     if (WiFi.status() != WL_CONNECTED) {
         // Calm solid dim red when Wi-Fi offline or connecting
         setPixel(10, 0, 0);
@@ -638,6 +650,7 @@ void loop() {
                 WiFi.RSSI()
             );
             mqttClient.publish(MQTT_TOPIC, json);
+            triggerTxFlash();
             Serial.printf("[MQTT 📡] Published to %s: %s\n", MQTT_TOPIC, json);
         }
     }
