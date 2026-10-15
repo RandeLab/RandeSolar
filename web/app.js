@@ -3,7 +3,8 @@ let solarChartInstance = null;
 let chargeChartInstance = null;
 let lastChartAppendTime = 0;
 const CHART_THROTTLE_MS = 4000; // Update charts every 4-5 seconds for calm reading
-let currentLimit = 50;
+let currentLimit = 240; // Default 1 hour of history
+let currentHours = 1;
 let lastBeaconTime = null;
 const urlParams = new URLSearchParams(window.location.search);
 let currentTheme = urlParams.get('theme') || 'pinkograph'; // Start default with Pinkograph theme
@@ -621,9 +622,15 @@ setInterval(() => {
 const SUPABASE_URL = "https://pakfuetvwpffwfrrxshz.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBha2Z1ZXR2d3BmZndmcnJ4c2h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwODkwNjIsImV4cCI6MjEwNzY2NTA2Mn0.J4HDEP28BF0fRkmfYqeeaM1urn29lYNUz9k4kQjXWhU";
 
-async function loadSupabaseHistory(limit = 50) {
+async function loadSupabaseHistory(limit = 240, hours = 1) {
   try {
-    const url = `${SUPABASE_URL}/rest/v1/solar_telemetry?select=*&order=created_at.desc&limit=${limit}`;
+    currentHours = hours || 1;
+    let url = `${SUPABASE_URL}/rest/v1/solar_telemetry?select=*&order=created_at.desc&limit=${limit}`;
+    if (hours && hours > 0) {
+      const since = new Date(Date.now() - hours * 3600 * 1000).toISOString();
+      url = `${SUPABASE_URL}/rest/v1/solar_telemetry?select=*&created_at=gte.${since}&order=created_at.desc&limit=${limit}`;
+    }
+
     const res = await fetch(url, {
       headers: {
         'apikey': SUPABASE_KEY,
@@ -652,7 +659,9 @@ async function loadSupabaseHistory(limit = 50) {
 
     rows.forEach(item => {
       const d = new Date(item.created_at);
-      const timeLabel = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      const timeLabel = (currentHours >= 6)
+        ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
       if (solarChartInstance) {
         solarChartInstance.data.labels.push(timeLabel);
@@ -676,19 +685,20 @@ async function loadSupabaseHistory(limit = 50) {
       isDemoMode = false;
       updateDashboard(latest);
     }
-    console.log(`[Supabase ⚡] Loaded ${rows.length} historical points!`);
+    console.log(`[Supabase ⚡] Loaded ${rows.length} historical points for ${currentHours}h!`);
   } catch (err) {
     console.warn('[Supabase] History fetch warning:', err);
   }
 }
 
-// Setup Timeframe selector buttons
+// Setup Timeframe selector buttons (1h, 3h, 6h, 12h, 24h)
 document.querySelectorAll('#timeframeSelector button').forEach(btn => {
   btn.addEventListener('click', (e) => {
     document.querySelectorAll('#timeframeSelector button').forEach(b => b.classList.remove('active'));
     e.target.classList.add('active');
-    currentLimit = parseInt(e.target.dataset.limit, 10);
-    loadSupabaseHistory(currentLimit);
+    currentLimit = parseInt(e.target.dataset.limit || '240', 10);
+    const hours = parseFloat(e.target.dataset.hours || '1');
+    loadSupabaseHistory(currentLimit, hours);
   });
 });
 
@@ -757,8 +767,8 @@ window.addEventListener('DOMContentLoaded', () => {
   initChart();
   window.setTheme(currentTheme);
 
-  // Load cloud history from Supabase
-  loadSupabaseHistory(currentLimit);
+  // Load cloud history from Supabase (default 1h)
+  loadSupabaseHistory(currentLimit, 1);
 
   // Connect to live MQTT stream from HiveMQ
   initMQTT();

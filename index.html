@@ -179,9 +179,11 @@
         <div class="chart-header-row">
           <h2 id="lblChartTitle1">☀️ Solarmodul (W) & Batteriespeicher (V)</h2>
           <div class="btn-group" id="timeframeSelector">
-            <button class="btn btn-sm active" data-limit="50">50 pts</button>
-            <button class="btn btn-sm" data-limit="150">150 pts</button>
-            <button class="btn btn-sm" data-limit="500">500 pts</button>
+            <button class="btn btn-sm active" data-hours="1" data-limit="240">1h</button>
+            <button class="btn btn-sm" data-hours="3" data-limit="720">3h</button>
+            <button class="btn btn-sm" data-hours="6" data-limit="1000">6h</button>
+            <button class="btn btn-sm" data-hours="12" data-limit="1000">12h</button>
+            <button class="btn btn-sm" data-hours="24" data-limit="1000">24h</button>
           </div>
         </div>
         <div class="chart-canvas-wrap">
@@ -231,6 +233,6 @@
     </footer>
   </div>
 
-  <script src="./web/app.js?v=2.4"></script>
+  <script src="./web/app.js?v=2.5"></script>
 </body>
 </html>
