@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RandeSolar • openBrushograph Studio</title>
+  <meta name="description" content="Geil ich gseh was lauft! Im Solarologie Panel • Victron MPPT 75|15 Bluetooth Telemetry Monitor">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="RandeSolar • openBrushograph Studio">
+  <meta property="og:description" content="Geil ich gseh was lauft! Im Solarologie Panel • Victron MPPT 75|15 BLE Monitor">
+  <meta property="og:type" content="website">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&family=Noto+Sans+Kannada:wght@400;700&family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="./web/style.css">
+</head>
+<body class="theme-pinkograph">
+  <div class="studio-wrapper">
+    <!-- Header Container -->
+    <header class="header-container">
+      <div class="brand-left">
+        <a href="https://github.com/RandeLab/RandeSolar" target="_blank" title="RandeLab/RandeSolar on GitHub">
+          <img src="./web/arai-icon.svg" alt="Arai Logo" class="logo-img" id="dynamic-logo">
+        </a>
+        <div class="title-group">
+          <h1 id="main-title">RandeSolar Studio</h1>
+          <div class="badge-sub-row">
+            <span class="sub-chip">VICTRON MPPT 75|15</span>
+            <span class="sub-chip" style="color:var(--accent-yellow)">Solarologie Panel</span>
+            <span class="sub-chip" id="deviceModel">BLE TELEMETRY</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <!-- Studio Theme Selector -->
+        <div class="theme-select-wrap">
+          <label for="theme-selector" id="lblTheme">STIL:</label>
+          <select id="theme-selector" autocomplete="off" onchange="setTheme(this.value)">
+            <option value="pinkograph" selected>Pinkograph</option>
+            <option value="randen">Randen</option>
+            <option value="dresden-dark">Kongreß Dresden (Nacht) 🇩🇪</option>
+            <option value="dresden">Kongreß Dresden (Altpapier) 🇩🇪</option>
+            <option value="tropical">Deep Jungle Dark</option>
+            <option value="coconut">Coconut Phosphor</option>
+            <option value="bengaluru">Bengaluru Fair</option>
+            <option value="uwu">UwU Pink</option>
+            <option value="light">Arai-eek Light</option>
+          </select>
+        </div>
+
+        <!-- Connection Source Pill -->
+        <div class="status-indicator" id="connectionStatus" title="Status">
+          <span class="dot"></span>
+          <span class="status-text" id="statusText">Verbinde...</span>
+        </div>
+
+        <a href="https://github.com/RandeLab/RandeSolar" target="_blank" class="btn" style="gap:6px;">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+          </svg>
+          GitHub
+        </a>
+      </div>
+    </header>
+
+    <!-- Lab Connection Bar / Easter Egg Banner -->
+    <div style="background:var(--panel-bg); border:1px solid var(--border); border-radius:var(--border-radius); padding:8px 16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; font-size:0.8rem; font-family:var(--font-mono);">
+      <div>
+        <span style="color:var(--accent-yellow)">⚡ »Geil ich gseh was lauft! Im Solarologie Panel«</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <label for="endpointInput">Lab-IP:</label>
+        <input type="text" id="endpointInput" value="http://randesolar.local" style="background:var(--input-bg); color:var(--text-color); border:1px solid var(--border); padding:3px 8px; border-radius:4px; font-size:0.75rem; width:170px;">
+        <button class="btn btn-sm" onclick="connectToCustomEndpoint()">Verbinden</button>
+      </div>
+    </div>
+
+    <!-- Main Grid of Panels -->
+    <main class="studio-layout">
+      <!-- Panel 1: Solar Array -->
+      <section class="panel panel-solar">
+        <h2 id="lblPanelSolar">Solarmodul (Photovoltaik)</h2>
+        <div class="panel-body">
+          <div class="metric-row">
+            <span class="metric-val" id="solarPower">0</span>
+            <span class="metric-unit">W</span>
+          </div>
+          <div class="metric-details">
+            <div class="detail-col">
+              <span class="detail-label" id="lblYield">Tagesertrag</span>
+              <span class="detail-val" id="yieldToday">0.00 kWh</span>
+            </div>
+            <div class="detail-col align-right">
+              <span class="detail-label">Status</span>
+              <span class="detail-val val-green" id="pvStatus">Online</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel 2: Battery Storage -->
+      <section class="panel panel-battery">
+        <h2 id="lblPanelBattery">Batteriespeicher (12V)</h2>
+        <div class="panel-body">
+          <div class="metric-row">
+            <span class="metric-val" id="batteryVoltage">0.00</span>
+            <span class="metric-unit">V</span>
+          </div>
+          <div class="gauge-wrap">
+            <div class="gauge-fill" id="batteryBar" style="width: 50%;"></div>
+          </div>
+          <div class="metric-details">
+            <div class="detail-col">
+              <span class="detail-label" id="lblSoc">Ladezustand</span>
+              <span class="detail-val" id="estSoc">-- %</span>
+            </div>
+            <div class="detail-col align-right">
+              <span class="detail-label">Akkutyp</span>
+              <span class="detail-val">12V Storage</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel 3: Charge Flow -->
+      <section class="panel panel-current">
+        <h2 id="lblPanelCurrent">Ladestrom & Fluß</h2>
+        <div class="panel-body">
+          <div class="metric-row">
+            <span class="metric-val" id="batteryCurrent">0.0</span>
+            <span class="metric-unit">A</span>
+          </div>
+          <div class="metric-details">
+            <div class="detail-col">
+              <span class="detail-label" id="lblFlow">Leistung</span>
+              <span class="detail-val" id="batteryPowerFlow">0.0 W</span>
+            </div>
+            <div class="detail-col align-right">
+              <span class="detail-label">Richtung</span>
+              <span class="detail-val val-blue">Zum Akku</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel 4: Controller State -->
+      <section class="panel panel-state">
+        <h2 id="lblPanelState">Regler-Zustand</h2>
+        <div class="panel-body">
+          <div class="state-pill-wrap">
+            <span class="state-pill" id="chargeStatePill">OFF</span>
+          </div>
+          <div class="metric-details">
+            <div class="detail-col">
+              <span class="detail-label" id="lblLoad">Lastanschluß</span>
+              <span class="detail-val" id="externalLoad">0.0 A</span>
+            </div>
+            <div class="detail-col align-right">
+              <span class="detail-label">Diagnose</span>
+              <span class="detail-val" id="errorBadge">Normal</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Chart Panel -->
+    <section class="panel panel-chart">
+      <div class="chart-header-row">
+        <h2 id="lblChartTitle">Echtzeit-Telemetrie</h2>
+        <div class="btn-group" id="timeframeSelector">
+          <button class="btn btn-sm active" data-limit="50">50 pts</button>
+          <button class="btn btn-sm" data-limit="150">150 pts</button>
+          <button class="btn btn-sm" data-limit="500">500 pts</button>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap">
+        <canvas id="solarChart"></canvas>
+      </div>
+    </section>
+
+    <!-- Architecture & Documentation Section -->
+    <section class="panel" style="border-top-color:var(--accent-green); margin-top:10px;">
+      <h2>Hardware & Mechatronik Übersicht</h2>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px; font-size:0.85rem; line-height:1.6; margin-top:10px;">
+        <div>
+          <h3 style="color:var(--accent-pink); margin-bottom:6px;">⚡ Victron MPPT 75 | 15</h3>
+          <p>Liest verschlüsselte <b>Instant Readout</b> BLE-Advertisements (Hersteller-ID <code>0x02E1</code>) ohne Bluetooth-Kopplung. Keine Blockierung der offiziellen VictronConnect App.</p>
+        </div>
+        <div>
+          <h3 style="color:var(--accent-blue); margin-bottom:6px;">📡 ESP32-S3 Standalone Station</h3>
+          <p>Autonomer ESP32-S3 im RandeLab-WLAN. Hardware-AES-128-CTR Entschlüsselung, integrierter Webserver auf Port 80 und mDNS-Erkennung unter <code>http://randesolar.local</code>.</p>
+        </div>
+        <div>
+          <h3 style="color:var(--accent-yellow); margin-bottom:6px;">🎨 openBrushograph Ästhetik</h3>
+          <p>Entwickelt im unverwechselbaren Stil der openBrushograph Studio Apps mit 8 umschaltbaren Farbschemata (Pinkograph, Randen, Kongreß Dresden, Deep Jungle, Coconut).</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Diagnostics Footer Strip -->
+    <footer class="panel panel-footer">
+      <div class="footer-strip">
+        <span><b>GERÄT:</b> <span class="font-mono" id="diagMac">cb:06:61:60:5a:c2</span></span>
+        <span><b>CHIPHER:</b> AES-128-CTR</span>
+        <span><b>TELEGRAMM:</b> <span id="lastSeenTimer">Live</span></span>
+        <span><b>RSSI:</b> <span class="font-mono" id="rssiValue">-76 dBm</span></span>
+        <span><b>QUELLE:</b> <span id="diagSource">Live Lab</span></span>
+      </div>
+    </footer>
+  </div>
+
+  <script src="./web/app.js"></script>
+</body>
+</html>

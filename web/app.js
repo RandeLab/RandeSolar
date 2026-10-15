@@ -3,6 +3,10 @@ let chartInstance = null;
 let currentLimit = 50;
 let lastBeaconTime = null;
 let currentTheme = localStorage.getItem('openbrushograph-studio-theme') || 'pinkograph';
+let activeEndpoint = localStorage.getItem('randesolar-endpoint') || 'http://randesolar.local';
+let isDemoMode = false;
+let simSolarWatts = 0;
+let simBattVolts = 12.72;
 
 // DOM Elements
 const el = {
@@ -17,12 +21,25 @@ const el = {
   errorBadge: document.getElementById('errorBadge'),
   externalLoad: document.getElementById('externalLoad'),
   connectionStatus: document.getElementById('connectionStatus'),
+  statusText: document.getElementById('statusText'),
   rssiValue: document.getElementById('rssiValue'),
   deviceModel: document.getElementById('deviceModel'),
   lastSeenTimer: document.getElementById('lastSeenTimer'),
   diagMac: document.getElementById('diagMac'),
-  diagTotalRecords: document.getElementById('diagTotalRecords'),
+  diagSource: document.getElementById('diagSource'),
   themeSelector: document.getElementById('theme-selector'),
+  endpointInput: document.getElementById('endpointInput'),
+  lblTitle: document.getElementById('main-title'),
+  lblTheme: document.getElementById('lblTheme'),
+  lblPanelSolar: document.getElementById('lblPanelSolar'),
+  lblYield: document.getElementById('lblYield'),
+  lblPanelBattery: document.getElementById('lblPanelBattery'),
+  lblSoc: document.getElementById('lblSoc'),
+  lblPanelCurrent: document.getElementById('lblPanelCurrent'),
+  lblFlow: document.getElementById('lblFlow'),
+  lblPanelState: document.getElementById('lblPanelState'),
+  lblLoad: document.getElementById('lblLoad'),
+  lblChartTitle: document.getElementById('lblChartTitle'),
 };
 
 // Studio Theme Palettes for Chart.js
@@ -45,6 +62,24 @@ const studioThemePalettes = {
     grid: 'rgba(92, 75, 58, 0.2)',
     text: '#7A6A58'
   },
+  'dresden-dark': {
+    solar: '#ffffff',
+    solarFill: 'rgba(255, 255, 255, 0.2)',
+    volt: '#dddddd',
+    voltFill: 'rgba(221, 221, 221, 0.1)',
+    curr: '#aaaaaa',
+    grid: 'rgba(102, 102, 102, 0.25)',
+    text: '#aaaaaa'
+  },
+  dresden: {
+    solar: '#1a1a1a',
+    solarFill: 'rgba(26, 26, 26, 0.15)',
+    volt: '#4f4f4f',
+    voltFill: 'rgba(79, 79, 79, 0.1)',
+    curr: '#2b2b2b',
+    grid: 'rgba(140, 136, 126, 0.25)',
+    text: '#5a574f'
+  },
   tropical: {
     solar: '#facc15',
     solarFill: 'rgba(250, 204, 21, 0.2)',
@@ -62,15 +97,6 @@ const studioThemePalettes = {
     curr: '#33FF66',
     grid: 'rgba(31, 107, 60, 0.25)',
     text: '#2E9455'
-  },
-  'dresden-dark': {
-    solar: '#ffffff',
-    solarFill: 'rgba(255, 255, 255, 0.2)',
-    volt: '#dddddd',
-    voltFill: 'rgba(221, 221, 221, 0.1)',
-    curr: '#aaaaaa',
-    grid: 'rgba(102, 102, 102, 0.25)',
-    text: '#aaaaaa'
   },
   bengaluru: {
     solar: '#fca311',
@@ -101,6 +127,40 @@ const studioThemePalettes = {
   }
 };
 
+// Language Dictionary (English & German)
+const i18n = {
+  de: {
+    title: "RandeSolar Kraftwerk",
+    theme: "STIL:",
+    panelSolar: "Solarmodul (Photovoltaik)",
+    yield: "Tagesertrag",
+    panelBattery: "Batteriespeicher (12V)",
+    soc: "Ladezustand",
+    panelCurrent: "Ladestrom & Fluß",
+    flow: "Leistung",
+    panelState: "Regler-Zustand",
+    load: "Lastanschluß",
+    chartTitle: "Echtzeit-Telemetrie",
+    states: { 0: "AUS", 2: "FEHLER", 3: "HAUPTLADUNG", 4: "NACHLADUNG", 5: "ERHALTUNG", 252: "EXT. STEUERUNG" }
+  },
+  en: {
+    title: "RandeSolar Studio",
+    theme: "THEME:",
+    panelSolar: "Solar Array (PV)",
+    yield: "Yield Today",
+    panelBattery: "Storage Pack (12V)",
+    soc: "Est. SOC",
+    panelCurrent: "Charge Flow",
+    flow: "Pack Flow",
+    panelState: "Controller State",
+    load: "Load Port",
+    chartTitle: "Live Power Stream",
+    states: { 0: "OFF", 2: "FAULT", 3: "BULK", 4: "ABSORPTION", 5: "FLOAT", 252: "EXT CONTROL" }
+  }
+};
+
+let currentLang = "de";
+
 // Function called by theme selector dropdown
 window.setTheme = function(theme) {
   currentTheme = theme;
@@ -110,6 +170,21 @@ window.setTheme = function(theme) {
   if (el.themeSelector) {
     el.themeSelector.value = theme;
   }
+
+  // Language selection: Dresden and Randen are German!
+  currentLang = (theme.startsWith('dresden') || theme === 'randen') ? 'de' : 'en';
+  const l = i18n[currentLang];
+  if (el.lblTitle) el.lblTitle.textContent = l.title;
+  if (el.lblTheme) el.lblTheme.textContent = l.theme;
+  if (el.lblPanelSolar) el.lblPanelSolar.textContent = l.panelSolar;
+  if (el.lblYield) el.lblYield.textContent = l.yield;
+  if (el.lblPanelBattery) el.lblPanelBattery.textContent = l.panelBattery;
+  if (el.lblSoc) el.lblSoc.textContent = l.soc;
+  if (el.lblPanelCurrent) el.lblPanelCurrent.textContent = l.panelCurrent;
+  if (el.lblFlow) el.lblFlow.textContent = l.flow;
+  if (el.lblPanelState) el.lblPanelState.textContent = l.panelState;
+  if (el.lblLoad) el.lblLoad.textContent = l.load;
+  if (el.lblChartTitle) el.lblChartTitle.textContent = l.chartTitle;
 
   // Update Chart colors
   if (chartInstance) {
@@ -131,9 +206,19 @@ window.setTheme = function(theme) {
   }
 };
 
+window.connectToCustomEndpoint = function() {
+  if (el.endpointInput) {
+    activeEndpoint = el.endpointInput.value.trim().replace(/\/$/, '');
+    localStorage.setItem('randesolar-endpoint', activeEndpoint);
+    fetchLiveTelemetry();
+  }
+};
+
 // Initialize Chart
 function initChart() {
-  const ctx = document.getElementById('solarChart').getContext('2d');
+  const canvas = document.getElementById('solarChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
   const pal = studioThemePalettes[currentTheme] || studioThemePalettes.pinkograph;
 
   chartInstance = new Chart(ctx, {
@@ -243,73 +328,75 @@ function updateDashboard(data) {
 
   lastBeaconTime = Date.now();
 
-  // Solar Values
   const solarW = Number(data.solar_power || 0);
-  el.solarPower.textContent = solarW.toFixed(0);
+  if (el.solarPower) el.solarPower.textContent = solarW.toFixed(0);
 
-  const yieldWh = Number(data.yield_today || 0);
-  el.yieldToday.textContent = (yieldWh / 1000).toFixed(2) + ' kWh';
+  const yieldWh = Number(data.yield_today_wh || data.yield_today || 0);
+  if (el.yieldToday) el.yieldToday.textContent = (yieldWh / 1000).toFixed(2) + ' kWh';
 
-  // Battery Values
   const v = Number(data.battery_voltage || 0);
-  el.batteryVoltage.textContent = v.toFixed(2);
+  if (el.batteryVoltage) el.batteryVoltage.textContent = v.toFixed(2);
 
-  let soc = Math.round(Math.min(100, Math.max(0, ((v - 11.8) / (12.8 - 11.8)) * 100)));
-  el.batteryBar.style.width = soc + '%';
-  el.estSoc.textContent = `${soc}% (~12V)`;
+  let soc = Math.round(Math.min(100, Math.max(0, ((v - 11.8) / 1.0) * 100)));
+  if (el.batteryBar) el.batteryBar.style.width = soc + '%';
+  if (el.estSoc) el.estSoc.textContent = `${soc}% (~12V)`;
 
-  // Current & Flow
-  const i = Number(data.battery_charging_current || 0);
-  el.batteryCurrent.textContent = i.toFixed(1);
+  const i = Number(data.battery_charging_current || data.battery_current || 0);
+  if (el.batteryCurrent) el.batteryCurrent.textContent = i.toFixed(1);
   const flowW = (v * i).toFixed(1);
-  el.batteryPowerFlow.textContent = `${flowW} W`;
+  if (el.batteryPowerFlow) el.batteryPowerFlow.textContent = `${flowW} W`;
 
-  // State pill
-  const state = (data.charge_state || 'off').toLowerCase();
-  el.chargeStatePill.textContent = state.toUpperCase();
-  el.chargeStatePill.className = `state-pill state-${state}`;
+  // State translation
+  const stateCode = data.charge_state || 0;
+  const stateMap = (i18n[currentLang] || i18n.de).states;
+  const stStr = stateMap[stateCode] || data.state_str || 'OFF';
+  if (el.chargeStatePill) {
+    el.chargeStatePill.textContent = stStr;
+    const rawClass = (data.state_str || 'off').toLowerCase();
+    el.chargeStatePill.className = `state-pill state-${rawClass}`;
+  }
 
   // Error Badge
   const err = data.charger_error || 'no_error';
-  el.errorBadge.textContent = err === 'no_error' ? 'Normal' : err.replace('_', ' ').toUpperCase();
-
-  // External load
-  if (data.external_device_load !== undefined && data.external_device_load !== null) {
-    el.externalLoad.textContent = Number(data.external_device_load).toFixed(1) + ' A';
+  if (el.errorBadge) {
+    el.errorBadge.textContent = (err === 'no_error' || err === 0) ? (currentLang === 'de' ? 'Normal' : 'Normal') : 'Fehler';
   }
 
-  // Signal & Info
-  if (data.rssi) {
-    el.rssiValue.textContent = `${data.rssi} dBm`;
+  if (data.external_load !== undefined && el.externalLoad) {
+    el.externalLoad.textContent = Number(data.external_load).toFixed(1) + ' A';
   }
-  if (data.model_name) {
-    el.deviceModel.textContent = `${data.model_name}`;
+
+  if (data.ble_rssi || data.rssi) {
+    const rssi = data.ble_rssi || data.rssi;
+    if (el.rssiValue) el.rssiValue.textContent = `${rssi} dBm`;
   }
-  if (data.address) {
-    el.diagMac.textContent = data.address;
+
+  if (data.ip && el.statusText) {
+    el.statusText.textContent = `Live: ${data.ip}`;
   }
 
   setOnlineStatus(true);
 }
 
 function setOnlineStatus(online) {
+  if (!el.connectionStatus) return;
   if (online) {
     el.connectionStatus.className = 'status-indicator';
-    el.connectionStatus.innerHTML = '<span class="dot"></span><span class="status-text">BLE Active</span>';
+    if (el.statusText && !isDemoMode) el.statusText.textContent = 'BLE Empfang';
   } else {
     el.connectionStatus.className = 'status-indicator offline';
-    el.connectionStatus.innerHTML = '<span class="dot"></span><span class="status-text">No Beacon</span>';
+    if (el.statusText) el.statusText.textContent = 'Kein Signal';
   }
 }
 
 function appendChartPoint(item) {
   if (!chartInstance) return;
-  const timeLabel = new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const timeLabel = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
   chartInstance.data.labels.push(timeLabel);
   chartInstance.data.datasets[0].data.push(item.solar_power || 0);
   chartInstance.data.datasets[1].data.push(item.battery_voltage || 0);
-  chartInstance.data.datasets[2].data.push(item.battery_charging_current || 0);
+  chartInstance.data.datasets[2].data.push(item.battery_charging_current || item.battery_current || 0);
 
   while (chartInstance.data.labels.length > currentLimit) {
     chartInstance.data.labels.shift();
@@ -321,86 +408,112 @@ function appendChartPoint(item) {
   chartInstance.update('none');
 }
 
-async function loadHistory(limit) {
-  try {
-    const res = await fetch(`/api/history?limit=${limit}`);
-    const data = await res.json();
-    if (!Array.isArray(data)) return;
+// Fetch live telemetry (try local API, custom endpoint, or demo mode)
+async function fetchLiveTelemetry() {
+  const endpointsToTry = [
+    '/api/live',                     // 1. Same-origin (when running on local server or ESP32)
+    `${activeEndpoint}/api/live`,     // 2. Custom lab endpoint (e.g. http://randesolar.local)
+    'http://192.168.1.101/api/live'  // 3. Known lab IP fallback
+  ];
 
-    el.diagTotalRecords.textContent = data.length;
-
-    if (chartInstance) {
-      chartInstance.data.labels = [];
-      chartInstance.data.datasets[0].data = [];
-      chartInstance.data.datasets[1].data = [];
-      chartInstance.data.datasets[2].data = [];
-
-      data.forEach(item => {
-        const timeLabel = new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        chartInstance.data.labels.push(timeLabel);
-        chartInstance.data.datasets[0].data.push(item.solar_power || 0);
-        chartInstance.data.datasets[1].data.push(item.battery_voltage || 0);
-        chartInstance.data.datasets[2].data.push(item.battery_charging_current || 0);
-      });
-      chartInstance.update();
-    }
-  } catch (err) {
-    console.error('Failed to load history:', err);
-  }
-}
-
-function connectSSE() {
-  const eventSource = new EventSource('/api/stream');
-
-  eventSource.onopen = () => {
-    setOnlineStatus(true);
-  };
-
-  eventSource.onmessage = (event) => {
+  for (const url of endpointsToTry) {
     try {
-      const data = JSON.parse(event.data);
-      updateDashboard(data);
-      appendChartPoint(data);
-    } catch (e) {
-      // Ping
-    }
-  };
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const res = await fetch(url, { signal: controller.signal, mode: 'cors' });
+      clearTimeout(timeoutId);
 
-  eventSource.onerror = () => {
-    setOnlineStatus(false);
-    eventSource.close();
-    setTimeout(connectSSE, 3000);
-  };
+      if (res.ok) {
+        const json = await res.json();
+        const payload = json.data || json;
+        if (payload.has_data !== false) {
+          isDemoMode = false;
+          if (el.diagSource) el.diagSource.textContent = url.includes('192.168') || url.includes('.local') ? 'ESP32 Lab' : 'Local Host';
+          updateDashboard(payload);
+          appendChartPoint(payload);
+          return;
+        }
+      }
+    } catch (e) {
+      // Continue to next endpoint
+    }
+  }
+
+  // If outside the lab network (e.g. visiting public GitHub Pages from elsewhere):
+  runSimulationStep();
 }
 
+// Live interactive simulation for public GitHub Pages visitors
+function runSimulationStep() {
+  isDemoMode = true;
+  if (el.diagSource) el.diagSource.textContent = 'Demo Mode (Sim)';
+  if (el.statusText) el.statusText.textContent = 'Demo Modus';
+
+  // Smooth realistic solar dynamics
+  const t = Date.now() / 10000;
+  simSolarWatts = Math.max(0, Math.round(35 + 20 * Math.sin(t) + (Math.random() * 4 - 2)));
+  const simCurrent = simSolarWatts > 0 ? (simSolarWatts / 13.2) : 0.0;
+  simBattVolts = Number((12.65 + (simSolarWatts > 10 ? 0.35 : 0.05) + Math.sin(t * 0.5) * 0.05).toFixed(2));
+
+  const demoData = {
+    has_data: true,
+    solar_power: simSolarWatts,
+    battery_voltage: simBattVolts,
+    battery_charging_current: Number(simCurrent.toFixed(1)),
+    yield_today_wh: 850 + Math.floor((Date.now() % 3600000) / 1000),
+    external_load: 0.2,
+    charge_state: simSolarWatts > 25 ? 3 : (simSolarWatts > 5 ? 4 : 5),
+    state_str: simSolarWatts > 25 ? 'BULK' : (simSolarWatts > 5 ? 'ABSORPTION' : 'FLOAT'),
+    charger_error: 0,
+    rssi: -72 + Math.floor(Math.random() * 6 - 3),
+  };
+
+  updateDashboard(demoData);
+  appendChartPoint(demoData);
+}
+
+// Timer tick
 setInterval(() => {
   if (!lastBeaconTime) {
-    el.lastSeenTimer.textContent = 'Waiting...';
+    if (el.lastSeenTimer) el.lastSeenTimer.textContent = 'Warte...';
     return;
   }
   const sec = Math.floor((Date.now() - lastBeaconTime) / 1000);
-  if (sec < 3) {
-    el.lastSeenTimer.textContent = 'Live';
-  } else if (sec < 60) {
-    el.lastSeenTimer.textContent = `${sec}s ago`;
-  } else {
-    el.lastSeenTimer.textContent = `${Math.floor(sec / 60)}m ago`;
-    setOnlineStatus(false);
+  if (el.lastSeenTimer) {
+    if (sec < 3) {
+      el.lastSeenTimer.textContent = currentLang === 'de' ? 'Live' : 'Live';
+    } else if (sec < 60) {
+      el.lastSeenTimer.textContent = `${sec}` + (currentLang === 'de' ? 's vor' : 's ago');
+    } else {
+      el.lastSeenTimer.textContent = `${Math.floor(sec / 60)}` + (currentLang === 'de' ? 'm vor' : 'm ago');
+    }
   }
 }, 1000);
 
+// Setup Timeframe selector buttons
 document.querySelectorAll('#timeframeSelector button').forEach(btn => {
   btn.addEventListener('click', (e) => {
     document.querySelectorAll('#timeframeSelector button').forEach(b => b.classList.remove('active'));
     e.target.classList.add('active');
     currentLimit = parseInt(e.target.dataset.limit, 10);
-    loadHistory(currentLimit);
   });
 });
 
+// Startup
 window.addEventListener('DOMContentLoaded', () => {
+  if (el.endpointInput) {
+    el.endpointInput.value = activeEndpoint;
+  }
+
   initChart();
   window.setTheme(currentTheme);
-  loadHistory(currentLimit);
-  connectSSE();
+
+  // Pre-seed chart with initial points for immediate beauty
+  for (let k = 0; k < 12; k++) {
+    runSimulationStep();
+  }
+
+  // Poll every 2 seconds
+  fetchLiveTelemetry();
+  setInterval(fetchLiveTelemetry, 2000);
 });
