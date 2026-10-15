@@ -46,6 +46,12 @@ const el = {
   lblLoad: document.getElementById('lblLoad'),
   lblChartTitle1: document.getElementById('lblChartTitle1'),
   lblChartTitle2: document.getElementById('lblChartTitle2'),
+  peakSolarPower: document.getElementById('peakSolarPower'),
+  yieldYesterday: document.getElementById('yieldYesterday'),
+  batteryMinMax: document.getElementById('batteryMinMax'),
+  lblPeak: document.getElementById('lblPeak'),
+  lblYesterday: document.getElementById('lblYesterday'),
+  lblMinMax: document.getElementById('lblMinMax'),
 };
 
 // Studio Theme Palettes for Chart.js
@@ -166,6 +172,9 @@ const i18n = {
     load: "Lastanschluß",
     chartTitle1: "Solarmodul (W) & Batteriespeicher (V)",
     chartTitle2: "Ladestrom & Laststrom (A)",
+    peak: "Spitze heute",
+    yesterday: "Gestern",
+    minMax: "Min / Max",
     states: { 0: "AUS", 2: "FEHLER", 3: "HAUPTLADUNG", 4: "NACHLADUNG", 5: "ERHALTUNG", 252: "EXT. STEUERUNG" },
     ledTitle: "💡 ESP32-S3 Status-LED (WS2812 Farbcodes)",
     ledSubtitle: "Die integrierte RGB-LED auf GPIO 48 zeigt den aktuellen Betriebszustand und die Funkübertragung in Echtzeit an:",
@@ -191,6 +200,9 @@ const i18n = {
     load: "Load Port",
     chartTitle1: "Solar Power (W) & Battery Voltage (V)",
     chartTitle2: "Charging & Load Current (A)",
+    peak: "Peak Today",
+    yesterday: "Yesterday",
+    minMax: "Min / Max",
     states: { 0: "OFF", 2: "FAULT", 3: "BULK", 4: "ABSORPTION", 5: "FLOAT", 252: "EXT CONTROL" },
     ledTitle: "💡 ESP32-S3 Status LED (WS2812 Color Codes)",
     ledSubtitle: "The onboard RGB LED on GPIO 48 displays real-time controller state and radio telemetry transmission:",
@@ -206,6 +218,25 @@ const i18n = {
 };
 
 let currentLang = "de";
+
+// Derived Statistics Trackers
+let peakWattsToday = 0;
+let minVoltsToday = 999;
+let maxVoltsToday = 0;
+
+function updateDerivedStats(power, volt) {
+  if (power !== undefined && power > peakWattsToday) {
+    peakWattsToday = power;
+    if (el.peakSolarPower) el.peakSolarPower.textContent = `${peakWattsToday} W`;
+  }
+  if (volt && volt > 5) {
+    if (volt < minVoltsToday) minVoltsToday = volt;
+    if (volt > maxVoltsToday) maxVoltsToday = volt;
+    if (el.batteryMinMax && minVoltsToday < 900) {
+      el.batteryMinMax.textContent = `${minVoltsToday.toFixed(2)} / ${maxVoltsToday.toFixed(2)} V`;
+    }
+  }
+}
 
 // Function called by theme selector dropdown
 window.setTheme = function(theme) {
@@ -232,6 +263,9 @@ window.setTheme = function(theme) {
   if (el.lblLoad) el.lblLoad.textContent = l.load;
   if (el.lblChartTitle1) el.lblChartTitle1.textContent = l.chartTitle1;
   if (el.lblChartTitle2) el.lblChartTitle2.textContent = l.chartTitle2;
+  if (el.lblPeak && l.peak) el.lblPeak.textContent = l.peak;
+  if (el.lblYesterday && l.yesterday) el.lblYesterday.textContent = l.yesterday;
+  if (el.lblMinMax && l.minMax) el.lblMinMax.textContent = l.minMax;
 
   // LED Legend translation
   const ledTitle = document.getElementById("lblLedTitle");
@@ -517,6 +551,8 @@ function updateDashboard(data) {
     el.statusText.textContent = `Live: ${data.ip}`;
   }
 
+  updateDerivedStats(solarW, v);
+
   setOnlineStatus(true);
 }
 
@@ -710,6 +746,10 @@ async function loadSupabaseHistory(limit = 240, hours = 1) {
         solarChartInstance.data.datasets[1].data.push(item.battery_voltage || 0);
       }
 
+      if (item.solar_power !== undefined && item.battery_voltage) {
+        updateDerivedStats(Number(item.solar_power), Number(item.battery_voltage));
+      }
+
       if (chargeChartInstance) {
         chargeChartInstance.data.labels.push(timeLabel);
         chargeChartInstance.data.datasets[0].data.push(item.battery_current || 0);
@@ -729,6 +769,26 @@ async function loadSupabaseHistory(limit = 240, hours = 1) {
     console.log(`[Supabase ⚡] Loaded ${rows.length} historical points for ${currentHours}h!`);
   } catch (err) {
     console.warn('[Supabase] History fetch warning:', err);
+  }
+}
+
+async function fetchYesterdayYield() {
+  try {
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+    const url = `${SUPABASE_URL}/rest/v1/solar_telemetry?select=yield_today_wh&created_at=lt.${todayStart.toISOString()}&order=created_at.desc&limit=1`;
+    const res = await fetch(url, { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` } });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.length > 0 && data[0].yield_today_wh) {
+        const kwh = (data[0].yield_today_wh / 1000).toFixed(2);
+        if (el.yieldYesterday) el.yieldYesterday.textContent = `${kwh} kWh`;
+      } else {
+        if (el.yieldYesterday) el.yieldYesterday.textContent = `0.00 kWh`;
+      }
+    }
+  } catch (e) {
+    console.warn("fetchYesterdayYield:", e);
   }
 }
 
@@ -810,6 +870,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Load cloud history from Supabase (default 1h)
   loadSupabaseHistory(currentLimit, 1);
+  fetchYesterdayYield();
 
   // Connect to live MQTT stream from HiveMQ
   initMQTT();

@@ -93,10 +93,18 @@
             <span class="metric-val" id="solarPower">0</span>
             <span class="metric-unit">W</span>
           </div>
-          <div class="metric-details">
+          <div class="metric-details" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
             <div class="detail-col">
               <span class="detail-label" id="lblYield">Tagesertrag</span>
               <span class="detail-val" id="yieldToday">0.00 kWh</span>
+            </div>
+            <div class="detail-col align-right">
+              <span class="detail-label" id="lblPeak">Spitze heute</span>
+              <span class="detail-val" style="color:var(--accent-yellow);" id="peakSolarPower">-- W</span>
+            </div>
+            <div class="detail-col">
+              <span class="detail-label" id="lblYesterday">Gestern</span>
+              <span class="detail-val" id="yieldYesterday">-- kWh</span>
             </div>
             <div class="detail-col align-right">
               <span class="detail-label">Status</span>
@@ -117,14 +125,22 @@
           <div class="gauge-wrap">
             <div class="gauge-fill" id="batteryBar" style="width: 50%;"></div>
           </div>
-          <div class="metric-details">
+          <div class="metric-details" style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
             <div class="detail-col">
               <span class="detail-label" id="lblSoc">Ladezustand</span>
               <span class="detail-val" id="estSoc">-- %</span>
             </div>
             <div class="detail-col align-right">
+              <span class="detail-label" id="lblMinMax">Min / Max</span>
+              <span class="detail-val val-blue" id="batteryMinMax">-- / -- V</span>
+            </div>
+            <div class="detail-col">
               <span class="detail-label">Akkutyp</span>
               <span class="detail-val">12V Storage</span>
+            </div>
+            <div class="detail-col align-right">
+              <span class="detail-label">Chemie</span>
+              <span class="detail-val">Bleisäure / AGM</span>
             </div>
           </div>
         </div>
@@ -315,6 +331,6 @@
     </footer>
   </div>
 
-  <script src="./web/app.js?v=2.6"></script>
+  <script src="./web/app.js?v=2.7"></script>
 </body>
 </html>

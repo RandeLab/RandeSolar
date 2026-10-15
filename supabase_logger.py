@@ -1,10 +1,6 @@
-"""
-RandeSolar - HiveMQ to Supabase Cloud Logger
-Listens to HiveMQ topic 'randelab/solar/telemetry' and logs records to Supabase Postgres.
-"""
-
 import json
 import time
+import datetime
 import urllib.request
 import paho.mqtt.client as mqtt
 
@@ -13,8 +9,70 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 MQTT_BROKER = "broker.hivemq.com"
 MQTT_TOPIC = "randelab/solar/telemetry"
 
+TELEGRAM_BOT_TOKEN = "8600149990:AAGGHL_USsmi_PfzPFBDIvoFgQx-rmvXIkc"
+TELEGRAM_CHAT_ID = "818690605"
+
 last_log_time = 0
 LOG_INTERVAL_SEC = 15  # Log to database every 15 seconds to create a clean, dense history
+last_report_day = None
+
+def send_telegram(text):
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": text,
+        "parse_mode": "Markdown"
+    }
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            print("[Telegram ✈️] Daily report delivered to Marc (@dusjagr)!")
+    except Exception as e:
+        print(f"[Telegram ⚠️] Report send failed: {e}")
+
+def generate_daily_report():
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}"
+    }
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    today_start = now_utc.strftime("%Y-%m-%dT00:00:00Z")
+
+    # Fetch today's telemetry
+    url = f"{SUPABASE_URL}/rest/v1/solar_telemetry?select=solar_power,battery_voltage,yield_today_wh,created_at&created_at=gte.{today_start}&order=created_at.desc&limit=1000"
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            rows = json.loads(resp.read().decode())
+            if not rows:
+                print("[Report] No rows recorded for today yet.")
+                return
+
+            max_power = max(r.get("solar_power", 0) for r in rows)
+            max_yield_wh = max(r.get("yield_today_wh", 0) for r in rows)
+            voltages = [r.get("battery_voltage", 0) for r in rows if r.get("battery_voltage", 0) > 5.0]
+            min_v = min(voltages) if voltages else 0.0
+            max_v = max(voltages) if voltages else 0.0
+
+            yield_kwh = max_yield_wh / 1000.0
+
+            report = (
+                "📊 *RandeSolar Tagesbericht* ☀️\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                f"⚡ *Tagesertrag:* {yield_kwh:.2f} kWh ({max_yield_wh} Wh)\n"
+                f"🏆 *Spitzenleistung:* {max_power} W\n"
+                f"🔋 *Batterie Min / Max:* {min_v:.2f} V / {max_v:.2f} V\n"
+                f"📈 *Datenpunkte:* {len(rows)} Messungen in Cloud\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "🌐 _Dashboard:_ https://randelab.github.io/RandeSolar/"
+            )
+            send_telegram(report)
+    except Exception as e:
+        print(f"[Report ⚠️] Error generating report: {e}")
 
 def insert_to_supabase(record):
     url = f"{SUPABASE_URL}/rest/v1/solar_telemetry"
@@ -53,8 +111,17 @@ def on_connect(client, userdata, flags, rc, properties=None):
     print(f"[MQTT] Subscribed to {MQTT_TOPIC}")
 
 def on_message(client, userdata, msg):
-    global last_log_time
+    global last_log_time, last_report_day
     now = time.time()
+    
+    # Check if 20:00 daily evening report should be sent
+    local_time = datetime.datetime.now()
+    current_day = local_time.date()
+    if local_time.hour == 20 and last_report_day != current_day:
+        last_report_day = current_day
+        print("[Scheduler ⏰] Triggering 20:00 evening Telegram report...")
+        generate_daily_report()
+
     if now - last_log_time < LOG_INTERVAL_SEC:
         return  # Throttle database writes
 
@@ -67,7 +134,7 @@ def on_message(client, userdata, msg):
 
 def main():
     print("=" * 60)
-    print("🚀 RandeSolar -> Supabase Cloud Logger")
+    print("🚀 RandeSolar -> Supabase Cloud Logger + Telegram Bot")
     print(f"Supabase Project: {SUPABASE_URL}")
     print(f"MQTT Broker:      {MQTT_BROKER} ({MQTT_TOPIC})")
     print("=" * 60)
