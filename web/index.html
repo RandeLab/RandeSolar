@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RandeSolar • openBrushograph Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&family=Noto+Sans+Kannada:wght@400;700&family=Outfit:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="theme-pinkograph">
+  <div class="studio-wrapper">
+    <!-- Header with openBrushograph Studio styling -->
+    <header class="header-container">
+      <div class="brand-left">
+        <a href="https://openbrushograph.github.io/" target="_blank" title="openBrushograph">
+          <img src="/static/arai-icon.svg" alt="Arai Logo" class="logo-img" id="dynamic-logo">
+        </a>
+        <div class="title-group">
+          <h1 id="main-title">RandeSolar Studio</h1>
+          <div class="badge-sub-row">
+            <span class="sub-chip">VICTRON MPPT 75|15</span>
+            <span class="sub-chip" id="deviceModel">BLE TELEMETRY</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <!-- Exact Studio Theme Selector -->
+        <div class="theme-select-wrap">
+          <label for="theme-selector">THEME:</label>
+          <select id="theme-selector" autocomplete="off" onchange="setTheme(this.value)">
+            <option value="pinkograph" selected>Pinkograph</option>
+            <option value="randen">Randen</option>
+            <option value="tropical">Deep Jungle Dark</option>
+            <option value="coconut">Coconut Phosphor</option>
+            <option value="dresden-dark">Kongress Dresden (Nacht)</option>
+            <option value="bengaluru">Bengaluru Fair</option>
+            <option value="uwu">UwU Pink</option>
+            <option value="light">Arai-eek Light</option>
+          </select>
+        </div>
+
+        <div class="status-indicator" id="connectionStatus">
+          <span class="dot"></span>
+          <span class="status-text">BLE Active</span>
+        </div>
+
+        <a href="/api/export" class="btn btn-export" download>
+          <span>Export CSV</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- Studio Layout Panels -->
+    <main class="studio-layout">
+      <!-- Panel 1: Solar PV -->
+      <section class="panel panel-solar">
+        <h2>Solar Array (PV)</h2>
+        <div class="panel-body">
+          <div class="metric-row">
+            <span class="metric-val" id="solarPower">0</span>
+            <span class="metric-unit">W</span>
+          </div>
+          <div class="metric-details">
+            <div class="detail-col">
+              <span class="detail-label">Yield Today</span>
+              <span class="detail-val" id="yieldToday">0.00 kWh</span>
+            </div>
+            <div class="detail-col align-right">
+              <span class="detail-label">Status</span>
+              <span class="detail-val val-green" id="pvStatus">Online</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel 2: Battery Storage -->
+      <section class="panel panel-battery">
+        <h2>Storage Pack (12V)</h2>
+        <div class="panel-body">
+          <div class="metric-row">
+            <span class="metric-val" id="batteryVoltage">0.00</span>
+            <span class="metric-unit">V</span>
+          </div>
+          <div class="gauge-wrap">
+            <div class="gauge-fill" id="batteryBar" style="width: 50%;"></div>
+          </div>
+          <div class="metric-details">
+            <div class="detail-col">
+              <span class="detail-label">Est. SOC</span>
+              <span class="detail-val" id="estSoc">-- %</span>
+            </div>
+            <div class="detail-col align-right">
+              <span class="detail-label">Chemistry</span>
+              <span class="detail-val">12V Storage</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel 3: Charging Current -->
+      <section class="panel panel-current">
+        <h2>Charge Flow</h2>
+        <div class="panel-body">
+          <div class="metric-row">
+            <span class="metric-val" id="batteryCurrent">0.0</span>
+            <span class="metric-unit">A</span>
+          </div>
+          <div class="metric-details">
+            <div class="detail-col">
+              <span class="detail-label">Pack Flow</span>
+              <span class="detail-val" id="batteryPowerFlow">0.0 W</span>
+            </div>
+            <div class="detail-col align-right">
+              <span class="detail-label">Direction</span>
+              <span class="detail-val val-blue">To Battery</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Panel 4: Controller State -->
+      <section class="panel panel-state">
+        <h2>Controller State</h2>
+        <div class="panel-body">
+          <div class="state-pill-wrap">
+            <span class="state-pill" id="chargeStatePill">OFF</span>
+          </div>
+          <div class="metric-details">
+            <div class="detail-col">
+              <span class="detail-label">Load Port</span>
+              <span class="detail-val" id="externalLoad">0.0 A</span>
+            </div>
+            <div class="detail-col align-right">
+              <span class="detail-label">Diagnostics</span>
+              <span class="detail-val" id="errorBadge">No Errors</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Chart Panel -->
+    <section class="panel panel-chart">
+      <div class="chart-header-row">
+        <h2>Telemetry Stream</h2>
+        <div class="btn-group" id="timeframeSelector">
+          <button class="btn btn-sm active" data-limit="50">50 pts</button>
+          <button class="btn btn-sm" data-limit="150">150 pts</button>
+          <button class="btn btn-sm" data-limit="500">500 pts</button>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap">
+        <canvas id="solarChart"></canvas>
+      </div>
+    </section>
+
+    <!-- Footer / Diagnostics Panel -->
+    <footer class="panel panel-footer">
+      <div class="footer-strip">
+        <span><b>DONGLE:</b> <span class="font-mono" id="diagMac">cb:06:61:60:5a:c2</span></span>
+        <span><b>CIPHER:</b> AES-128-CTR</span>
+        <span><b>BEACON:</b> <span id="lastSeenTimer">Live</span></span>
+        <span><b>RSSI:</b> <span class="font-mono" id="rssiValue">-- dBm</span></span>
+        <span><b>BUFFER:</b> <span class="font-mono" id="diagTotalRecords">--</span> records</span>
+      </div>
+    </footer>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

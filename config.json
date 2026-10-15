@@ -1,0 +1,7 @@
+{
+  "device_address": "cb:06:61:60:5a:c2",
+  "encryption_key": "16233767e72a76e15c04023274102c9d",
+  "web_port": 8080,
+  "web_host": "0.0.0.0",
+  "log_interval_seconds": 2
+}

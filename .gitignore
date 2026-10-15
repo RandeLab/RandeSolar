@@ -1,0 +1,16 @@
+# Virtual Environment & Python cache
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# PlatformIO build artifacts & IDE files
+.pio/
+.vscode/
+compile_commands.json
+
+# Local databases & logs
+*.db
+*.db-journal
+*.log
