@@ -530,13 +530,9 @@ function appendChartPoint(item, force = false) {
 async function fetchLiveTelemetry(explicit = false) {
   const isHttps = window.location.protocol === 'https:';
 
-  // When loaded over HTTPS (like GitHub Pages), do NOT automatically ping private HTTP network IPs
-  // because modern browsers will show a "Local Network Access" security prompt.
+  // When loaded over HTTPS (like GitHub Pages), do NOT automatically ping private HTTP network IPs.
   // MQTT over WebSocket handles live data seamlessly on HTTPS.
   if (isHttps && !explicit) {
-    if (!mqttClient || !mqttClient.connected) {
-      runSimulationStep();
-    }
     return;
   }
 
@@ -570,11 +566,6 @@ async function fetchLiveTelemetry(explicit = false) {
     } catch (e) {
       // Continue to next endpoint
     }
-  }
-
-  // Fallback if no endpoint answered
-  if (!mqttClient || !mqttClient.connected) {
-    runSimulationStep();
   }
 }
 
@@ -699,10 +690,6 @@ window.addEventListener('DOMContentLoaded', () => {
   initChart();
   window.setTheme(currentTheme);
 
-  // Pre-seed chart with initial points
-  for (let k = 0; k < 12; k++) {
-    runSimulationStep(true);
-  }
 
   // Connect to live MQTT stream from HiveMQ
   initMQTT();
