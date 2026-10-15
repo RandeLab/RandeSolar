@@ -41,6 +41,28 @@ static const uint8_t ENCRYPTION_KEY[16] = {
 
 static const uint16_t VICTRON_MFG_ID = 0x02E1;
 
+// ==================== ONBOARD WS2812 NEOPIXEL (GPIO 48) ====================
+#ifndef RGB_BUILTIN
+#define RGB_BUILTIN 48
+#endif
+
+static uint32_t g_lastFlashMs = 0;
+static uint8_t g_flashR = 0, g_flashG = 0, g_flashB = 0;
+
+void setPixel(uint8_t r, uint8_t g, uint8_t b) {
+    neopixelWrite(RGB_BUILTIN, r, g, b);
+}
+
+void triggerPixelFlash(uint8_t r, uint8_t g, uint8_t b) {
+    g_flashR = r;
+    g_flashG = g;
+    g_flashB = b;
+    g_lastFlashMs = millis();
+    setPixel(r, g, b);
+}
+
+void updateNeoPixel();
+
 // ==================== TELEMETRY STATE ====================
 struct SolarData {
     uint16_t solar_power = 0;
@@ -171,6 +193,7 @@ class VictronScanCallbacks : public NimBLEScanCallbacks {
         g_data.has_data = true;
         g_newDataAvailable = true;
         portEXIT_CRITICAL(&g_mux);
+        triggerPixelFlash(60, 15, 45); // Pinkograph neon heartbeat pulse on fresh beacon
 
         Serial.printf("[☀️ BEACON] Solar: %uW | Batt: %.2fV, %.1fA | State: %s (%s) | Yield: %uWh | RSSI: %ddBm\n",
             solarPower, batteryVoltage, batteryCurrent, getChargeStateName(chargeState), getChargeStateGerman(chargeState), yieldTodayWh, rssi);
@@ -482,9 +505,65 @@ void reconnectMQTT() {
     }
 }
 
+void updateNeoPixel() {
+    uint32_t now = millis();
+
+    // Check if in 80ms heartbeat flash pulse
+    if (now - g_lastFlashMs < 80) {
+        setPixel(g_flashR, g_flashG, g_flashB);
+        return;
+    }
+
+    if (WiFi.status() != WL_CONNECTED) {
+        // Red slow breathing pulse when Wi-Fi offline or connecting
+        float breathe = (sin(now / 300.0f) + 1.0f) * 0.5f;
+        setPixel((uint8_t)(10 + breathe * 35), 0, 0);
+        return;
+    }
+
+    SolarData d;
+    portENTER_CRITICAL(&g_mux);
+    d = g_data;
+    portEXIT_CRITICAL(&g_mux);
+
+    if (!d.has_data || (now - d.last_seen_ms > 15000)) {
+        // Amber/Orange breathing pulse when searching for Victron BLE beacon
+        float breathe = (sin(now / 450.0f) + 1.0f) * 0.5f;
+        setPixel((uint8_t)(15 + breathe * 25), (uint8_t)(5 + breathe * 10), 0);
+        return;
+    }
+
+    // 1. Solar Producing (> 0W): Warm Solar Gold/Yellow proportional to generation wattage
+    if (d.solar_power > 0) {
+        uint8_t pwr = constrain(d.solar_power, 1, 75);
+        uint8_t bright = map(pwr, 1, 75, 12, 65);
+        setPixel(bright, (uint8_t)(bright * 0.72f), 0);
+        return;
+    }
+
+    // 2. Battery / Charge State colors
+    switch (d.charge_state) {
+        case 3: // Bulk charging -> Deep Violet/Purple
+            setPixel(18, 2, 35);
+            break;
+        case 4: // Absorption -> Vivid Cyan
+            setPixel(0, 25, 30);
+            break;
+        case 5: // Float -> Emerald Green
+            setPixel(0, 30, 8);
+            break;
+        default: // Standby / Night / Off -> Gentle subtle Teal glow
+            setPixel(0, 8, 12);
+            break;
+    }
+}
+
 void setup() {
     Serial.begin(115200);
-    delay(2000);
+    delay(1000);
+
+    // Initial soft blue startup
+    setPixel(0, 10, 30);
 
     Serial.println("\n========================================");
     Serial.println("  RandeSolar • ESP32-S3 BLE & Wi-Fi & MQTT");
@@ -501,6 +580,8 @@ void setup() {
     while (WiFi.status() != WL_CONNECTED && attempts < 25) {
         delay(500);
         Serial.print(".");
+        // Gentle blue pulsing during Wi-Fi connect
+        setPixel(0, 0, (uint8_t)(10 + (attempts % 2) * 35));
         attempts++;
     }
 
@@ -509,8 +590,10 @@ void setup() {
         if (MDNS.begin(MDNS_HOST)) {
             Serial.printf("[mDNS] http://%s.local\n", MDNS_HOST);
         }
+        setPixel(0, 30, 15); // Green confirmation flash
     } else {
         Serial.println("\n[WiFi] Connection timed out. Running offline BLE logger mode.");
+        setPixel(30, 0, 0); // Red warning
     }
 
     // Configure MQTT
@@ -542,6 +625,9 @@ void loop() {
     reconnectMQTT();
     mqttClient.loop();
 
+    // Update onboard NeoPixel state machine
+    updateNeoPixel();
+
     // Publish to MQTT every 5 seconds when BLE data is active
     static uint32_t lastMqttPublish = 0;
     uint32_t now = millis();
@@ -572,6 +658,7 @@ void loop() {
                 WiFi.RSSI()
             );
             mqttClient.publish(MQTT_TOPIC, json);
+            triggerPixelFlash(0, 80, 80); // Crisp Cyan flash on MQTT publish
             Serial.printf("[MQTT 📡] Published to %s: %s\n", MQTT_TOPIC, json);
         }
     }
