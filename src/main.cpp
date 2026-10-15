@@ -416,7 +416,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       }
     }
 
-    const savedTheme = localStorage.getItem("randesolar-esp-theme") || "dresden-dark";
+    const savedTheme = localStorage.getItem("randesolar-esp-theme") || "pinkograph";
     document.getElementById("themeSelect").value = savedTheme;
     applyTheme(savedTheme);
 
