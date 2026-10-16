@@ -124,6 +124,44 @@ const char* getChargeStateGerman(uint8_t state) {
     }
 }
 
+// State-Aware Battery SoC Estimation (Lead-Acid / AGM with Victron 3-stage charging compensation)
+int estimateBatterySoC(float v, float chargeCurrent = 0.0f, float loadCurrent = 0.0f, uint8_t chargeState = 0) {
+    if (v < 5.0f) return 0;
+    if (chargeState == 5) return 100; // Float -> full
+    if (chargeState == 4) { // Absorption (80% - 95%)
+        float taper = constrain(chargeCurrent / 5.0f, 0.0f, 1.0f);
+        return (int)constrain(round(95.0f - taper * 15.0f), 80.0f, 95.0f);
+    }
+    if (chargeState == 3 || chargeCurrent > 0.4f) { // Bulk (15% - 80%)
+        float bulkSoC = 15.0f;
+        if (v >= 14.2f) bulkSoC = 80.0f;
+        else if (v >= 13.6f) bulkSoC = 70.0f + ((v - 13.6f) / 0.6f) * 10.0f;
+        else if (v >= 13.0f) bulkSoC = 55.0f + ((v - 13.0f) / 0.6f) * 15.0f;
+        else if (v >= 12.5f) bulkSoC = 35.0f + ((v - 12.5f) / 0.5f) * 20.0f;
+        else if (v >= 12.0f) bulkSoC = 15.0f + ((v - 12.0f) / 0.5f) * 20.0f;
+        else bulkSoC = constrain(((v - 11.2f) / 0.8f) * 15.0f, 5.0f, 15.0f);
+        return (int)constrain(round(bulkSoC), 5.0f, 80.0f);
+    }
+
+    // Resting / discharging with load sag compensation (~0.03 Ohm)
+    float vComp = v + (loadCurrent * 0.03f);
+    struct OcvPoint { float v; int soc; };
+    static const OcvPoint table[10] = {
+        {12.75f, 100}, {12.60f, 90}, {12.50f, 80}, {12.40f, 70},
+        {12.30f, 60},  {12.20f, 50}, {12.10f, 40}, {12.00f, 30},
+        {11.85f, 15},  {11.60f, 0}
+    };
+    if (vComp >= table[0].v) return 100;
+    if (vComp <= table[9].v) return 0;
+    for (int i = 0; i < 9; i++) {
+        if (vComp <= table[i].v && vComp >= table[i+1].v) {
+            float frac = (vComp - table[i+1].v) / (table[i].v - table[i+1].v);
+            return (int)round(table[i+1].soc + frac * (table[i].soc - table[i+1].soc));
+        }
+    }
+    return 50;
+}
+
 // Decrypt Victron BLE Instant Readout payload
 bool decryptVictronPayload(const uint8_t* encPayload, size_t encLen, uint16_t iv, const uint8_t* key, uint8_t* outDecrypted) {
     if (encLen < 12) return false;
@@ -467,9 +505,19 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
         document.getElementById('yieldToday').textContent = (d.yield_today_wh / 1000).toFixed(2) + ' kWh';
         document.getElementById('batteryVoltage').textContent = d.battery_voltage.toFixed(2);
 
-        let soc = Math.round(Math.min(100, Math.max(0, ((d.battery_voltage - 11.8) / 1.0) * 100)));
+        let soc = 50;
+        if (d.charge_state === 5) soc = 100;
+        else if (d.charge_state === 4) soc = 88;
+        else if (d.charge_state === 3 || d.battery_current > 0.4) {
+          if (d.battery_voltage >= 14.2) soc = 80;
+          else if (d.battery_voltage >= 13.0) soc = Math.round(55 + ((d.battery_voltage - 13.0) / 1.2) * 25);
+          else soc = Math.round(Math.min(50, Math.max(10, ((d.battery_voltage - 11.8) / 1.2) * 50)));
+        } else {
+          soc = Math.round(Math.min(100, Math.max(0, ((d.battery_voltage - 11.6) / 1.15) * 100)));
+        }
         document.getElementById('batteryBar').style.width = soc + '%';
-        document.getElementById('estSoc').textContent = soc + '%';
+        const stageLabel = (d.charge_state === 5) ? 'Float' : (d.charge_state === 4) ? 'Absorp.' : (d.charge_state === 3) ? 'Bulk' : 'Ruhe';
+        document.getElementById('estSoc').textContent = soc + '% (' + stageLabel + ')';
 
         document.getElementById('batteryCurrent').textContent = d.battery_current.toFixed(1);
         document.getElementById('flowWatts').textContent = (d.battery_voltage * d.battery_current).toFixed(1) + ' W';
@@ -775,7 +823,13 @@ String generateHumanMoodReport(const SolarData& d) {
     }
 
     if (d.charge_state == 5) {
-        story += "\n\n🔋 *Status:* Der Speicher ist randvoll (Float)! Ich chille im grünen NeoPixel-Licht.";
+        story += "\n\n🔋 *Status:* Der Speicher ist randvoll (Float, 100%)! Ich chille im grünen NeoPixel-Licht.";
+    } else if (d.charge_state == 4) {
+        int s = estimateBatterySoC(v, a, load, d.charge_state);
+        story += "\n\n🔋 *Status:* Nachladephase (Absorption, ~" + String(s) + "%). Die letzten Elektronen werden schonend aufgenommen.";
+    } else if (d.charge_state == 3 || a > 0.4f) {
+        int s = estimateBatterySoC(v, a, load, d.charge_state);
+        story += "\n\n🔋 *Status:* Hauptladung aktiv (Bulk, ~" + String(s) + "%). Mein Akku schluckt hungrig puren Sonnenstrom!";
     }
 
     if (load > 0.1f) {
@@ -837,7 +891,8 @@ void checkTelegramUpdates() {
                             portEXIT_CRITICAL(&g_mux);
 
                             char msg[650];
-                            int soc = (int)constrain(((d.battery_voltage - 11.8f) / 1.0f) * 100.0f, 0.0f, 100.0f);
+                            int soc = estimateBatterySoC(d.battery_voltage, d.battery_current, d.external_load, d.charge_state);
+                            const char* socStage = (d.charge_state == 5) ? "Float" : (d.charge_state == 4) ? "Absorp." : (d.charge_state == 3 || d.battery_current > 0.4f) ? "Bulk" : "Ruhe";
                             unsigned long ageSec = d.has_data ? ((millis() - d.last_seen_ms) / 1000) : 999;
                             float minV = (g_minBattToday > 50.0f ? d.battery_voltage : g_minBattToday);
                             float maxV = (g_maxBattToday < 5.0f ? d.battery_voltage : g_maxBattToday);
@@ -846,7 +901,7 @@ void checkTelegramUpdates() {
                                 "☀️ *RandeSolar Kraftwerk Status* ⚡\n"
                                 "━━━━━━━━━━━━━━━━━━━━\n"
                                 "☀️ *Solar-Leistung:* %u W (Peak: %u W)\n"
-                                "🔋 *Batteriespeicher:* %.2f V (~%d%%)\n"
+                                "🔋 *Batteriespeicher:* %.2f V (~%d%% • %s)\n"
                                 "📉 *Batterie Min / Max:* %.2f V / %.2f V\n"
                                 "⚡ *Ladestrom:* %.1f A\n"
                                 "💡 *Lastanschluß:* %.1f A\n"
@@ -860,6 +915,7 @@ void checkTelegramUpdates() {
                                 g_peakPowerToday,
                                 d.battery_voltage,
                                 soc,
+                                socStage,
                                 minV,
                                 maxV,
                                 d.battery_current,

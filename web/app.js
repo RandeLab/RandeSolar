@@ -552,6 +552,69 @@ function initChart() {
   }
 }
 
+// State-Aware Battery SoC Estimation (Lead-Acid / AGM with Victron 3-stage charging compensation)
+function estimateSoC(v, chargeCurrent = 0, loadCurrent = 0, chargeState = 0) {
+  if (!v || v < 5.0) return 0;
+
+  // 1. Float State (5): Charger has completed bulk & absorption, battery is full
+  if (chargeState === 5) {
+    return 100;
+  }
+
+  // 2. Absorption State (4): Voltage held constant (~14.2V - 14.4V), current tapers down (80% - 95%)
+  if (chargeState === 4) {
+    const taper = Math.min(1.0, Math.max(0, chargeCurrent / 5.0));
+    return Math.min(95, Math.max(80, Math.round(95 - taper * 15)));
+  }
+
+  // 3. Bulk State (3 / Active Solar Charging):
+  // Terminal voltage is driven high by charging current & plate polarization.
+  // Bulk charges from 0% to ~80% before absorption begins.
+  if (chargeState === 3 || chargeCurrent > 0.4) {
+    let bulkSoC = 15;
+    if (v >= 14.2) bulkSoC = 80;
+    else if (v >= 13.6) bulkSoC = 70 + ((v - 13.6) / 0.6) * 10;
+    else if (v >= 13.0) bulkSoC = 55 + ((v - 13.0) / 0.6) * 15;
+    else if (v >= 12.5) bulkSoC = 35 + ((v - 12.5) / 0.5) * 20;
+    else if (v >= 12.0) bulkSoC = 15 + ((v - 12.0) / 0.5) * 20;
+    else bulkSoC = Math.max(5, Math.round(((v - 11.2) / 0.8) * 15));
+
+    return Math.min(80, Math.max(5, Math.round(bulkSoC)));
+  }
+
+  // 4. Resting / Discharging (State 0, Night, or no solar charging):
+  // Compensate for load sag using battery internal resistance (~0.03 Ohm)
+  const vComp = v + (loadCurrent * 0.03);
+
+  // Standard 12V Lead-Acid / AGM Open Circuit Voltage (OCV) curve
+  const ocvTable = [
+    { v: 12.75, soc: 100 },
+    { v: 12.60, soc: 90 },
+    { v: 12.50, soc: 80 },
+    { v: 12.40, soc: 70 },
+    { v: 12.30, soc: 60 },
+    { v: 12.20, soc: 50 },
+    { v: 12.10, soc: 40 },
+    { v: 12.00, soc: 30 },
+    { v: 11.85, soc: 15 },
+    { v: 11.60, soc: 0 }
+  ];
+
+  if (vComp >= ocvTable[0].v) return 100;
+  if (vComp <= ocvTable[ocvTable.length - 1].v) return 0;
+
+  for (let idx = 0; idx < ocvTable.length - 1; idx++) {
+    const higher = ocvTable[idx];
+    const lower = ocvTable[idx + 1];
+    if (vComp <= higher.v && vComp >= lower.v) {
+      const frac = (vComp - lower.v) / (higher.v - lower.v);
+      return Math.round(lower.soc + frac * (higher.soc - lower.soc));
+    }
+  }
+
+  return 50;
+}
+
 // Update UI
 function updateDashboard(data) {
   if (!data) return;
@@ -567,17 +630,26 @@ function updateDashboard(data) {
   const v = Number(data.battery_voltage || 0);
   if (el.batteryVoltage) el.batteryVoltage.textContent = v.toFixed(2);
 
-  let soc = Math.round(Math.min(100, Math.max(0, ((v - 11.8) / 1.0) * 100)));
-  if (el.batteryBar) el.batteryBar.style.width = soc + '%';
-  if (el.estSoc) el.estSoc.textContent = `${soc}% (~12V)`;
-
   const i = Number(data.battery_charging_current || data.battery_current || 0);
+  const loadA = Number(data.external_load || 0);
+  const stateCode = data.charge_state || 0;
+
+  let soc = estimateSoC(v, i, loadA, stateCode);
+  if (el.batteryBar) el.batteryBar.style.width = soc + '%';
+
+  let socStage = '';
+  if (stateCode === 5) socStage = currentLang === 'de' ? 'Erhaltung' : 'Float';
+  else if (stateCode === 4) socStage = currentLang === 'de' ? 'Nachladung' : 'Absorp.';
+  else if (stateCode === 3 || i > 0.4) socStage = currentLang === 'de' ? 'Bulk' : 'Bulk';
+  else socStage = currentLang === 'de' ? 'Ruhe' : 'Resting';
+
+  if (el.estSoc) el.estSoc.textContent = `${soc}% (${socStage})`;
+
   if (el.batteryCurrent) el.batteryCurrent.textContent = i.toFixed(1);
   const flowW = (v * i).toFixed(1);
   if (el.batteryPowerFlow) el.batteryPowerFlow.textContent = `${flowW} W`;
 
   // State translation
-  const stateCode = data.charge_state || 0;
   const stateMap = (i18n[currentLang] || i18n.de).states;
   const stStr = stateMap[stateCode] || data.state_str || 'OFF';
   if (el.chargeStatePill) {
