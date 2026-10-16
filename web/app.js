@@ -315,6 +315,12 @@ window.setTheme = function(theme) {
     moodEl.textContent = getHumanMoodText(lastTelemetryData, currentLang);
   }
 
+  // Timeframe Week button translation
+  const btnWeek = document.getElementById('btnTimeWeek');
+  if (btnWeek) {
+    btnWeek.textContent = currentLang === 'de' ? '1 Woche' : '1 week';
+  }
+
   // LED Legend translation
   const ledTitle = document.getElementById("lblLedTitle");
   const ledSub = document.getElementById("lblLedSubtitle");
@@ -776,6 +782,13 @@ async function loadSupabaseHistory(limit = 240, hours = 1) {
     // Sort chronologically (oldest to newest)
     rows.reverse();
 
+    // Calculate derived daily/window stats across the full row collection
+    rows.forEach(item => {
+      if (item.solar_power !== undefined && item.battery_voltage) {
+        updateDerivedStats(Number(item.solar_power), Number(item.battery_voltage));
+      }
+    });
+
     if (solarChartInstance) {
       solarChartInstance.data.labels = [];
       solarChartInstance.data.datasets[0].data = [];
@@ -788,20 +801,33 @@ async function loadSupabaseHistory(limit = 240, hours = 1) {
       chargeChartInstance.data.datasets[1].data = [];
     }
 
-    rows.forEach(item => {
+    // Downsample chart data points if dataset is dense (e.g. 1 week), keeps 60fps rendering
+    let displayRows = rows;
+    if (rows.length > 500) {
+      const step = Math.ceil(rows.length / 500);
+      displayRows = rows.filter((_, idx) => idx % step === 0 || idx === rows.length - 1);
+    }
+
+    displayRows.forEach(item => {
       const d = new Date(item.created_at);
-      const timeLabel = (currentHours >= 6)
-        ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      let timeLabel;
+      if (currentHours >= 48) {
+        // Multi-day format (e.g. "Fr 09:15" or "16.10 09:15")
+        const dayStr = d.toLocaleDateString([], { weekday: 'short' });
+        const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        timeLabel = `${dayStr} ${timeStr}`;
+      } else if (currentHours >= 2) {
+        // 6h, 24h: show "HH:MM"
+        timeLabel = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } else {
+        // 10 min, 1h: show "HH:MM:SS" with seconds
+        timeLabel = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      }
 
       if (solarChartInstance) {
         solarChartInstance.data.labels.push(timeLabel);
         solarChartInstance.data.datasets[0].data.push(item.solar_power || 0);
         solarChartInstance.data.datasets[1].data.push(item.battery_voltage || 0);
-      }
-
-      if (item.solar_power !== undefined && item.battery_voltage) {
-        updateDerivedStats(Number(item.solar_power), Number(item.battery_voltage));
       }
 
       if (chargeChartInstance) {
@@ -846,13 +872,14 @@ async function fetchYesterdayYield() {
   }
 }
 
-// Setup Timeframe selector buttons (1h, 3h, 6h, 12h, 24h)
+// Setup Timeframe selector buttons (10m, 1h, 6h, 24h, 1w)
 document.querySelectorAll('#timeframeSelector button').forEach(btn => {
   btn.addEventListener('click', (e) => {
+    const button = e.currentTarget || e.target;
     document.querySelectorAll('#timeframeSelector button').forEach(b => b.classList.remove('active'));
-    e.target.classList.add('active');
-    currentLimit = parseInt(e.target.dataset.limit || '240', 10);
-    const hours = parseFloat(e.target.dataset.hours || '1');
+    button.classList.add('active');
+    currentLimit = parseInt(button.dataset.limit || '250', 10);
+    const hours = parseFloat(button.dataset.hours || '1');
     loadSupabaseHistory(currentLimit, hours);
   });
 });

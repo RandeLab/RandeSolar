@@ -605,6 +605,8 @@ body.theme-pinkograph .panel h2 {
 .btn-group {
   display: inline-flex;
   gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 .btn-sm {
