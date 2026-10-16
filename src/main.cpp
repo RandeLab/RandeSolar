@@ -24,6 +24,7 @@
 #include <PubSubClient.h>
 #include <NimBLEDevice.h>
 #include "mbedtls/aes.h"
+#include <time.h>
 
 // ==================== CONFIGURATION ====================
 static const char* WIFI_SSID     = "RandeLab";
@@ -34,6 +35,17 @@ static const char* MDNS_HOST     = "randesolar";
 static const char* TELEGRAM_BOT_TOKEN = "8600149990:AAGGHL_USsmi_PfzPFBDIvoFgQx-rmvXIkc";
 static const char* TELEGRAM_CHAT_ID   = "818690605";
 static int64_t g_lastTelegramUpdateId = 0;
+
+// Supabase Cloud History Logger
+static const char* SUPABASE_URL = "https://pakfuetvwpffwfrrxshz.supabase.co/rest/v1/solar_telemetry";
+static const char* SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBha2Z1ZXR2d3BmZndmcnJ4c2h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwODkwNjIsImV4cCI6MjEwNzY2NTA2Mn0.J4HDEP28BF0fRkmfYqeeaM1urn29lYNUz9k4kQjXWhU";
+
+// Daily Analytics Tracking (reset every midnight)
+static uint16_t g_peakPowerToday = 0;
+static float g_minBattToday = 99.0f;
+static float g_maxBattToday = 0.0f;
+static int g_lastReportDay = -1;
+static int g_currentMday = -1;
 
 // HiveMQ Broker
 static const char* MQTT_BROKER   = "broker.hivemq.com";
@@ -194,6 +206,12 @@ class VictronScanCallbacks : public NimBLEScanCallbacks {
         g_data.last_seen_ms = millis();
         g_data.has_data = true;
         g_newDataAvailable = true;
+
+        if (solarPower > g_peakPowerToday) g_peakPowerToday = solarPower;
+        if (batteryVoltage > 5.0f) {
+            if (g_minBattToday > 50.0f || batteryVoltage < g_minBattToday) g_minBattToday = batteryVoltage;
+            if (batteryVoltage > g_maxBattToday) g_maxBattToday = batteryVoltage;
+        }
         portEXIT_CRITICAL(&g_mux);
 
         Serial.printf("[☀️ BEACON] Solar: %uW | Batt: %.2fV, %.1fA | State: %s (%s) | Yield: %uWh | RSSI: %ddBm\n",
@@ -588,6 +606,8 @@ void updateNeoPixel() {
 }
 
 // ==================== TELEGRAM BOT CLIENT ====================
+void sendTelegramMessage(const String& text, const char* targetChatId = TELEGRAM_CHAT_ID);
+
 String escapeJsonString(const String& s) {
     String out = "";
     out.reserve(s.length() + 32);
@@ -602,7 +622,95 @@ String escapeJsonString(const String& s) {
     return out;
 }
 
-void sendTelegramMessage(const String& text, const char* targetChatId = TELEGRAM_CHAT_ID) {
+// ==================== SUPABASE CLOUD LOGGER ====================
+void logToSupabase(const SolarData& d) {
+    if (WiFi.status() != WL_CONNECTED || !d.has_data) return;
+
+    WiFiClientSecure secClient;
+    secClient.setInsecure();
+    secClient.setTimeout(4500);
+
+    HTTPClient http;
+    if (http.begin(secClient, SUPABASE_URL)) {
+        http.addHeader("Content-Type", "application/json");
+        http.addHeader("apikey", SUPABASE_KEY);
+        String authHeader = "Bearer " + String(SUPABASE_KEY);
+        http.addHeader("Authorization", authHeader.c_str());
+        http.addHeader("Prefer", "return=minimal");
+
+        char json[380];
+        snprintf(json, sizeof(json),
+            "{\"solar_power\":%u,\"battery_voltage\":%.2f,\"battery_current\":%.2f,"
+            "\"yield_today_wh\":%lu,\"external_load\":%.2f,\"charge_state\":%u,\"state_str\":\"%s\","
+            "\"charger_error\":%u,\"ble_rssi\":%d,\"wifi_rssi\":%d}",
+            d.solar_power,
+            d.battery_voltage,
+            d.battery_current,
+            (unsigned long)d.yield_today_wh,
+            d.external_load,
+            d.charge_state,
+            getChargeStateName(d.charge_state),
+            d.charger_error,
+            d.rssi,
+            WiFi.RSSI()
+        );
+
+        int code = http.POST((uint8_t*)json, strlen(json));
+        if (code == 200 || code == 201) {
+            Serial.printf("[Supabase 💾] Logged row to cloud: %.2fV | %uW | %.1fA\n", d.battery_voltage, d.solar_power, d.battery_current);
+        } else {
+            Serial.printf("[Supabase ⚠️] Insert failed (HTTP %d): %s\n", code, http.errorToString(code).c_str());
+        }
+        http.end();
+    }
+}
+
+// ==================== DAILY EVENING REPORT (20:00) ====================
+void checkDailyEveningReport(const SolarData& d) {
+    if (WiFi.status() != WL_CONNECTED || !d.has_data) return;
+
+    time_t nowTime = time(nullptr);
+    struct tm timeinfo;
+    if (!localtime_r(&nowTime, &timeinfo)) return;
+    if (timeinfo.tm_year < (2024 - 1900)) return; // NTP not synced yet
+
+    // Reset daily counters at midnight
+    if (g_currentMday != timeinfo.tm_mday) {
+        g_currentMday = timeinfo.tm_mday;
+        g_peakPowerToday = d.solar_power;
+        g_minBattToday = d.battery_voltage;
+        g_maxBattToday = d.battery_voltage;
+    }
+
+    // Trigger daily summary at 20:00 (8:00 PM) once per day
+    if (timeinfo.tm_hour == 20 && g_lastReportDay != timeinfo.tm_mday) {
+        g_lastReportDay = timeinfo.tm_mday;
+
+        char report[500];
+        float yieldKwh = d.yield_today_wh / 1000.0f;
+        float minV = (g_minBattToday > 50.0f ? d.battery_voltage : g_minBattToday);
+        float maxV = (g_maxBattToday < 5.0f ? d.battery_voltage : g_maxBattToday);
+
+        snprintf(report, sizeof(report),
+            "📊 *RandeSolar Tagesbericht* ☀️\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "⚡ *Tagesertrag:* %.2f kWh (%lu Wh)\n"
+            "🏆 *Spitzenleistung:* %u W\n"
+            "🔋 *Batterie Min / Max:* %.2f V / %.2f V\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "🌐 _Dashboard:_ https://randelab.github.io/RandeSolar/",
+            yieldKwh,
+            (unsigned long)d.yield_today_wh,
+            g_peakPowerToday,
+            minV,
+            maxV
+        );
+        sendTelegramMessage(report);
+        Serial.println("[Scheduler ⏰] 20:00 Evening Telegram report delivered to Marc!");
+    }
+}
+
+void sendTelegramMessage(const String& text, const char* targetChatId) {
     if (WiFi.status() != WL_CONNECTED) return;
 
     WiFiClientSecure secClient;
@@ -728,15 +836,18 @@ void checkTelegramUpdates() {
                             d = g_data;
                             portEXIT_CRITICAL(&g_mux);
 
-                            char msg[600];
+                            char msg[650];
                             int soc = (int)constrain(((d.battery_voltage - 11.8f) / 1.0f) * 100.0f, 0.0f, 100.0f);
                             unsigned long ageSec = d.has_data ? ((millis() - d.last_seen_ms) / 1000) : 999;
+                            float minV = (g_minBattToday > 50.0f ? d.battery_voltage : g_minBattToday);
+                            float maxV = (g_maxBattToday < 5.0f ? d.battery_voltage : g_maxBattToday);
 
                             snprintf(msg, sizeof(msg),
                                 "☀️ *RandeSolar Kraftwerk Status* ⚡\n"
                                 "━━━━━━━━━━━━━━━━━━━━\n"
-                                "☀️ *Solar-Leistung:* %u W\n"
+                                "☀️ *Solar-Leistung:* %u W (Peak: %u W)\n"
                                 "🔋 *Batteriespeicher:* %.2f V (~%d%%)\n"
+                                "📉 *Batterie Min / Max:* %.2f V / %.2f V\n"
                                 "⚡ *Ladestrom:* %.1f A\n"
                                 "💡 *Lastanschluß:* %.1f A\n"
                                 "📊 *Tagesertrag:* %.2f kWh\n"
@@ -746,8 +857,11 @@ void checkTelegramUpdates() {
                                 "━━━━━━━━━━━━━━━━━━━━\n"
                                 "📍 _ESP32-S3 Standalone Station_",
                                 d.solar_power,
+                                g_peakPowerToday,
                                 d.battery_voltage,
                                 soc,
+                                minV,
+                                maxV,
                                 d.battery_current,
                                 d.external_load,
                                 d.yield_today_wh / 1000.0f,
@@ -821,6 +935,10 @@ void setup() {
             Serial.printf("[mDNS] http://%s.local\n", MDNS_HOST);
         }
         setPixel(0, 30, 15); // Green confirmation flash
+
+        // Sync time via NTP (Europe/Zurich: UTC+1 with 1h daylight saving = UTC+2 in summer)
+        configTime(3600, 3600, "pool.ntp.org", "time.google.com");
+        Serial.println("[NTP] Time synchronization requested");
 
         // Send Telegram startup message to Marc
         char bootMsg[240];
@@ -909,6 +1027,22 @@ void loop() {
             mqttClient.publish(MQTT_TOPIC, json);
             triggerTxFlash();
             Serial.printf("[MQTT 📡] Published to %s: %s\n", MQTT_TOPIC, json);
+        }
+    }
+
+    // Log to Supabase Cloud every 20 seconds
+    static uint32_t lastSupabaseLog = 0;
+    if (now - lastSupabaseLog >= 20000) {
+        lastSupabaseLog = now;
+
+        SolarData d;
+        portENTER_CRITICAL(&g_mux);
+        d = g_data;
+        portEXIT_CRITICAL(&g_mux);
+
+        if (d.has_data) {
+            logToSupabase(d);
+            checkDailyEveningReport(d);
         }
     }
 

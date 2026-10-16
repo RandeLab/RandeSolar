@@ -8,49 +8,33 @@ This project supports two interchangeable setups:
 
 ---
 
-## ⚡ Setup 1: Standalone ESP32-S3 Station (Active Now!)
+---
 
-Your **ESP32-S3** is flashed and currently running autonomously on the **RandeLab** Wi-Fi network:
+## ⚡ 100% Standalone ESP32-S3 Architecture (No Laptop Needed!)
 
-- **Web Dashboard**: 👉 **[http://randesolar.local](http://randesolar.local)** *(or `http://192.168.1.101`)*
-- **REST API**: `http://randesolar.local/api/live`
-- **Wi-Fi Network**: `RandeLab`
-- **Features**:
-  - Embedded openBrushograph studio themes (Pinkograph, Randen, Deep Jungle, Coconut)
-  - Hardware-accelerated AES-128-CTR decryption of Victron BLE Instant Readout
-  - Built-in HTTP web server on port 80 & mDNS discovery
-  - Powered via any 5V USB adapter anywhere in the lab
+The **ESP32-S3** handles the entire pipeline autonomously 24/7 without requiring any laptop or local server:
 
-### Reflashing / Monitoring the ESP32:
+1. **BLE Decryption**: Hardware-accelerated AES-128-CTR decryption of Victron MPPT 75|15 Instant Readout beacons.
+2. **HiveMQ MQTT**: Streams live telemetry packets every 5s over WebSocket/MQTT (`broker.hivemq.com`).
+3. **Supabase Cloud Database**: Posts dense time-series telemetry every 20s directly to PostgreSQL cloud database over HTTPS for long-term charts.
+4. **Standalone Telegram Bot**: Direct replies to commands (`/status`, `/mood`, `/wiegehts`, `/ping`) and automated 20:00 evening summary reports.
+5. **Onboard Web Server**: Runs openBrushograph Kraftwerk Studio on port 80 at **[http://randesolar.local](http://randesolar.local)**.
+6. **GitHub Pages Cloud Dashboard**: Accessible worldwide at **[https://randelab.github.io/RandeSolar/](https://randelab.github.io/RandeSolar/)**.
+
+### Flash or Monitor Firmware:
 ```bash
-cd ~/Documents/PlatformIO/Projects/RandeSolar
-
 # Build and flash:
-~/.platformio/penv/bin/pio run -t upload
+pio run -t upload
 
-# Open live serial monitor:
-~/.platformio/penv/bin/pio device monitor
+# Open serial monitor:
+pio device monitor
 ```
 
 ---
 
-## 💻 Setup 2: Local Python Server & SQLite Logger
+## 📦 Legacy / Optional Local Tools (Optional)
 
-If you want long-term historical logging to SQLite with Chart.js time-series graphs and CSV export:
-
-### 1. Start the Server
-```bash
-cd ~/Documents/PlatformIO/Projects/RandeSolar
-./start.sh
-```
-
-### 2. Open the Dashboard
-👉 **[http://localhost:8080](http://localhost:8080)**
-
-### 3. Stop the Server
-```bash
-./stop.sh
-```
+The Python scripts (`server.py`, `supabase_logger.py`) were used during initial prototyping and are **no longer required** for continuous operation. The ESP32-S3 handles all cloud logging, MQTT streaming, and Telegram communications standalone.
 
 ---
 
