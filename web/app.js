@@ -321,6 +321,12 @@ window.setTheme = function(theme) {
     btnWeek.textContent = currentLang === 'de' ? '1 Woche' : '1 week';
   }
 
+  // Diagnostics Footer Signal/Reception label
+  const lblDiagSeen = document.getElementById('lblDiagSeen');
+  if (lblDiagSeen) {
+    lblDiagSeen.textContent = currentLang === 'de' ? 'EMPFANG:' : 'SIGNAL:';
+  }
+
   // LED Legend translation
   const ledTitle = document.getElementById("lblLedTitle");
   const ledSub = document.getElementById("lblLedSubtitle");

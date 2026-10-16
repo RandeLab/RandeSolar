@@ -429,7 +429,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
         <span><b>WLAN:</b> <span id="wifiRssi">--</span> dBm</span>
         <span><b>MQTT:</b> broker.hivemq.com</span>
         <span><b>Netzwerk-IP:</b> <span id="ipAddr">--</span></span>
-        <span><b>Telegramm:</b> <span id="beaconAge">--</span></span>
+        <span><b>Empfang:</b> <span id="beaconAge">--</span></span>
       </div>
     </div>
     <div class="footer" id="lblFooter">RandeSolar • Mechatronische Kunstwerkstatt RandeLab</div>
@@ -908,7 +908,7 @@ void checkTelegramUpdates() {
                                 "📊 *Tagesertrag:* %.2f kWh\n"
                                 "🏷️ *Zustand:* %s (%s)\n"
                                 "📶 *Signal:* BLE %d dBm | WiFi %d dBm\n"
-                                "⏱️ *Telegramm-Alter:* %lu Sek.\n"
+                                "⏱️ *Letzter Empfang:* vor %lu Sek.\n"
                                 "━━━━━━━━━━━━━━━━━━━━\n"
                                 "📍 _ESP32-S3 Standalone Station_",
                                 d.solar_power,
