@@ -1084,9 +1084,117 @@ async function resolveTelegramBotLink() {
   }
 }
 
+// Hyper-Localized Weather & Solar Radiation for RandeLab (Underes Ätzisloo 189, 8232 Merishausen / Randen)
+// High-resolution MeteoSwiss ICON-CH model via Open-Meteo API
+const RANDELAB_LAT = 47.7612;
+const RANDELAB_LON = 8.5868;
+const RANDELAB_ELEVATION = 640;
+
+const WMO_WEATHER_CODES = {
+  0: { de: "Wolkenlos", en: "Clear sky", icon: "☀️" },
+  1: { de: "Überwiegend heiter", en: "Mainly clear", icon: "🌤️" },
+  2: { de: "Teilweise bewölkt", en: "Partly cloudy", icon: "⛅" },
+  3: { de: "Bedeckt", en: "Overcast", icon: "☁️" },
+  45: { de: "Nebel", en: "Fog", icon: "🌫️" },
+  48: { de: "Reifnebel / Hochnebel", en: "Depositing rime fog", icon: "🌫️" },
+  51: { de: "Leichter Nieselregen", en: "Light drizzle", icon: "🌦️" },
+  53: { de: "Mässiger Nieselregen", en: "Moderate drizzle", icon: "🌧️" },
+  55: { de: "Dichter Nieselregen", en: "Dense drizzle", icon: "🌧️" },
+  61: { de: "Leichter Regen", en: "Slight rain", icon: "🌦️" },
+  63: { de: "Mässiger Regen", en: "Moderate rain", icon: "🌧️" },
+  65: { de: "Starker Regen", en: "Heavy rain", icon: "🌧️" },
+  71: { de: "Leichter Schneefall", en: "Slight snow", icon: "🌨️" },
+  73: { de: "Schneefall", en: "Moderate snow", icon: "🌨️" },
+  75: { de: "Starker Schneefall", en: "Heavy snow", icon: "❄️" },
+  77: { de: "Schneegriesel", en: "Snow grains", icon: "❄️" },
+  80: { de: "Leichte Regenschauer", en: "Slight rain showers", icon: "🌦️" },
+  81: { de: "Regenschauer", en: "Moderate rain showers", icon: "🌧️" },
+  82: { de: "Heftige Regenschauer", en: "Violent rain showers", icon: "⛈️" },
+  85: { de: "Schneeschauer", en: "Snow showers", icon: "🌨️" },
+  86: { de: "Starke Schneeschauer", en: "Heavy snow showers", icon: "❄️" },
+  95: { de: "Gewitter", en: "Thunderstorm", icon: "⛈️" },
+  96: { de: "Gewitter mit Hagel", en: "Thunderstorm with slight hail", icon: "⛈️" },
+  99: { de: "Schweres Hagelgewitter", en: "Thunderstorm with heavy hail", icon: "⛈️" }
+};
+
+function getWindCompass(deg) {
+  if (deg === undefined || deg === null) return "--";
+  const sectors = ["N", "NNO", "NO", "ONO", "O", "OSO", "SO", "SSO", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+  return sectors[Math.round(deg / 22.5) % 16];
+}
+
+async function fetchRandeLabWeather() {
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${RANDELAB_LAT}&longitude=${RANDELAB_LON}&elevation=${RANDELAB_ELEVATION}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,shortwave_radiation,direct_normal_irradiance,diffuse_radiation,global_tilted_irradiance&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,sunshine_duration,uv_index_max&timezone=Europe%2FZurich&tilt=35&azimuth=0`;
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const data = await res.json();
+    const cur = data.current;
+    const daily = data.daily;
+    if (!cur) return;
+
+    const wmo = WMO_WEATHER_CODES[cur.weather_code] || { de: "Unbestimmt", en: "Unknown", icon: "🌤️" };
+    const desc = currentLang === 'de' ? wmo.de : wmo.en;
+
+    const setT = (id, val) => { const node = document.getElementById(id); if (node) node.textContent = val; };
+
+    setT('wxIcon', wmo.icon);
+    setT('wxTemp', cur.temperature_2m !== undefined ? cur.temperature_2m.toFixed(1) : '--');
+    setT('wxDesc', desc);
+    setT('wxApparent', cur.apparent_temperature !== undefined ? cur.apparent_temperature.toFixed(1) : '--');
+
+    // Solar Irradiance
+    const gti = cur.global_tilted_irradiance !== undefined ? Math.round(cur.global_tilted_irradiance) : Math.round(cur.shortwave_radiation || 0);
+    setT('wxSolarWm2', gti);
+    setT('wxDirectWm2', cur.direct_normal_irradiance !== undefined ? Math.round(cur.direct_normal_irradiance) : '--');
+    setT('wxDiffuseWm2', cur.diffuse_radiation !== undefined ? Math.round(cur.diffuse_radiation) : '--');
+
+    // Cloud layers
+    setT('wxCloudTotal', cur.cloud_cover !== undefined ? cur.cloud_cover : '--');
+    setT('wxCloudLow', cur.cloud_cover_low !== undefined ? cur.cloud_cover_low : '--');
+    setT('wxCloudMid', cur.cloud_cover_mid !== undefined ? cur.cloud_cover_mid : '--');
+    setT('wxCloudHigh', cur.cloud_cover_high !== undefined ? cur.cloud_cover_high : '--');
+
+    // Wind on the Randen
+    setT('wxWindSpeed', cur.wind_speed_10m !== undefined ? Math.round(cur.wind_speed_10m) : '--');
+    setT('wxWindDir', getWindCompass(cur.wind_direction_10m));
+    setT('wxWindGusts', cur.wind_gusts_10m !== undefined ? Math.round(cur.wind_gusts_10m) : '--');
+
+    // Humidity, Dew Point, Pressure
+    setT('wxHumidity', cur.relative_humidity_2m !== undefined ? cur.relative_humidity_2m : '--');
+    setT('wxPressure', cur.surface_pressure !== undefined ? Math.round(cur.surface_pressure) : '--');
+    setT('wxPrecip', cur.precipitation !== undefined ? cur.precipitation.toFixed(1) : '0.0');
+
+    // Simple Magnus formula for dew point
+    if (cur.temperature_2m !== undefined && cur.relative_humidity_2m !== undefined) {
+      const a = 17.27, b = 237.7;
+      const alpha = ((a * cur.temperature_2m) / (b + cur.temperature_2m)) + Math.log(cur.relative_humidity_2m / 100.0);
+      const dp = (b * alpha) / (a - alpha);
+      setT('wxDewPoint', dp.toFixed(1));
+    }
+
+    // Daily Forecast
+    if (daily) {
+      if (daily.sunrise && daily.sunrise[0]) setT('wxSunrise', daily.sunrise[0].substring(11, 16));
+      if (daily.sunset && daily.sunset[0]) setT('wxSunset', daily.sunset[0].substring(11, 16));
+      if (daily.temperature_2m_min && daily.temperature_2m_min[0] !== undefined) setT('wxTempMin', Math.round(daily.temperature_2m_min[0]));
+      if (daily.temperature_2m_max && daily.temperature_2m_max[0] !== undefined) setT('wxTempMax', Math.round(daily.temperature_2m_max[0]));
+      if (daily.sunshine_duration && daily.sunshine_duration[0] !== undefined) {
+        const sunH = (daily.sunshine_duration[0] / 3600).toFixed(1);
+        setT('wxSunHours', sunH);
+      }
+      if (daily.uv_index_max && daily.uv_index_max[0] !== undefined) setT('wxUvMax', daily.uv_index_max[0].toFixed(1));
+    }
+  } catch (e) {
+    console.warn('[Weather] Could not fetch RandeLab microclimate:', e);
+  }
+}
+
 // Startup
 window.addEventListener('DOMContentLoaded', () => {
   resolveTelegramBotLink();
+  fetchRandeLabWeather();
+  setInterval(fetchRandeLabWeather, 120000); // Refresh weather every 2 minutes
   const isHttps = window.location.protocol === 'https:';
 
   if (el.endpointInput) {

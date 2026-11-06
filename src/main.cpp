@@ -433,6 +433,46 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       </div>
     </div>
 
+    <!-- Hyper-Localized Weather & Solar Radiation (Underes Ätzisloo 189, Merishausen / Randen) -->
+    <div class="panel" style="border-top-color: var(--yellow)">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--border); padding-bottom:6px; margin-bottom:10px; flex-wrap:wrap; gap:6px;">
+        <h2 id="lblPanelWeather" style="border:none; margin:0; padding:0;">🌤️ Mikroklima & Solar-Strahlung • Underes Ätzisloo 189</h2>
+        <span style="font-size:0.72rem; color:var(--muted); font-family:monospace;">47.7612°N, 8.5868°E • ~640m ü.M. (MeteoSwiss ICON)</span>
+      </div>
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap:10px; font-size:0.82rem;">
+        <div style="padding:8px; border:1px solid var(--border); border-radius:4px;">
+          <div style="color:var(--muted); font-size:0.72rem;">🌡️ AUSSENTEMP. (ÄTZISLOO)</div>
+          <div style="font-size:1.35rem; font-weight:bold; color:var(--yellow);"><span id="wxIcon">⛅</span> <span id="wxTemp">--</span> °C</div>
+          <div style="font-size:0.72rem; color:var(--muted); margin-top:2px;"><span id="wxDesc">Lade Wetter...</span> (Gef. <span id="wxApparent">--</span>°)</div>
+        </div>
+        <div style="padding:8px; border:1px solid var(--border); border-radius:4px;">
+          <div style="color:var(--muted); font-size:0.72rem;">☀️ SONNENSTRAHLUNG (GTI)</div>
+          <div style="font-size:1.35rem; font-weight:bold; color:var(--pink);"><span id="wxSolarWm2">--</span> <small style="font-size:0.75rem;">W/m²</small></div>
+          <div style="font-size:0.72rem; color:var(--muted); margin-top:2px;">Direkt <span id="wxDirectWm2">--</span> • Diffus <span id="wxDiffuseWm2">--</span></div>
+        </div>
+        <div style="padding:8px; border:1px solid var(--border); border-radius:4px;">
+          <div style="color:var(--muted); font-size:0.72rem;">🌫️ BEWÖLKUNG & HOCHNEBEL</div>
+          <div style="font-size:1.35rem; font-weight:bold; color:var(--cyan);"><span id="wxCloudTotal">--</span> <small style="font-size:0.75rem;">%</small></div>
+          <div style="font-size:0.72rem; color:var(--muted); margin-top:2px;">Tief <span id="wxCloudLow">--</span>% • Mitt <span id="wxCloudMid">--</span>% • Hoch <span id="wxCloudHigh">--</span>%</div>
+        </div>
+        <div style="padding:8px; border:1px solid var(--border); border-radius:4px;">
+          <div style="color:var(--muted); font-size:0.72rem;">💨 WIND & BÖEN (RANDEN)</div>
+          <div style="font-size:1.15rem; font-weight:bold; color:var(--green);"><span id="wxWindSpeed">--</span> km/h <small style="color:var(--muted); font-size:0.75rem;">(<span id="wxWindDir">--</span>)</small></div>
+          <div style="font-size:0.72rem; color:var(--muted); margin-top:2px;">Böen bis <span id="wxWindGusts">--</span> km/h</div>
+        </div>
+        <div style="padding:8px; border:1px solid var(--border); border-radius:4px;">
+          <div style="color:var(--muted); font-size:0.72rem;">💧 FEUCHTE & DRUCK</div>
+          <div style="font-size:1.15rem; font-weight:bold;"><span id="wxHumidity">--</span>% <small style="color:var(--muted); font-size:0.75rem;">• <span id="wxPressure">--</span> hPa</small></div>
+          <div style="font-size:0.72rem; color:var(--muted); margin-top:2px;">Taupunkt <span id="wxDewPoint">--</span>°C • Regen <span id="wxPrecip">0.0</span> mm</div>
+        </div>
+        <div style="padding:8px; border:1px solid var(--border); border-radius:4px;">
+          <div style="color:var(--muted); font-size:0.72rem;">🌅 SONNENLAUF & PROGNOSE</div>
+          <div style="font-size:1.1rem; font-weight:bold; color:var(--yellow); margin-top:2px;">☀️↑ <span id="wxSunrise">--:--</span> • 🌙↓ <span id="wxSunset">--:--</span></div>
+          <div style="font-size:0.72rem; color:var(--muted); margin-top:2px;">Heute <span id="wxTempMin">--</span>°/<span id="wxTempMax">--</span>°C • ☀️ <span id="wxSunHours">--</span>h</div>
+        </div>
+      </div>
+    </div>
+
     <div class="panel" style="border-top-color: var(--cyan)">
       <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--border); padding-bottom:6px; margin-bottom:10px;">
         <h2 id="lblPanelNet" style="border:none; margin:0; padding:0;">🚀 Internet-Speed & ESP32-S3 Netzwerk-Diagnose</h2>
@@ -603,6 +643,85 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
     const savedTheme = localStorage.getItem("randesolar-esp-theme") || "pinkograph";
     document.getElementById("themeSelect").value = savedTheme;
     applyTheme(savedTheme);
+
+    const WMO_MAP = {
+      0: { de: "Wolkenlos", en: "Clear sky", icon: "☀️" },
+      1: { de: "Überwiegend heiter", en: "Mainly clear", icon: "🌤️" },
+      2: { de: "Teilweise bewölkt", en: "Partly cloudy", icon: "⛅" },
+      3: { de: "Bedeckt", en: "Overcast", icon: "☁️" },
+      45: { de: "Nebel", en: "Fog", icon: "🌫️" },
+      48: { de: "Reifnebel / Hochnebel", en: "Depositing rime fog", icon: "🌫️" },
+      51: { de: "Leichter Nieselregen", en: "Light drizzle", icon: "🌦️" },
+      61: { de: "Leichter Regen", en: "Slight rain", icon: "🌦️" },
+      63: { de: "Mässiger Regen", en: "Moderate rain", icon: "🌧️" },
+      65: { de: "Starker Regen", en: "Heavy rain", icon: "🌧️" },
+      71: { de: "Schneefall", en: "Snow", icon: "🌨️" },
+      80: { de: "Regenschauer", en: "Rain showers", icon: "🌦️" },
+      95: { de: "Gewitter", en: "Thunderstorm", icon: "⛈️" }
+    };
+
+    function getWindDir(deg) {
+      if (deg === undefined) return "--";
+      const s = ["N","NNO","NO","ONO","O","OSO","SO","SSO","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+      return s[Math.round(deg / 22.5) % 16];
+    }
+
+    async function fetchWeather() {
+      try {
+        const url = 'https://api.open-meteo.com/v1/forecast?latitude=47.7612&longitude=8.5868&elevation=640&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,shortwave_radiation,direct_normal_irradiance,diffuse_radiation,global_tilted_irradiance&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset,sunshine_duration&timezone=Europe%2FZurich&tilt=35';
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const d = await res.json();
+        const cur = d.current;
+        const daily = d.daily;
+        if (!cur) return;
+
+        const wmo = WMO_MAP[cur.weather_code] || { de: "Unbestimmt", en: "Unknown", icon: "🌤️" };
+        const setT = (id, val) => { const n = document.getElementById(id); if (n) n.textContent = val; };
+
+        setT('wxIcon', wmo.icon);
+        setT('wxTemp', cur.temperature_2m !== undefined ? cur.temperature_2m.toFixed(1) : '--');
+        setT('wxDesc', curLang === 'de' ? wmo.de : wmo.en);
+        setT('wxApparent', cur.apparent_temperature !== undefined ? cur.apparent_temperature.toFixed(1) : '--');
+
+        const gti = cur.global_tilted_irradiance !== undefined ? Math.round(cur.global_tilted_irradiance) : Math.round(cur.shortwave_radiation || 0);
+        setT('wxSolarWm2', gti);
+        setT('wxDirectWm2', cur.direct_normal_irradiance !== undefined ? Math.round(cur.direct_normal_irradiance) : '--');
+        setT('wxDiffuseWm2', cur.diffuse_radiation !== undefined ? Math.round(cur.diffuse_radiation) : '--');
+
+        setT('wxCloudTotal', cur.cloud_cover !== undefined ? cur.cloud_cover : '--');
+        setT('wxCloudLow', cur.cloud_cover_low !== undefined ? cur.cloud_cover_low : '--');
+        setT('wxCloudMid', cur.cloud_cover_mid !== undefined ? cur.cloud_cover_mid : '--');
+        setT('wxCloudHigh', cur.cloud_cover_high !== undefined ? cur.cloud_cover_high : '--');
+
+        setT('wxWindSpeed', cur.wind_speed_10m !== undefined ? Math.round(cur.wind_speed_10m) : '--');
+        setT('wxWindDir', getWindDir(cur.wind_direction_10m));
+        setT('wxWindGusts', cur.wind_gusts_10m !== undefined ? Math.round(cur.wind_gusts_10m) : '--');
+
+        setT('wxHumidity', cur.relative_humidity_2m !== undefined ? cur.relative_humidity_2m : '--');
+        setT('wxPressure', cur.surface_pressure !== undefined ? Math.round(cur.surface_pressure) : '--');
+        setT('wxPrecip', cur.precipitation !== undefined ? cur.precipitation.toFixed(1) : '0.0');
+
+        if (cur.temperature_2m !== undefined && cur.relative_humidity_2m !== undefined) {
+          const a = 17.27, b = 237.7;
+          const alpha = ((a * cur.temperature_2m) / (b + cur.temperature_2m)) + Math.log(cur.relative_humidity_2m / 100.0);
+          setT('wxDewPoint', ((b * alpha) / (a - alpha)).toFixed(1));
+        }
+
+        if (daily) {
+          if (daily.sunrise && daily.sunrise[0]) setT('wxSunrise', daily.sunrise[0].substring(11, 16));
+          if (daily.sunset && daily.sunset[0]) setT('wxSunset', daily.sunset[0].substring(11, 16));
+          if (daily.temperature_2m_min && daily.temperature_2m_min[0] !== undefined) setT('wxTempMin', Math.round(daily.temperature_2m_min[0]));
+          if (daily.temperature_2m_max && daily.temperature_2m_max[0] !== undefined) setT('wxTempMax', Math.round(daily.temperature_2m_max[0]));
+          if (daily.sunshine_duration && daily.sunshine_duration[0] !== undefined) setT('wxSunHours', (daily.sunshine_duration[0] / 3600).toFixed(1));
+        }
+      } catch (e) {
+        console.warn('Weather fetch:', e);
+      }
+    }
+
+    fetchWeather();
+    setInterval(fetchWeather, 120000);
 
     fetch('https://api.telegram.org/bot8600149990:AAGGHL_USsmi_PfzPFBDIvoFgQx-rmvXIkc/getMe')
       .then(r => r.json())
@@ -1383,6 +1502,58 @@ void checkTelegramUpdates() {
 
                             String moodMsg = generateHumanMoodReport(d);
                             sendTelegramMessage(moodMsg, fromChatId.c_str());
+                        } else if (cmd.startsWith("/weather") || cmd.startsWith("/wetter") || cmd.startsWith("/climate")) {
+                            WiFiClientSecure wxClient;
+                            wxClient.setInsecure();
+                            HTTPClient wxHttp;
+                            String wxUrl = "https://api.open-meteo.com/v1/forecast?latitude=47.7612&longitude=8.5868&elevation=640&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,shortwave_radiation&timezone=Europe%2FZurich";
+                            if (wxHttp.begin(wxClient, wxUrl)) {
+                                int code = wxHttp.GET();
+                                if (code == HTTP_CODE_OK) {
+                                    String payload = wxHttp.getString();
+                                    auto getJsonVal = [](const String& src, const char* key) -> String {
+                                        int k = src.indexOf(key);
+                                        if (k < 0) return "--";
+                                        int c = src.indexOf(':', k);
+                                        if (c < 0) return "--";
+                                        int end = src.indexOf(',', c);
+                                        int endB = src.indexOf('}', c);
+                                        if (end < 0 || (endB > 0 && endB < end)) end = endB;
+                                        if (end < 0) return "--";
+                                        String v = src.substring(c + 1, end);
+                                        v.trim();
+                                        return v;
+                                    };
+
+                                    String t = getJsonVal(payload, "\"temperature_2m\"");
+                                    String app = getJsonVal(payload, "\"apparent_temperature\"");
+                                    String rh = getJsonVal(payload, "\"relative_humidity_2m\"");
+                                    String rad = getJsonVal(payload, "\"shortwave_radiation\"");
+                                    String cc = getJsonVal(payload, "\"cloud_cover\"");
+                                    String ws = getJsonVal(payload, "\"wind_speed_10m\"");
+                                    String wg = getJsonVal(payload, "\"wind_gusts_10m\"");
+                                    String pr = getJsonVal(payload, "\"precipitation\"");
+
+                                    char wxMsg[500];
+                                    snprintf(wxMsg, sizeof(wxMsg),
+                                        "🌤️ *Mikroklima RandeLab (Ätzisloo 189)* 📍\n"
+                                        "━━━━━━━━━━━━━━━━━━━━\n"
+                                        "🌡️ *Aussentemperatur:* %s °C (Gefühlt: %s °C)\n"
+                                        "☀️ *Solare Einstrahlung:* %s W/m²\n"
+                                        "🌫️ *Bewölkung / Hochnebel:* %s %%\n"
+                                        "💧 *Luftfeuchtigkeit:* %s %%\n"
+                                        "🌧️ *Niederschlag:* %s mm\n"
+                                        "💨 *Wind:* %s km/h (Böen bis %s km/h)\n"
+                                        "━━━━━━━━━━━━━━━━━━━━\n"
+                                        "🏔️ _47.7612°N, 8.5868°E • ~640m ü.M. (MeteoSwiss ICON)_",
+                                        t.c_str(), app.c_str(), rad.c_str(), cc.c_str(), rh.c_str(), pr.c_str(), ws.c_str(), wg.c_str()
+                                    );
+                                    sendTelegramMessage(wxMsg, fromChatId.c_str());
+                                } else {
+                                    sendTelegramMessage("⚠️ Konnte Wetterdaten von Open-Meteo gerade nicht abrufen.", fromChatId.c_str());
+                                }
+                                wxHttp.end();
+                            }
                         } else if (cmd.startsWith("/ping")) {
                             sendTelegramMessage("🏓 *Pong!* RandeSolar ESP32-S3 ist online und empfängt Bluetooth-Telemetrie.", fromChatId.c_str());
                         } else if (cmd.startsWith("/start") || cmd.startsWith("/help") || cmd.startsWith("/hilfe")) {
@@ -1390,6 +1561,7 @@ void checkTelegramUpdates() {
                                 "☀️ *Willkommen beim RandeSolar Bot!* ⚡\n\n"
                                 "Verfügbare Befehle:\n"
                                 "• /status - Technische Zahlen & Messwerte\n"
+                                "• /weather - Lokales Wetter & Solarstrahlung 🌤️\n"
                                 "• /mood - Wie ich mich heute fühle (Tagebuch) 💬\n"
                                 "• /speed - Live Internet-Speedtest vom ESP32 🚀\n"
                                 "• /ping - Verbindungsstatus prüfen 🏓\n\n"
