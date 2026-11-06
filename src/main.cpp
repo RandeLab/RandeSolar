@@ -21,6 +21,8 @@
 #include <HTTPClient.h>
 #include <WebServer.h>
 #include <ESPmDNS.h>
+#include <ArduinoOTA.h>
+#include <Update.h>
 #include <PubSubClient.h>
 #include <NimBLEDevice.h>
 #include "mbedtls/aes.h"
@@ -46,6 +48,16 @@ static float g_minBattToday = 99.0f;
 static float g_maxBattToday = 0.0f;
 static int g_lastReportDay = -1;
 static int g_currentMday = -1;
+
+// Internet Speed & Network Diagnostics Tracking
+static uint32_t g_netPingMs = 0;      // TCP handshake to 1.1.1.1:53
+static uint32_t g_gwPingMs = 0;       // TCP handshake to local router/gateway
+static uint32_t g_dnsMs = 0;          // DNS lookup time for speed.cloudflare.com
+static uint32_t g_ttfbMs = 0;         // HTTP Time-To-First-Byte
+static float g_netSpeedMbps = 0.0f;   // Download speed in Mbit/s
+static float g_netUpMbps = 0.0f;      // Upload speed in Mbit/s
+static uint32_t g_lastSpeedTestMs = 0;
+void measureInternetSpeed(bool measureBandwidth = false);
 
 // HiveMQ Broker
 static const char* MQTT_BROKER   = "broker.hivemq.com";
@@ -421,15 +433,45 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       </div>
     </div>
 
-    <div class="panel">
-      <h2 id="lblPanelDiag">Systemdiagnose & Funknetz</h2>
-      <div class="sub" style="border:none; margin:0; padding:0; display:flex; flex-wrap:wrap; gap:16px;">
-        <span><b>Gerät:</b> cb:06:61:60:5a:c2</span>
-        <span><b>Bluetooth:</b> <span id="bleRssi">--</span> dBm</span>
-        <span><b>WLAN:</b> <span id="wifiRssi">--</span> dBm</span>
+    <div class="panel" style="border-top-color: var(--cyan)">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--border); padding-bottom:6px; margin-bottom:10px;">
+        <h2 id="lblPanelNet" style="border:none; margin:0; padding:0;">🚀 Internet-Speed & ESP32-S3 Netzwerk-Diagnose</h2>
+        <button id="btnSpeedtest" onclick="runSpeedtest()" style="padding:4px 10px; background:var(--pink); color:var(--bg); border:none; border-radius:4px; font-weight:bold; cursor:pointer; font-size:0.78rem;">🔄 Live Speedtest</button>
+      </div>
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap:10px; font-size:0.82rem;">
+        <div style="padding:8px; border:1px solid var(--border); border-radius:4px;">
+          <div style="color:var(--muted); font-size:0.72rem;">⬇️ DOWNLOAD</div>
+          <div style="font-size:1.35rem; font-weight:bold; color:var(--cyan);"><span id="netDown">--</span> <small style="font-size:0.75rem;">Mbit/s</small></div>
+        </div>
+        <div style="padding:8px; border:1px solid var(--border); border-radius:4px;">
+          <div style="color:var(--muted); font-size:0.72rem;">⬆️ UPLOAD</div>
+          <div style="font-size:1.35rem; font-weight:bold; color:var(--pink);"><span id="netUp">--</span> <small style="font-size:0.75rem;">Mbit/s</small></div>
+        </div>
+        <div style="padding:8px; border:1px solid var(--border); border-radius:4px;">
+          <div style="color:var(--muted); font-size:0.72rem;">🏓 PING (INTERNET / ROUTER)</div>
+          <div style="font-size:1.15rem; font-weight:bold; color:var(--green);"><span id="netPing">--</span> ms <small style="color:var(--muted); font-size:0.75rem;">/ GW <span id="gwPing">--</span> ms</small></div>
+        </div>
+        <div style="padding:8px; border:1px solid var(--border); border-radius:4px;">
+          <div style="color:var(--muted); font-size:0.72rem;">🔍 DNS & HTTP TTFB</div>
+          <div style="font-size:1.15rem; font-weight:bold; color:var(--yellow);">DNS <span id="dnsMs">--</span> ms <small style="color:var(--muted); font-size:0.75rem;">/ TTFB <span id="ttfbMs">--</span> ms</small></div>
+        </div>
+        <div style="padding:8px; border:1px solid var(--border); border-radius:4px;">
+          <div style="color:var(--muted); font-size:0.72rem;">📶 WLAN SIGNAL & KANAL</div>
+          <div style="font-size:1.15rem; font-weight:bold;"><span id="wifiRssi">--</span> dBm <small style="color:var(--muted); font-size:0.75rem;">(<span id="wifiQual">--</span>% • Ch <span id="wifiCh">--</span>)</small></div>
+        </div>
+        <div style="padding:8px; border:1px solid var(--border); border-radius:4px;">
+          <div style="color:var(--muted); font-size:0.72rem;">🌡️ ESP32-S3 CHIP & RAM</div>
+          <div style="font-size:1.15rem; font-weight:bold;"><span id="chipTemp">--</span> °C <small style="color:var(--muted); font-size:0.75rem;">(<span id="freeHeap">--</span> KB frei)</small></div>
+        </div>
+      </div>
+      <div class="sub" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:14px;">
+        <span><b>Victron BLE:</b> cb:06:61:60:5a:c2 (<span id="bleRssi">--</span> dBm)</span>
+        <span><b>ESP32-IP:</b> <span id="ipAddr">--</span></span>
+        <span><b>Gateway:</b> <span id="gwAddr">--</span></span>
         <span><b>MQTT:</b> broker.hivemq.com</span>
-        <span><b>Netzwerk-IP:</b> <span id="ipAddr">--</span></span>
         <span><b>Empfang:</b> <span id="beaconAge">--</span></span>
+        <span><a id="tgBotLink" href="https://t.me/RandeSolarBot" target="_blank" style="color:var(--cyan);text-decoration:none;font-weight:bold;">✈️ Telegram Bot</a></span>
+        <span><a href="/update" style="color:var(--pink);text-decoration:none;font-weight:bold;">⚡ OTA Firmware Update</a></span>
       </div>
     </div>
     <div class="footer" id="lblFooter">RandeSolar • Mechatronische Kunstwerkstatt RandeLab</div>
@@ -491,8 +533,19 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       document.getElementById("lblFlow").textContent = l.flow;
       document.getElementById("lblPanelState").textContent = l.panelState;
       document.getElementById("lblLoad").textContent = l.load;
-      document.getElementById("lblPanelDiag").textContent = l.panelDiag;
+      const elDiag = document.getElementById("lblPanelDiag");
+      if (elDiag) elDiag.textContent = l.panelDiag;
       document.getElementById("lblFooter").textContent = l.footer;
+    }
+
+    async function runSpeedtest() {
+      const btn = document.getElementById('btnSpeedtest');
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ Messe...'; }
+      try {
+        await fetch('/api/speedtest');
+        await update();
+      } catch (e) { console.error(e); }
+      if (btn) { btn.disabled = false; btn.textContent = '🔄 Live Speedtest'; }
     }
 
     async function update() {
@@ -529,7 +582,18 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
         document.getElementById('externalLoad').textContent = d.external_load.toFixed(1) + ' A';
         document.getElementById('bleRssi').textContent = d.ble_rssi;
         document.getElementById('wifiRssi').textContent = d.wifi_rssi;
+        if (d.wifi_quality_pct !== undefined) document.getElementById('wifiQual').textContent = d.wifi_quality_pct;
+        if (d.wifi_channel !== undefined) document.getElementById('wifiCh').textContent = d.wifi_channel;
         document.getElementById('ipAddr').textContent = d.ip;
+        if (d.gateway_ip) document.getElementById('gwAddr').textContent = d.gateway_ip;
+        if (d.chip_temp !== undefined) document.getElementById('chipTemp').textContent = d.chip_temp.toFixed(1);
+        if (d.free_heap_kb !== undefined) document.getElementById('freeHeap').textContent = d.free_heap_kb;
+        if (d.net_mbps !== undefined) document.getElementById('netDown').textContent = d.net_mbps.toFixed(2);
+        if (d.net_up_mbps !== undefined) document.getElementById('netUp').textContent = d.net_up_mbps.toFixed(2);
+        if (d.net_ping_ms !== undefined) document.getElementById('netPing').textContent = d.net_ping_ms;
+        if (d.gw_ping_ms !== undefined) document.getElementById('gwPing').textContent = d.gw_ping_ms;
+        if (d.dns_ms !== undefined) document.getElementById('dnsMs').textContent = d.dns_ms;
+        if (d.ttfb_ms !== undefined) document.getElementById('ttfbMs').textContent = d.ttfb_ms;
         document.getElementById('beaconAge').textContent = d.age_sec + (curLang === 'de' ? ' Sek.' : 's ago');
       } catch (e) {
         console.error(e);
@@ -540,8 +604,100 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
     document.getElementById("themeSelect").value = savedTheme;
     applyTheme(savedTheme);
 
+    fetch('https://api.telegram.org/bot8600149990:AAGGHL_USsmi_PfzPFBDIvoFgQx-rmvXIkc/getMe')
+      .then(r => r.json())
+      .then(j => {
+        if (j.ok && j.result && j.result.username) {
+          const el = document.getElementById('tgBotLink');
+          if (el) { el.href = 'https://t.me/' + j.result.username; el.textContent = '✈️ @' + j.result.username; }
+        }
+      }).catch(() => {});
+
     setInterval(update, 2000);
     update();
+  </script>
+</body>
+</html>
+)rawliteral";
+
+// ==================== WEB OTA UPDATE PAGE ====================
+static const char OTA_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RandeSolar • OTA Firmware Update</title>
+  <style>
+    body { background: #0B0014; color: #FFEAF4; font-family: monospace, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 90vh; margin: 0; padding: 18px; }
+    .card { background: #16032A; border: 2px solid #FF6BB5; border-top: 4px solid #00F5FF; border-radius: 6px; padding: 24px; max-width: 460px; width: 100%; box-shadow: 0 0 15px rgba(255, 107, 181, 0.5); }
+    h1 { color: #FF6BB5; font-size: 1.4rem; margin: 0 0 8px 0; }
+    p { color: #E3A0C0; font-size: 0.85rem; margin: 0 0 18px 0; line-height: 1.4; }
+    input[type=file] { width: 100%; padding: 10px; background: #0B0014; color: #FFEAF4; border: 1px dashed #FF6BB5; border-radius: 4px; margin-bottom: 14px; cursor: pointer; }
+    button { width: 100%; padding: 10px; background: #FF6BB5; color: #0B0014; border: none; border-radius: 4px; font-weight: bold; font-size: 1rem; cursor: pointer; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .bar { height: 10px; background: #0B0014; border: 1px solid #FF6BB5; border-radius: 4px; overflow: hidden; margin-top: 14px; display: none; }
+    .fill { height: 100%; width: 0%; background: linear-gradient(90deg, #00F5FF, #39FF14); transition: width 0.2s; }
+    #status { margin-top: 10px; font-size: 0.85rem; color: #00F5FF; text-align: center; }
+    .back { display: inline-block; margin-top: 16px; color: #E3A0C0; font-size: 0.8rem; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>⚡ RandeSolar OTA Update</h1>
+    <p>Wähle eine kompilierte <code>firmware.bin</code> Datei aus (<code>.pio/build/esp32-s3-devkitc-1/firmware.bin</code>), um den ESP32-S3 drahtlos zu aktualisieren.</p>
+    <form id="otaForm">
+      <input type="file" id="fileInput" name="update" accept=".bin" required>
+      <button type="submit" id="btnUpload">Firmware flashen</button>
+    </form>
+    <div class="bar" id="progBar"><div class="fill" id="progFill"></div></div>
+    <div id="status"></div>
+    <a class="back" href="/">← Zurück zum Dashboard</a>
+  </div>
+  <script>
+    const form = document.getElementById('otaForm');
+    form.onsubmit = function(e) {
+      e.preventDefault();
+      const file = document.getElementById('fileInput').files[0];
+      if (!file) return;
+      const btn = document.getElementById('btnUpload');
+      const bar = document.getElementById('progBar');
+      const fill = document.getElementById('progFill');
+      const status = document.getElementById('status');
+      btn.disabled = true;
+      bar.style.display = 'block';
+      status.textContent = 'Übertrage Firmware...';
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/update', true);
+      xhr.upload.onprogress = function(ev) {
+        if (ev.lengthComputable) {
+          const pct = Math.round((ev.loaded / ev.total) * 100);
+          fill.style.width = pct + '%';
+          status.textContent = 'Upload: ' + pct + '% (' + Math.round(ev.loaded / 1024) + ' KB)';
+        }
+      };
+      xhr.onload = function() {
+        if (xhr.status === 200) {
+          fill.style.width = '100%';
+          status.style.color = '#39FF14';
+          status.textContent = '✅ Update erfolgreich! ESP32-S3 startet neu...';
+          setTimeout(() => { location.href = '/'; }, 6000);
+        } else {
+          status.style.color = '#FF3860';
+          status.textContent = '❌ Fehler: ' + xhr.responseText;
+          btn.disabled = false;
+        }
+      };
+      xhr.onerror = function() {
+        status.style.color = '#FF3860';
+        status.textContent = '❌ Verbindungsfehler beim Upload.';
+        btn.disabled = false;
+      };
+      const data = new FormData();
+      data.append('update', file);
+      xhr.send(data);
+    };
   </script>
 </body>
 </html>
@@ -552,6 +708,73 @@ void handleRoot() {
     server.send(200, "text/html", INDEX_HTML);
 }
 
+void handleOtaPage() {
+    server.send(200, "text/html", OTA_HTML);
+}
+
+void handleOtaUploadDone() {
+    server.sendHeader("Connection", "close");
+    if (Update.hasError()) {
+        server.send(500, "text/plain", Update.errorString());
+    } else {
+        server.send(200, "text/plain", "OK");
+        delay(400);
+        ESP.restart();
+    }
+}
+
+void handleOtaUploadChunk() {
+    HTTPUpload& upload = server.upload();
+    if (upload.status == UPLOAD_FILE_START) {
+        Serial.printf("[WebOTA] Update Start: %s\n", upload.filename.c_str());
+        NimBLEDevice::getScan()->stop();
+        setPixel(25, 0, 25); // Magenta during OTA
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+            Update.printError(Serial);
+        }
+    } else if (upload.status == UPLOAD_FILE_WRITE) {
+        if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+            Update.printError(Serial);
+        }
+    } else if (upload.status == UPLOAD_FILE_END) {
+        if (Update.end(true)) {
+            Serial.printf("[WebOTA] Update Success: %u bytes. Rebooting...\n", upload.totalSize);
+            setPixel(0, 40, 10);
+        } else {
+            Update.printError(Serial);
+            setPixel(40, 0, 0);
+            NimBLEDevice::getScan()->start(0, false);
+        }
+    }
+}
+
+void setupOTA() {
+    ArduinoOTA.setHostname(MDNS_HOST);
+
+    ArduinoOTA.onStart([]() {
+        NimBLEDevice::getScan()->stop();
+        setPixel(25, 0, 25); // Magenta indicator for OTA start
+        Serial.println("\n[ArduinoOTA] Starting wireless update...");
+    });
+    ArduinoOTA.onEnd([]() {
+        setPixel(0, 40, 10); // Green on finish
+        Serial.println("\n[ArduinoOTA] Update complete! Rebooting...");
+    });
+    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+        uint8_t pct = (progress * 100) / (total ? total : 1);
+        setPixel(20, 0, (uint8_t)map(pct, 0, 100, 5, 45));
+        Serial.printf("[ArduinoOTA] Progress: %u%%\r", pct);
+    });
+    ArduinoOTA.onError([](ota_error_t error) {
+        setPixel(40, 0, 0);
+        Serial.printf("\n[ArduinoOTA] Error[%u]\n", error);
+        NimBLEDevice::getScan()->start(0, false);
+    });
+
+    ArduinoOTA.begin();
+    Serial.printf("[OTA] Ready at %s.local:3232 and http://%s.local/update\n", MDNS_HOST, MDNS_HOST);
+}
+
 void handleLiveApi() {
     SolarData d;
     portENTER_CRITICAL(&g_mux);
@@ -559,12 +782,18 @@ void handleLiveApi() {
     portEXIT_CRITICAL(&g_mux);
 
     unsigned long ageSec = d.has_data ? ((millis() - d.last_seen_ms) / 1000) : 999;
+    float chipTemp = temperatureRead();
+    int wifiRssi = WiFi.RSSI();
+    int wifiQual = constrain(2 * (wifiRssi + 100), 0, 100);
 
-    char json[450];
+    char json[680];
     snprintf(json, sizeof(json),
         "{\"has_data\":%s,\"solar_power\":%u,\"battery_voltage\":%.2f,\"battery_current\":%.2f,"
         "\"yield_today_wh\":%lu,\"external_load\":%.2f,\"charge_state\":%u,\"state_str\":\"%s\","
-        "\"charger_error\":%u,\"ble_rssi\":%d,\"wifi_rssi\":%d,\"ip\":\"%s\",\"age_sec\":%lu}",
+        "\"charger_error\":%u,\"ble_rssi\":%d,\"wifi_rssi\":%d,\"wifi_quality_pct\":%d,\"wifi_channel\":%d,"
+        "\"chip_temp\":%.1f,\"free_heap_kb\":%u,\"net_mbps\":%.2f,\"net_up_mbps\":%.2f,"
+        "\"net_ping_ms\":%u,\"gw_ping_ms\":%u,\"dns_ms\":%u,\"ttfb_ms\":%u,"
+        "\"ip\":\"%s\",\"gateway_ip\":\"%s\",\"age_sec\":%lu}",
         d.has_data ? "true" : "false",
         d.solar_power,
         d.battery_voltage,
@@ -575,13 +804,149 @@ void handleLiveApi() {
         getChargeStateName(d.charge_state),
         d.charger_error,
         d.rssi,
-        WiFi.RSSI(),
+        wifiRssi,
+        wifiQual,
+        WiFi.channel(),
+        chipTemp,
+        (unsigned int)(ESP.getFreeHeap() / 1024),
+        g_netSpeedMbps,
+        g_netUpMbps,
+        (unsigned int)g_netPingMs,
+        (unsigned int)g_gwPingMs,
+        (unsigned int)g_dnsMs,
+        (unsigned int)g_ttfbMs,
         WiFi.localIP().toString().c_str(),
+        WiFi.gatewayIP().toString().c_str(),
         ageSec
     );
 
     server.sendHeader("Access-Control-Allow-Origin", "*");
     server.send(200, "application/json", json);
+}
+
+void handleSpeedtestApi() {
+    measureInternetSpeed(true);
+    handleLiveApi();
+}
+
+void measureInternetSpeed(bool measureBandwidth) {
+    if (WiFi.status() != WL_CONNECTED) return;
+
+    // 1. Local Router / Gateway Ping (TCP handshake to gateway port 80 or 53)
+    {
+        WiFiClient gwClient;
+        gwClient.setTimeout(500);
+        uint32_t t0 = millis();
+        if (gwClient.connect(WiFi.gatewayIP(), 80) || gwClient.connect(WiFi.gatewayIP(), 53)) {
+            g_gwPingMs = millis() - t0;
+            gwClient.stop();
+        } else {
+            uint32_t elapsed = millis() - t0;
+            if (elapsed < 450) g_gwPingMs = elapsed; // Instant TCP RST from gateway still proves RTT!
+        }
+    }
+
+    // 2. Internet Ping to Cloudflare DNS (1.1.1.1:53)
+    {
+        WiFiClient pingClient;
+        pingClient.setTimeout(2000);
+        uint32_t t0 = millis();
+        if (pingClient.connect(IPAddress(1, 1, 1, 1), 53)) {
+            g_netPingMs = millis() - t0;
+            pingClient.stop();
+        }
+    }
+
+    // 3. Full Bandwidth & Protocol Timing Benchmark (Download + Upload + DNS + TTFB)
+    if (measureBandwidth) {
+        IPAddress cfIp;
+        uint32_t dnsStart = millis();
+        if (WiFi.hostByName("speed.cloudflare.com", cfIp)) {
+            g_dnsMs = millis() - dnsStart;
+        }
+
+        uint8_t* buf = (uint8_t*)malloc(4096);
+        if (!buf) return;
+
+        // 3a. Pure Streaming Download Test (256 KB payload from Cloudflare Speedtest)
+        {
+            WiFiClient dlClient;
+            HTTPClient http;
+            if (http.begin(dlClient, "http://speed.cloudflare.com/__down?bytes=262144")) {
+                http.setTimeout(5000);
+                uint32_t getStart = millis();
+                int code = http.GET();
+                if (code == 200) {
+                    WiFiClient* stream = http.getStreamPtr();
+                    // Wait for first payload byte to separate TTFB from pure transfer rate
+                    uint32_t waitStart = millis();
+                    while (http.connected() && !stream->available() && (millis() - waitStart < 2000)) {
+                        yield();
+                    }
+                    g_ttfbMs = millis() - getStart;
+
+                    uint32_t streamStartUs = micros();
+                    size_t totalRead = 0;
+                    uint32_t loopGuardMs = millis();
+                    while (http.connected() && totalRead < 262144) {
+                        size_t avail = stream->available();
+                        if (avail) {
+                            int r = stream->readBytes(buf, min(avail, (size_t)4096));
+                            if (r > 0) totalRead += r;
+                        } else {
+                            if (millis() - loopGuardMs > 4500) break;
+                            yield();
+                        }
+                    }
+                    uint32_t streamElapsedUs = micros() - streamStartUs;
+                    if (streamElapsedUs > 1000 && totalRead > 0) {
+                        // (bytes * 8 bits) / microseconds = Mbit/s
+                        g_netSpeedMbps = (totalRead * 8.0f) / (float)streamElapsedUs;
+                    }
+                }
+                http.end();
+            }
+        }
+
+        // 3b. Upload Throughput Test (64 KB POST to speed.cloudflare.com/__up)
+        if (cfIp != IPAddress(0, 0, 0, 0)) {
+            WiFiClient upClient;
+            upClient.setTimeout(4000);
+            if (upClient.connect(cfIp, 80)) {
+                memset(buf, 'R', 4096);
+                upClient.print(
+                    "POST /__up HTTP/1.1\r\n"
+                    "Host: speed.cloudflare.com\r\n"
+                    "Content-Length: 65536\r\n"
+                    "Connection: close\r\n\r\n"
+                );
+                uint32_t upStartUs = micros();
+                size_t totalSent = 0;
+                for (int chunk = 0; chunk < 16; chunk++) {
+                    size_t w = upClient.write(buf, 4096);
+                    if (w == 0) break;
+                    totalSent += w;
+                }
+                // Wait for server HTTP 200 response header to confirm all bytes arrived
+                uint32_t ackWait = millis();
+                while (upClient.connected() && !upClient.available() && (millis() - ackWait < 3000)) {
+                    yield();
+                }
+                uint32_t totalUpUs = micros() - upStartUs;
+                uint32_t rttUs = g_netPingMs * 1000;
+                uint32_t xferUpUs = (totalUpUs > rttUs + 2000) ? (totalUpUs - rttUs) : totalUpUs;
+                if (xferUpUs > 1000 && totalSent > 0) {
+                    g_netUpMbps = (totalSent * 8.0f) / (float)xferUpUs;
+                }
+                upClient.stop();
+            }
+        }
+
+        free(buf);
+        g_lastSpeedTestMs = millis();
+        Serial.printf("[NetSpeed 🚀] Down: %.2f Mbit/s | Up: %.2f Mbit/s | Ping: %u ms (GW: %u ms) | DNS: %u ms | TTFB: %u ms\n",
+            g_netSpeedMbps, g_netUpMbps, (unsigned int)g_netPingMs, (unsigned int)g_gwPingMs, (unsigned int)g_dnsMs, (unsigned int)g_ttfbMs);
+    }
 }
 
 // Reconnect MQTT (non-blocking)
@@ -836,6 +1201,7 @@ String generateHumanMoodReport(const SolarData& d) {
         story += "\n💡 *Übrigens:* Am Lastanschluss saugt gerade jemand *" + String(load, 1) + " A* ab – schön, dass der Strom fliesst!";
     }
 
+    story += "\n🌡️ *Silizium-Temperatur:* " + String(temperatureRead(), 1) + " °C";
     story += "\n━━━━━━━━━━━━━━━━━━━━\n📍 _Direkt aus dem ESP32-S3 Silizium-Gehirn_";
     return story;
 }
@@ -890,12 +1256,15 @@ void checkTelegramUpdates() {
                             d = g_data;
                             portEXIT_CRITICAL(&g_mux);
 
-                            char msg[650];
+                            char msg[860];
                             int soc = estimateBatterySoC(d.battery_voltage, d.battery_current, d.external_load, d.charge_state);
                             const char* socStage = (d.charge_state == 5) ? "Float" : (d.charge_state == 4) ? "Absorp." : (d.charge_state == 3 || d.battery_current > 0.4f) ? "Bulk" : "Ruhe";
                             unsigned long ageSec = d.has_data ? ((millis() - d.last_seen_ms) / 1000) : 999;
                             float minV = (g_minBattToday > 50.0f ? d.battery_voltage : g_minBattToday);
                             float maxV = (g_maxBattToday < 5.0f ? d.battery_voltage : g_maxBattToday);
+                            float chipTemp = temperatureRead();
+                            int wifiRssi = WiFi.RSSI();
+                            int wifiQual = constrain(2 * (wifiRssi + 100), 0, 100);
 
                             snprintf(msg, sizeof(msg),
                                 "☀️ *RandeSolar Kraftwerk Status* ⚡\n"
@@ -907,7 +1276,11 @@ void checkTelegramUpdates() {
                                 "💡 *Lastanschluß:* %.1f A\n"
                                 "📊 *Tagesertrag:* %.2f kWh\n"
                                 "🏷️ *Zustand:* %s (%s)\n"
-                                "📶 *Signal:* BLE %d dBm | WiFi %d dBm\n"
+                                "━━━━━━━━━━━━━━━━━━━━\n"
+                                "🚀 *Internet:* ⬇️ %.2f Mbit/s | ⬆️ %.2f Mbit/s\n"
+                                "🏓 *Latenz:* %u ms (Router: %u ms | DNS: %u ms)\n"
+                                "📶 *Funk:* WiFi %d dBm (%d%%, Ch %d) | BLE %d dBm\n"
+                                "🌡️ *ESP32-S3:* %.1f °C (%u KB RAM frei)\n"
                                 "⏱️ *Letzter Empfang:* vor %lu Sek.\n"
                                 "━━━━━━━━━━━━━━━━━━━━\n"
                                 "📍 _ESP32-S3 Standalone Station_",
@@ -923,11 +1296,50 @@ void checkTelegramUpdates() {
                                 d.yield_today_wh / 1000.0f,
                                 getChargeStateName(d.charge_state),
                                 getChargeStateGerman(d.charge_state),
+                                g_netSpeedMbps,
+                                g_netUpMbps,
+                                (unsigned int)g_netPingMs,
+                                (unsigned int)g_gwPingMs,
+                                (unsigned int)g_dnsMs,
+                                wifiRssi,
+                                wifiQual,
+                                WiFi.channel(),
                                 d.rssi,
-                                WiFi.RSSI(),
+                                chipTemp,
+                                (unsigned int)(ESP.getFreeHeap() / 1024),
                                 ageSec
                             );
                             sendTelegramMessage(msg, fromChatId.c_str());
+                        } else if (cmd.startsWith("/speed")) {
+                            measureInternetSpeed(true);
+                            int wifiRssi = WiFi.RSSI();
+                            int wifiQual = constrain(2 * (wifiRssi + 100), 0, 100);
+                            char spMsg[480];
+                            snprintf(spMsg, sizeof(spMsg),
+                                "🚀 *RandeLab Internet & Netzwerk-Diagnose* 🌐\n"
+                                "━━━━━━━━━━━━━━━━━━━━\n"
+                                "⬇️ *Download:* %.2f Mbit/s (256 KB Stream)\n"
+                                "⬆️ *Upload:* %.2f Mbit/s (64 KB POST)\n"
+                                "🏓 *Internet-Ping (1.1.1.1):* %u ms\n"
+                                "🏠 *Router-Ping (%s):* %u ms\n"
+                                "🔍 *DNS Lookup:* %u ms\n"
+                                "⚡ *HTTP TTFB:* %u ms\n"
+                                "📶 *WLAN:* %d dBm (%d%% Qualität • Kanal %d)\n"
+                                "🌡️ *ESP32-S3 Chip:* %.1f °C (%u KB RAM frei)",
+                                g_netSpeedMbps,
+                                g_netUpMbps,
+                                (unsigned int)g_netPingMs,
+                                WiFi.gatewayIP().toString().c_str(),
+                                (unsigned int)g_gwPingMs,
+                                (unsigned int)g_dnsMs,
+                                (unsigned int)g_ttfbMs,
+                                wifiRssi,
+                                wifiQual,
+                                WiFi.channel(),
+                                temperatureRead(),
+                                (unsigned int)(ESP.getFreeHeap() / 1024)
+                            );
+                            sendTelegramMessage(spMsg, fromChatId.c_str());
                         } else if (cmd.startsWith("/mood") || cmd.startsWith("/feel") || cmd.startsWith("/wiegehts") || cmd.startsWith("/story") || cmd.startsWith("/tagebuch")) {
                             SolarData d;
                             portENTER_CRITICAL(&g_mux);
@@ -944,6 +1356,7 @@ void checkTelegramUpdates() {
                                 "Verfügbare Befehle:\n"
                                 "• /status - Technische Zahlen & Messwerte\n"
                                 "• /mood - Wie ich mich heute fühle (Tagebuch) 💬\n"
+                                "• /speed - Live Internet-Speedtest vom ESP32 🚀\n"
                                 "• /ping - Verbindungsstatus prüfen 🏓\n\n"
                                 "🌐 Live-Dashboard: https://randelab.github.io/RandeSolar/",
                                 fromChatId.c_str()
@@ -990,20 +1403,34 @@ void setup() {
         if (MDNS.begin(MDNS_HOST)) {
             Serial.printf("[mDNS] http://%s.local\n", MDNS_HOST);
         }
+        setupOTA();
         setPixel(0, 30, 15); // Green confirmation flash
 
         // Sync time via NTP (Europe/Zurich: UTC+1 with 1h daylight saving = UTC+2 in summer)
         configTime(3600, 3600, "pool.ntp.org", "time.google.com");
         Serial.println("[NTP] Time synchronization requested");
 
+        // Initial Internet Speed & Ping measurement
+        measureInternetSpeed(true);
+
         // Send Telegram startup message to Marc
-        char bootMsg[240];
+        char bootMsg[360];
         snprintf(bootMsg, sizeof(bootMsg),
-            "🚀 *RandeSolar ESP32-S3 online!* 🔌\n"
+            "🚀 *RandeSolar ESP32-S3 online (OTA)!* 🔌\n"
             "Verbunden mit Wi-Fi *%s* (IP: `%s`).\n"
-            "Sende /status für Live-Telemetrie.",
+            "🌡️ Chip: *%.1f °C* (%u KB RAM frei)\n"
+            "🌐 Speed: ⬇️ *%.2f Mbit/s* | ⬆️ *%.2f Mbit/s*\n"
+            "🏓 Ping: *%u ms* (Router: %u ms | DNS: %u ms)\n"
+            "Sende /status oder /speed für Live-Telemetrie.",
             WIFI_SSID,
-            WiFi.localIP().toString().c_str()
+            WiFi.localIP().toString().c_str(),
+            temperatureRead(),
+            (unsigned int)(ESP.getFreeHeap() / 1024),
+            g_netSpeedMbps,
+            g_netUpMbps,
+            (unsigned int)g_netPingMs,
+            (unsigned int)g_gwPingMs,
+            (unsigned int)g_dnsMs
         );
         sendTelegramMessage(bootMsg);
     } else {
@@ -1013,11 +1440,14 @@ void setup() {
 
     // Configure MQTT
     mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
-    mqttClient.setBufferSize(512);
+    mqttClient.setBufferSize(1024);
 
     // Setup Web Server
     server.on("/", handleRoot);
     server.on("/api/live", handleLiveApi);
+    server.on("/api/speedtest", handleSpeedtestApi);
+    server.on("/update", HTTP_GET, handleOtaPage);
+    server.on("/update", HTTP_POST, handleOtaUploadDone, handleOtaUploadChunk);
     server.begin();
     Serial.println("[HTTP] Web Server started on port 80");
 
@@ -1036,6 +1466,7 @@ void setup() {
 }
 
 void loop() {
+    ArduinoOTA.handle();
     server.handleClient();
     reconnectMQTT();
     mqttClient.loop();
@@ -1064,11 +1495,15 @@ void loop() {
         portEXIT_CRITICAL(&g_mux);
 
         if (d.has_data && mqttClient.connected()) {
-            char json[380];
+            int wifiRssi = WiFi.RSSI();
+            int wifiQual = constrain(2 * (wifiRssi + 100), 0, 100);
+            char json[580];
             snprintf(json, sizeof(json),
                 "{\"solar_power\":%u,\"battery_voltage\":%.2f,\"battery_current\":%.2f,"
                 "\"yield_today_wh\":%lu,\"external_load\":%.2f,\"charge_state\":%u,\"state_str\":\"%s\","
-                "\"charger_error\":%u,\"ble_rssi\":%d,\"wifi_rssi\":%d,\"age_sec\":0}",
+                "\"charger_error\":%u,\"ble_rssi\":%d,\"wifi_rssi\":%d,\"wifi_quality_pct\":%d,\"wifi_channel\":%d,"
+                "\"chip_temp\":%.1f,\"free_heap_kb\":%u,\"net_mbps\":%.2f,\"net_up_mbps\":%.2f,"
+                "\"net_ping_ms\":%u,\"gw_ping_ms\":%u,\"dns_ms\":%u,\"ttfb_ms\":%u,\"age_sec\":0}",
                 d.solar_power,
                 d.battery_voltage,
                 d.battery_current,
@@ -1078,7 +1513,17 @@ void loop() {
                 getChargeStateName(d.charge_state),
                 d.charger_error,
                 d.rssi,
-                WiFi.RSSI()
+                wifiRssi,
+                wifiQual,
+                WiFi.channel(),
+                temperatureRead(),
+                (unsigned int)(ESP.getFreeHeap() / 1024),
+                g_netSpeedMbps,
+                g_netUpMbps,
+                (unsigned int)g_netPingMs,
+                (unsigned int)g_gwPingMs,
+                (unsigned int)g_dnsMs,
+                (unsigned int)g_ttfbMs
             );
             mqttClient.publish(MQTT_TOPIC, json);
             triggerTxFlash();
@@ -1086,10 +1531,18 @@ void loop() {
         }
     }
 
+    // Refresh Internet Speed (Mbps) every 5 minutes, and Ping (ms) every 20s
+    static uint32_t lastSpeedTest = 0;
+    bool runFullSpeedTest = (now - lastSpeedTest >= 300000);
+    if (runFullSpeedTest) {
+        lastSpeedTest = now;
+    }
+
     // Log to Supabase Cloud every 20 seconds
     static uint32_t lastSupabaseLog = 0;
     if (now - lastSupabaseLog >= 20000) {
         lastSupabaseLog = now;
+        measureInternetSpeed(runFullSpeedTest);
 
         SolarData d;
         portENTER_CRITICAL(&g_mux);

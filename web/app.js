@@ -52,6 +52,8 @@ const el = {
   lblPeak: document.getElementById('lblPeak'),
   lblYesterday: document.getElementById('lblYesterday'),
   lblMinMax: document.getElementById('lblMinMax'),
+  chipTempValue: document.getElementById('chipTempValue'),
+  netSpeedValue: document.getElementById('netSpeedValue'),
 };
 
 // Studio Theme Palettes for Chart.js
@@ -679,6 +681,58 @@ function updateDashboard(data) {
     if (el.rssiValue) el.rssiValue.textContent = `${rssi} dBm`;
   }
 
+  if (data.chip_temp !== undefined) {
+    if (el.chipTempValue) el.chipTempValue.textContent = `${Number(data.chip_temp).toFixed(1)} °C`;
+    const ctDiag = document.getElementById('chipTempDiag');
+    if (ctDiag) ctDiag.textContent = Number(data.chip_temp).toFixed(1);
+  }
+  if (data.free_heap_kb !== undefined) {
+    const fhDiag = document.getElementById('freeHeapDiag');
+    if (fhDiag) fhDiag.textContent = data.free_heap_kb;
+  }
+
+  if (data.net_mbps !== undefined) {
+    const downStr = Number(data.net_mbps).toFixed(2);
+    const upStr = data.net_up_mbps !== undefined ? ` / ⬆️ ${Number(data.net_up_mbps).toFixed(2)}` : '';
+    const ping = data.net_ping_ms !== undefined ? ` (${data.net_ping_ms} ms)` : '';
+    if (el.netSpeedValue) el.netSpeedValue.textContent = `⬇️ ${downStr}${upStr} Mbit/s${ping}`;
+
+    const elDown = document.getElementById('netDownMbps');
+    if (elDown) elDown.textContent = downStr;
+  }
+  if (data.net_up_mbps !== undefined) {
+    const elUp = document.getElementById('netUpMbps');
+    if (elUp) elUp.textContent = Number(data.net_up_mbps).toFixed(2);
+  }
+  if (data.net_ping_ms !== undefined) {
+    const elPing = document.getElementById('netPingMs');
+    if (elPing) elPing.textContent = data.net_ping_ms;
+  }
+  if (data.gw_ping_ms !== undefined) {
+    const elGw = document.getElementById('gwPingMs');
+    if (elGw) elGw.textContent = data.gw_ping_ms;
+  }
+  if (data.dns_ms !== undefined) {
+    const elDns = document.getElementById('netDnsMs');
+    if (elDns) elDns.textContent = data.dns_ms;
+  }
+  if (data.ttfb_ms !== undefined) {
+    const elTtfb = document.getElementById('netTtfbMs');
+    if (elTtfb) elTtfb.textContent = data.ttfb_ms;
+  }
+  if (data.wifi_rssi !== undefined) {
+    const elW = document.getElementById('wifiRssiDiag');
+    if (elW) elW.textContent = data.wifi_rssi;
+  }
+  if (data.wifi_quality_pct !== undefined) {
+    const elQ = document.getElementById('wifiQualDiag');
+    if (elQ) elQ.textContent = data.wifi_quality_pct;
+  }
+  if (data.wifi_channel !== undefined) {
+    const elC = document.getElementById('wifiChDiag');
+    if (elC) elC.textContent = data.wifi_channel;
+  }
+
   if (data.ip && el.statusText) {
     el.statusText.textContent = `Live: ${data.ip}`;
   }
@@ -1011,8 +1065,28 @@ function initMQTT() {
   }
 }
 
+// Resolve exact Telegram Bot @username dynamically from Bot API
+async function resolveTelegramBotLink() {
+  const btn = document.getElementById('telegramBotBtn');
+  if (!btn) return;
+  try {
+    const res = await fetch('https://api.telegram.org/bot8600149990:AAGGHL_USsmi_PfzPFBDIvoFgQx-rmvXIkc/getMe');
+    if (res.ok) {
+      const json = await res.json();
+      if (json.ok && json.result && json.result.username) {
+        const uname = json.result.username;
+        btn.href = `https://t.me/${uname}`;
+        btn.title = `@${uname} auf Telegram öffnen (/status, /mood, /speed)`;
+      }
+    }
+  } catch (e) {
+    // Fallback link remains active
+  }
+}
+
 // Startup
 window.addEventListener('DOMContentLoaded', () => {
+  resolveTelegramBotLink();
   const isHttps = window.location.protocol === 'https:';
 
   if (el.endpointInput) {

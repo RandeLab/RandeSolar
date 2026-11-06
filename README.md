@@ -18,13 +18,19 @@ The **ESP32-S3** handles the entire pipeline autonomously 24/7 without requiring
 2. **HiveMQ MQTT**: Streams live telemetry packets every 5s over WebSocket/MQTT (`broker.hivemq.com`).
 3. **Supabase Cloud Database**: Posts dense time-series telemetry every 20s directly to PostgreSQL cloud database over HTTPS for long-term charts.
 4. **Standalone Telegram Bot**: Direct replies to commands (`/status`, `/mood`, `/wiegehts`, `/ping`) and automated 20:00 evening summary reports.
-5. **Onboard Web Server**: Runs openBrushograph Kraftwerk Studio on port 80 at **[http://randesolar.local](http://randesolar.local)**.
+5. **Onboard Web Server & OTA**: Runs openBrushograph Kraftwerk Studio on port 80 at **[http://randesolar.local](http://randesolar.local)** with wireless Over-The-Air firmware updates (`ArduinoOTA` + Web UI at `/update`).
 6. **GitHub Pages Cloud Dashboard**: Accessible worldwide at **[https://randelab.github.io/RandeSolar/](https://randelab.github.io/RandeSolar/)**.
 
 ### Flash or Monitor Firmware:
 ```bash
-# Build and flash:
-pio run -t upload
+# 1. First-time flash over USB (/dev/ttyACM0):
+pio run -e esp32-s3-devkitc-1 -t upload
+
+# 2. Wireless OTA flash over Wi-Fi (randesolar.local):
+pio run -e esp32-s3-ota -t upload
+
+# 3. Or upload .pio/build/esp32-s3-devkitc-1/firmware.bin in your browser:
+#    http://randesolar.local/update
 
 # Open serial monitor:
 pio device monitor
