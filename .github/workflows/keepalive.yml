@@ -1,0 +1,22 @@
+name: Supabase Keepalive
+
+on:
+  schedule:
+    # Run every 4 days at 04:00 UTC (well within the 7-day inactivity pause window)
+    - cron: '0 4 */4 * *'
+  workflow_dispatch:
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBha2Z1ZXR2d3BmZndmcnJ4c2h6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIwODkwNjIsImV4cCI6MjEwNzY2NTA2Mn0.J4HDEP28BF0fRkmfYqeeaM1urn29lYNUz9k4kQjXWhU" \
+            "https://pakfuetvwpffwfrrxshz.supabase.co/rest/v1/solar_telemetry?select=id&limit=1")
+          echo "Supabase HTTP response: $STATUS"
+          if [ "$STATUS" -ne 200 ]; then
+            echo "Warning: Received status $STATUS"
+            exit 1
+          fi

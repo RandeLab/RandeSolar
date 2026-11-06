@@ -1748,9 +1748,9 @@ void loop() {
         lastSpeedTest = now;
     }
 
-    // Log to Supabase Cloud every 20 seconds
+    // Log to Supabase Cloud every 2 minutes (120 seconds) - keeps database calm and clean
     static uint32_t lastSupabaseLog = 0;
-    if (now - lastSupabaseLog >= 20000) {
+    if (now - lastSupabaseLog >= 120000) {
         lastSupabaseLog = now;
         measureInternetSpeed(runFullSpeedTest);
 
