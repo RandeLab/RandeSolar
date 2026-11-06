@@ -27,6 +27,24 @@
 #include <NimBLEDevice.h>
 #include "mbedtls/aes.h"
 #include <time.h>
+#include <LittleFS.h>
+
+// ==================== TELEMETRY STATE ====================
+struct SolarData {
+    uint16_t solar_power = 0;
+    float battery_voltage = 0.0f;
+    float battery_current = 0.0f;
+    uint32_t yield_today_wh = 0;
+    float external_load = 0.0f;
+    uint8_t charge_state = 0;
+    uint8_t charger_error = 0;
+    int rssi = 0;
+    unsigned long last_seen_ms = 0;
+    bool has_data = false;
+};
+
+const char* getChargeStateName(uint8_t state);
+const char* getChargeStateGerman(uint8_t state);
 
 // ==================== CONFIGURATION ====================
 static const char* WIFI_SSID     = "RandeLab";
@@ -48,6 +66,194 @@ static float g_minBattToday = 99.0f;
 static float g_maxBattToday = 0.0f;
 static int g_lastReportDay = -1;
 static int g_currentMday = -1;
+
+// ==================== OFFLINE RESILIENT FLASH STORAGE (LittleFS) ====================
+// Compact 16-byte binary record for power-loss resilient ring buffer in onboard flash
+struct __attribute__((packed)) OfflineSolarRecord {
+    uint32_t timestamp;      // Unix timestamp (or millis() offset if NTP not available)
+    uint16_t solar_power;    // Watts
+    uint16_t battery_voltage;// V * 100 (e.g. 1252 = 12.52V)
+    int16_t  battery_current;// A * 10 (e.g. 25 = 2.5A)
+    uint32_t yield_today_wh; // Wh today
+    uint8_t  charge_state;   // 0=Off, 3=Bulk, 4=Abs, 5=Float
+    uint8_t  flags;          // Bit 0: time is real NTP (1) or uptime offset (0)
+};
+
+static const char* OFFLINE_BUFFER_PATH = "/solar_buffer.bin";
+static const size_t MAX_OFFLINE_RECORDS = 5000; // ~80 KB of flash (holds ~17 days of 5-min samples)
+static uint32_t g_bufferedRecordCount = 0;
+static bool g_littleFsReady = false;
+
+void initOfflineStorage() {
+    if (!LittleFS.begin(true)) {
+        Serial.println("[LittleFS ❌] Mount failed!");
+        g_littleFsReady = false;
+        return;
+    }
+    g_littleFsReady = true;
+    if (LittleFS.exists(OFFLINE_BUFFER_PATH)) {
+        File f = LittleFS.open(OFFLINE_BUFFER_PATH, "r");
+        if (f) {
+            g_bufferedRecordCount = f.size() / sizeof(OfflineSolarRecord);
+            f.close();
+            Serial.printf("[LittleFS 💾] Mounted! Buffered records waiting for sync: %u\n", g_bufferedRecordCount);
+        }
+    } else {
+        Serial.println("[LittleFS 💾] Mounted fresh buffer.");
+    }
+}
+
+void storeOfflineRecord(const SolarData& d) {
+    if (!g_littleFsReady || !d.has_data) return;
+
+    OfflineSolarRecord rec;
+    time_t nowTime = time(nullptr);
+    if (nowTime > 1700000000) {
+        rec.timestamp = (uint32_t)nowTime;
+        rec.flags = 1; // Real NTP
+    } else {
+        rec.timestamp = (uint32_t)(millis() / 1000);
+        rec.flags = 0; // Uptime relative
+    }
+
+    rec.solar_power = d.solar_power;
+    rec.battery_voltage = (uint16_t)(d.battery_voltage * 100.0f);
+    rec.battery_current = (int16_t)(d.battery_current * 10.0f);
+    rec.yield_today_wh = d.yield_today_wh;
+    rec.charge_state = d.charge_state;
+
+    // Append to file
+    File f = LittleFS.open(OFFLINE_BUFFER_PATH, "a");
+    if (f) {
+        f.write((uint8_t*)&rec, sizeof(OfflineSolarRecord));
+        f.close();
+        g_bufferedRecordCount++;
+        Serial.printf("[LittleFS 📦] Appended record #%u to flash (%u W, %.2f V)\n", 
+            g_bufferedRecordCount, d.solar_power, d.battery_voltage);
+    }
+}
+
+// Drain and sync buffered offline records to Supabase when Wi-Fi is restored
+void drainOfflineRecordsToCloud() {
+    if (!g_littleFsReady || WiFi.status() != WL_CONNECTED || g_bufferedRecordCount == 0) return;
+
+    File f = LittleFS.open(OFFLINE_BUFFER_PATH, "r");
+    if (!f) return;
+
+    size_t totalRecords = f.size() / sizeof(OfflineSolarRecord);
+    if (totalRecords == 0) {
+        f.close();
+        LittleFS.remove(OFFLINE_BUFFER_PATH);
+        g_bufferedRecordCount = 0;
+        return;
+    }
+
+    Serial.printf("[LittleFS 🔄] Starting cloud sync for %u buffered records...\n", (unsigned int)totalRecords);
+
+    // Read and upload in batches of 10 records
+    const size_t BATCH_SIZE = 10;
+    OfflineSolarRecord batch[BATCH_SIZE];
+
+    WiFiClientSecure secClient;
+    secClient.setInsecure();
+    secClient.setTimeout(4500);
+
+    size_t recordsProcessed = 0;
+    while (f.available() >= (int)sizeof(OfflineSolarRecord) && recordsProcessed < 40) { // Limit to 40 per loop run to avoid blocking
+        size_t count = 0;
+        for (size_t i = 0; i < BATCH_SIZE && f.available() >= (int)sizeof(OfflineSolarRecord); i++) {
+            if (f.read((uint8_t*)&batch[i], sizeof(OfflineSolarRecord)) == sizeof(OfflineSolarRecord)) {
+                count++;
+            }
+        }
+
+        if (count > 0) {
+            String jsonArray = "[";
+            for (size_t i = 0; i < count; i++) {
+                char item[260];
+                float v = batch[i].battery_voltage / 100.0f;
+                float a = batch[i].battery_current / 10.0f;
+                
+                if (batch[i].flags & 1) {
+                    // Has real unix timestamp
+                    time_t t = batch[i].timestamp;
+                    struct tm tmInfo;
+                    gmtime_r(&t, &tmInfo);
+                    char timeIso[32];
+                    strftime(timeIso, sizeof(timeIso), "%Y-%m-%dT%H:%M:%SZ", &tmInfo);
+
+                    snprintf(item, sizeof(item),
+                        "{\"created_at\":\"%s\",\"solar_power\":%u,\"battery_voltage\":%.2f,\"battery_current\":%.2f,"
+                        "\"yield_today_wh\":%lu,\"charge_state\":%u,\"state_str\":\"%s\"}",
+                        timeIso, batch[i].solar_power, v, a,
+                        (unsigned long)batch[i].yield_today_wh, batch[i].charge_state, getChargeStateName(batch[i].charge_state)
+                    );
+                } else {
+                    snprintf(item, sizeof(item),
+                        "{\"solar_power\":%u,\"battery_voltage\":%.2f,\"battery_current\":%.2f,"
+                        "\"yield_today_wh\":%lu,\"charge_state\":%u,\"state_str\":\"%s\"}",
+                        batch[i].solar_power, v, a,
+                        (unsigned long)batch[i].yield_today_wh, batch[i].charge_state, getChargeStateName(batch[i].charge_state)
+                    );
+                }
+
+                jsonArray += item;
+                if (i < count - 1) jsonArray += ",";
+            }
+            jsonArray += "]";
+
+            HTTPClient http;
+            if (http.begin(secClient, SUPABASE_URL)) {
+                http.addHeader("Content-Type", "application/json");
+                http.addHeader("apikey", SUPABASE_KEY);
+                String authHeader = "Bearer " + String(SUPABASE_KEY);
+                http.addHeader("Authorization", authHeader.c_str());
+                http.addHeader("Prefer", "return=minimal");
+
+                int code = http.POST((uint8_t*)jsonArray.c_str(), jsonArray.length());
+                if (code == 200 || code == 201) {
+                    recordsProcessed += count;
+                    Serial.printf("[LittleFS ✅] Synced batch of %u records to Supabase!\n", (unsigned int)count);
+                } else {
+                    Serial.printf("[LittleFS ⚠️] Batch sync returned HTTP %d\n", code);
+                    http.end();
+                    break; // Stop and retry later
+                }
+                http.end();
+            }
+        }
+        delay(50);
+        yield();
+    }
+
+    f.close();
+
+    // If all records were processed, clean up the file
+    if (recordsProcessed >= totalRecords) {
+        LittleFS.remove(OFFLINE_BUFFER_PATH);
+        g_bufferedRecordCount = 0;
+        Serial.println("[LittleFS 🧹] All offline records successfully synced! Flash buffer emptied.");
+    } else if (recordsProcessed > 0) {
+        // Truncate file by rewriting remaining records
+        File fRead = LittleFS.open(OFFLINE_BUFFER_PATH, "r");
+        if (fRead) {
+            fRead.seek(recordsProcessed * sizeof(OfflineSolarRecord));
+            File fTemp = LittleFS.open("/temp_buf.bin", "w");
+            if (fTemp) {
+                uint8_t chunk[256];
+                while (fRead.available()) {
+                    size_t r = fRead.read(chunk, sizeof(chunk));
+                    fTemp.write(chunk, r);
+                }
+                fTemp.close();
+            }
+            fRead.close();
+            LittleFS.remove(OFFLINE_BUFFER_PATH);
+            LittleFS.rename("/temp_buf.bin", OFFLINE_BUFFER_PATH);
+            g_bufferedRecordCount = totalRecords - recordsProcessed;
+        }
+    }
+}
 
 // Internet Speed & Network Diagnostics Tracking
 static uint32_t g_netPingMs = 0;      // TCP handshake to 1.1.1.1:53
@@ -88,20 +294,6 @@ void triggerTxFlash() {
 }
 
 void updateNeoPixel();
-
-// ==================== TELEMETRY STATE ====================
-struct SolarData {
-    uint16_t solar_power = 0;
-    float battery_voltage = 0.0f;
-    float battery_current = 0.0f;
-    uint32_t yield_today_wh = 0;
-    float external_load = 0.0f;
-    uint8_t charge_state = 0;
-    uint8_t charger_error = 0;
-    int rssi = 0;
-    unsigned long last_seen_ms = 0;
-    bool has_data = false;
-};
 
 static SolarData g_data;
 static volatile bool g_newDataAvailable = false;
@@ -905,14 +1097,14 @@ void handleLiveApi() {
     int wifiRssi = WiFi.RSSI();
     int wifiQual = constrain(2 * (wifiRssi + 100), 0, 100);
 
-    char json[680];
+    char json[760];
     snprintf(json, sizeof(json),
         "{\"has_data\":%s,\"solar_power\":%u,\"battery_voltage\":%.2f,\"battery_current\":%.2f,"
         "\"yield_today_wh\":%lu,\"external_load\":%.2f,\"charge_state\":%u,\"state_str\":\"%s\","
         "\"charger_error\":%u,\"ble_rssi\":%d,\"wifi_rssi\":%d,\"wifi_quality_pct\":%d,\"wifi_channel\":%d,"
         "\"chip_temp\":%.1f,\"free_heap_kb\":%u,\"net_mbps\":%.2f,\"net_up_mbps\":%.2f,"
         "\"net_ping_ms\":%u,\"gw_ping_ms\":%u,\"dns_ms\":%u,\"ttfb_ms\":%u,"
-        "\"ip\":\"%s\",\"gateway_ip\":\"%s\",\"age_sec\":%lu}",
+        "\"buffered_records\":%u,\"ip\":\"%s\",\"gateway_ip\":\"%s\",\"age_sec\":%lu}",
         d.has_data ? "true" : "false",
         d.solar_power,
         d.battery_voltage,
@@ -934,6 +1126,7 @@ void handleLiveApi() {
         (unsigned int)g_gwPingMs,
         (unsigned int)g_dnsMs,
         (unsigned int)g_ttfbMs,
+        (unsigned int)g_bufferedRecordCount,
         WiFi.localIP().toString().c_str(),
         WiFi.gatewayIP().toString().c_str(),
         ageSec
@@ -1191,7 +1384,13 @@ String escapeJsonString(const String& s) {
 
 // ==================== SUPABASE CLOUD LOGGER ====================
 void logToSupabase(const SolarData& d) {
-    if (WiFi.status() != WL_CONNECTED || !d.has_data) return;
+    if (!d.has_data) return;
+
+    if (WiFi.status() != WL_CONNECTED) {
+        // Wi-Fi / Router is offline! Store directly into flash buffer
+        storeOfflineRecord(d);
+        return;
+    }
 
     WiFiClientSecure secClient;
     secClient.setInsecure();
@@ -1585,6 +1784,9 @@ void setup() {
     // Initial soft blue startup
     setPixel(0, 10, 30);
 
+    // Initialize local LittleFS flash memory for offline logging
+    initOfflineStorage();
+
     Serial.println("\n========================================");
     Serial.println("  RandeSolar • ESP32-S3 BLE & Wi-Fi & MQTT");
     Serial.printf("  Connecting to: %s\n", WIFI_SSID);
@@ -1763,6 +1965,9 @@ void loop() {
             logToSupabase(d);
             checkDailyEveningReport(d);
         }
+
+        // Drain any stored offline records if Wi-Fi has reconnected
+        drainOfflineRecordsToCloud();
     }
 
     delay(10);
