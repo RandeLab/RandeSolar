@@ -832,6 +832,13 @@ void handleSpeedtestApi() {
 void measureInternetSpeed(bool measureBandwidth) {
     if (WiFi.status() != WL_CONNECTED) return;
 
+    // Pause BLE scanner during network benchmark so Wi-Fi gets 100% of the shared 2.4 GHz antenna
+    bool bleWasScanning = false;
+    if (NimBLEDevice::isInitialized() && NimBLEDevice::getScan()->isScanning()) {
+        NimBLEDevice::getScan()->stop();
+        bleWasScanning = true;
+    }
+
     // 1. Local Router / Gateway Ping (TCP handshake to gateway port 80 or 53)
     {
         WiFiClient gwClient;
@@ -865,87 +872,115 @@ void measureInternetSpeed(bool measureBandwidth) {
             g_dnsMs = millis() - dnsStart;
         }
 
-        uint8_t* buf = (uint8_t*)malloc(4096);
-        if (!buf) return;
+        const size_t BUF_SZ = 8192;
+        uint8_t* buf = (uint8_t*)malloc(BUF_SZ);
+        if (buf) {
+            // 3a. 4-Stream Parallel TCP Download Test (bypasses ESP32 single-socket 5.7KB TCP_WND BDP cap)
+            if (cfIp != IPAddress(0, 0, 0, 0)) {
+                const int NUM_STREAMS = 4;
+                const size_t TARGET_TOTAL = 524288; // 512 KB across 4 parallel sockets
+                WiFiClient dl[NUM_STREAMS];
+                int activeStreams = 0;
 
-        // 3a. Pure Streaming Download Test (256 KB payload from Cloudflare Speedtest)
-        {
-            WiFiClient dlClient;
-            HTTPClient http;
-            if (http.begin(dlClient, "http://speed.cloudflare.com/__down?bytes=262144")) {
-                http.setTimeout(5000);
                 uint32_t getStart = millis();
-                int code = http.GET();
-                if (code == 200) {
-                    WiFiClient* stream = http.getStreamPtr();
-                    // Wait for first payload byte to separate TTFB from pure transfer rate
+                for (int s = 0; s < NUM_STREAMS; s++) {
+                    dl[s].setNoDelay(true);
+                    dl[s].setTimeout(4000);
+                    if (dl[s].connect(cfIp, 80)) {
+                        dl[s].print(
+                            "GET /__down?bytes=163840 HTTP/1.1\r\n"
+                            "Host: speed.cloudflare.com\r\n"
+                            "Connection: close\r\n\r\n"
+                        );
+                        activeStreams++;
+                    }
+                }
+
+                if (activeStreams > 0) {
+                    // Wait for first response byte (TTFB)
                     uint32_t waitStart = millis();
-                    while (http.connected() && !stream->available() && (millis() - waitStart < 2000)) {
-                        yield();
+                    bool anyAvail = false;
+                    while (!anyAvail && (millis() - waitStart < 2500)) {
+                        for (int s = 0; s < NUM_STREAMS; s++) {
+                            if (dl[s].available()) { anyAvail = true; break; }
+                        }
+                        if (!anyAvail) yield();
                     }
                     g_ttfbMs = millis() - getStart;
 
                     uint32_t streamStartUs = micros();
                     size_t totalRead = 0;
                     uint32_t loopGuardMs = millis();
-                    while (http.connected() && totalRead < 262144) {
-                        size_t avail = stream->available();
-                        if (avail) {
-                            int r = stream->readBytes(buf, min(avail, (size_t)4096));
-                            if (r > 0) totalRead += r;
-                        } else {
-                            if (millis() - loopGuardMs > 4500) break;
-                            yield();
+
+                    while (totalRead < TARGET_TOTAL && (millis() - loopGuardMs < 4500)) {
+                        bool anyConnected = false;
+                        for (int s = 0; s < NUM_STREAMS; s++) {
+                            if (dl[s].connected() || dl[s].available()) {
+                                anyConnected = true;
+                                int r = dl[s].read(buf, BUF_SZ);
+                                if (r > 0) {
+                                    totalRead += r;
+                                }
+                            }
                         }
+                        if (!anyConnected) break;
+                        yield();
                     }
+
                     uint32_t streamElapsedUs = micros() - streamStartUs;
                     if (streamElapsedUs > 1000 && totalRead > 0) {
                         // (bytes * 8 bits) / microseconds = Mbit/s
                         g_netSpeedMbps = (totalRead * 8.0f) / (float)streamElapsedUs;
                     }
+                    for (int s = 0; s < NUM_STREAMS; s++) {
+                        dl[s].stop();
+                    }
                 }
-                http.end();
             }
-        }
 
-        // 3b. Upload Throughput Test (64 KB POST to speed.cloudflare.com/__up)
-        if (cfIp != IPAddress(0, 0, 0, 0)) {
-            WiFiClient upClient;
-            upClient.setTimeout(4000);
-            if (upClient.connect(cfIp, 80)) {
-                memset(buf, 'R', 4096);
-                upClient.print(
-                    "POST /__up HTTP/1.1\r\n"
-                    "Host: speed.cloudflare.com\r\n"
-                    "Content-Length: 65536\r\n"
-                    "Connection: close\r\n\r\n"
-                );
-                uint32_t upStartUs = micros();
-                size_t totalSent = 0;
-                for (int chunk = 0; chunk < 16; chunk++) {
-                    size_t w = upClient.write(buf, 4096);
-                    if (w == 0) break;
-                    totalSent += w;
+            // 3b. Upload Throughput Test (64 KB POST to speed.cloudflare.com/__up)
+            if (cfIp != IPAddress(0, 0, 0, 0)) {
+                WiFiClient upClient;
+                upClient.setNoDelay(true);
+                upClient.setTimeout(4000);
+                if (upClient.connect(cfIp, 80)) {
+                    memset(buf, 'R', BUF_SZ);
+                    upClient.print(
+                        "POST /__up HTTP/1.1\r\n"
+                        "Host: speed.cloudflare.com\r\n"
+                        "Content-Length: 65536\r\n"
+                        "Connection: close\r\n\r\n"
+                    );
+                    uint32_t upStartUs = micros();
+                    size_t totalSent = 0;
+                    for (int chunk = 0; chunk < 8; chunk++) {
+                        size_t w = upClient.write(buf, BUF_SZ);
+                        if (w == 0) break;
+                        totalSent += w;
+                    }
+                    uint32_t ackWait = millis();
+                    while (upClient.connected() && !upClient.available() && (millis() - ackWait < 3000)) {
+                        yield();
+                    }
+                    uint32_t totalUpUs = micros() - upStartUs;
+                    uint32_t rttUs = g_netPingMs * 1000;
+                    uint32_t xferUpUs = (totalUpUs > rttUs + 2000) ? (totalUpUs - rttUs) : totalUpUs;
+                    if (xferUpUs > 1000 && totalSent > 0) {
+                        g_netUpMbps = (totalSent * 8.0f) / (float)xferUpUs;
+                    }
+                    upClient.stop();
                 }
-                // Wait for server HTTP 200 response header to confirm all bytes arrived
-                uint32_t ackWait = millis();
-                while (upClient.connected() && !upClient.available() && (millis() - ackWait < 3000)) {
-                    yield();
-                }
-                uint32_t totalUpUs = micros() - upStartUs;
-                uint32_t rttUs = g_netPingMs * 1000;
-                uint32_t xferUpUs = (totalUpUs > rttUs + 2000) ? (totalUpUs - rttUs) : totalUpUs;
-                if (xferUpUs > 1000 && totalSent > 0) {
-                    g_netUpMbps = (totalSent * 8.0f) / (float)xferUpUs;
-                }
-                upClient.stop();
             }
-        }
 
-        free(buf);
-        g_lastSpeedTestMs = millis();
-        Serial.printf("[NetSpeed 🚀] Down: %.2f Mbit/s | Up: %.2f Mbit/s | Ping: %u ms (GW: %u ms) | DNS: %u ms | TTFB: %u ms\n",
-            g_netSpeedMbps, g_netUpMbps, (unsigned int)g_netPingMs, (unsigned int)g_gwPingMs, (unsigned int)g_dnsMs, (unsigned int)g_ttfbMs);
+            free(buf);
+            g_lastSpeedTestMs = millis();
+            Serial.printf("[NetSpeed 🚀] Down: %.2f Mbit/s | Up: %.2f Mbit/s | Ping: %u ms (GW: %u ms) | DNS: %u ms | TTFB: %u ms\n",
+                g_netSpeedMbps, g_netUpMbps, (unsigned int)g_netPingMs, (unsigned int)g_gwPingMs, (unsigned int)g_dnsMs, (unsigned int)g_ttfbMs);
+        }
+    }
+
+    if (bleWasScanning) {
+        NimBLEDevice::getScan()->start(0, false);
     }
 }
 
@@ -1398,6 +1433,19 @@ void setup() {
         attempts++;
     }
 
+    // Configure MQTT
+    mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
+    mqttClient.setBufferSize(1024);
+
+    // Setup Web Server
+    server.on("/", handleRoot);
+    server.on("/api/live", handleLiveApi);
+    server.on("/api/speedtest", handleSpeedtestApi);
+    server.on("/update", HTTP_GET, handleOtaPage);
+    server.on("/update", HTTP_POST, handleOtaUploadDone, handleOtaUploadChunk);
+    server.begin();
+    Serial.println("[HTTP] Web Server started on port 80");
+
     if (WiFi.status() == WL_CONNECTED) {
         Serial.printf("\n[WiFi] Connected! IP: %s\n", WiFi.localIP().toString().c_str());
         if (MDNS.begin(MDNS_HOST)) {
@@ -1405,15 +1453,34 @@ void setup() {
         }
         setupOTA();
         setPixel(0, 30, 15); // Green confirmation flash
+        for (int i = 0; i < 40; i++) { ArduinoOTA.handle(); server.handleClient(); delay(50); } // 2s boot OTA rescue window
 
         // Sync time via NTP (Europe/Zurich: UTC+1 with 1h daylight saving = UTC+2 in summer)
         configTime(3600, 3600, "pool.ntp.org", "time.google.com");
         Serial.println("[NTP] Time synchronization requested");
 
-        // Initial Internet Speed & Ping measurement
+        // Initial Internet Speed & Ping measurement (before BLE starts)
         measureInternetSpeed(true);
+    } else {
+        Serial.println("\n[WiFi] Connection timed out. Running offline BLE logger mode.");
+        setPixel(30, 0, 0); // Red warning
+    }
 
-        // Send Telegram startup message to Marc
+    // Initialize NimBLE
+    NimBLEDevice::init("RandeSolar-ESP32");
+    NimBLEDevice::setPower(ESP_PWR_LVL_P9);
+
+    NimBLEScan* pScan = NimBLEDevice::getScan();
+    pScan->setScanCallbacks(&scanCallbacks, true);
+    pScan->setActiveScan(false);
+    pScan->setInterval(160);
+    pScan->setWindow(40);
+
+    Serial.println("[BLE] Scanner active. Listening for Victron beacons...\n");
+    pScan->start(0, false);
+
+    // Send Telegram startup message ONLY after BLE + Wi-Fi + WebServer are all running cleanly
+    if (WiFi.status() == WL_CONNECTED) {
         char bootMsg[360];
         snprintf(bootMsg, sizeof(bootMsg),
             "🚀 *RandeSolar ESP32-S3 online (OTA)!* 🔌\n"
@@ -1433,36 +1500,7 @@ void setup() {
             (unsigned int)g_dnsMs
         );
         sendTelegramMessage(bootMsg);
-    } else {
-        Serial.println("\n[WiFi] Connection timed out. Running offline BLE logger mode.");
-        setPixel(30, 0, 0); // Red warning
     }
-
-    // Configure MQTT
-    mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
-    mqttClient.setBufferSize(1024);
-
-    // Setup Web Server
-    server.on("/", handleRoot);
-    server.on("/api/live", handleLiveApi);
-    server.on("/api/speedtest", handleSpeedtestApi);
-    server.on("/update", HTTP_GET, handleOtaPage);
-    server.on("/update", HTTP_POST, handleOtaUploadDone, handleOtaUploadChunk);
-    server.begin();
-    Serial.println("[HTTP] Web Server started on port 80");
-
-    // Initialize NimBLE
-    NimBLEDevice::init("RandeSolar-ESP32");
-    NimBLEDevice::setPower(ESP_PWR_LVL_P9);
-
-    NimBLEScan* pScan = NimBLEDevice::getScan();
-    pScan->setScanCallbacks(&scanCallbacks, true);
-    pScan->setActiveScan(false);
-    pScan->setInterval(100);
-    pScan->setWindow(99);
-
-    Serial.println("[BLE] Scanner active. Listening for Victron beacons...\n");
-    pScan->start(0, false);
 }
 
 void loop() {
