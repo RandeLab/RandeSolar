@@ -7,9 +7,9 @@ Observatory: RandeLab • Underes Ätzisloo 189, 8232 Merishausen (857 m ü. M.)
 Motto: "Zwischen Kabis und Kokosnuss – das 5G-Funkfeld auf dem Randen!"
 
 Features:
-  1. 📡 Live Kabis-Radar (Watch Mode - kontinuierliche Signal- & Mastenanzeige)
-  2. ⚡ Ookla 5G Speedtest (Kokosnuss-Turbo auf dem Gateway)
-  3. 🛰️ Masten- & Frequenz-Check (Merishausen, Bargen, 800 MHz, etc.)
+  1. 📡 Live Kabis-Radar (Watch Mode mit animiertem Puls)
+  2. ⚡ Ookla 5G Speedtest (Fliegende Kokosnuss & Spektrum-Animation)
+  3. 🛰️ Masten- & Frequenz-Check (Merishausen, Bargen, 800 MHz mit HF-Tuner-Animation)
   4. 🔬 Tiefen-Zell-Analyse (eNodeB, Sektor, TAC, PCID, SINR)
   5. 🥥📝 Vollständigen Kabis- & Kokosnuss-Bericht erstellen (reports/)
 """
@@ -18,6 +18,7 @@ import os
 import sys
 import time
 import json
+import math
 import argparse
 import urllib.request
 from datetime import datetime
@@ -31,6 +32,7 @@ try:
     from rich.layout import Layout
     from rich.live import Live
     from rich.prompt import Prompt, IntPrompt
+    from rich.align import Align
     from rich import box
 except ImportError:
     venv_py = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".venv", "bin", "python3")
@@ -64,6 +66,7 @@ class ChabisDashboard:
         self.accent_color = "chartreuse2"
         self.header_art = HEADER_ART_CHABIS
         self.logs = []
+        self.pulse_frame = 0
         self.log("🥬 Chabis Radio 5G Scanner gestartet auf 857 m ü. M.")
         self.log(f"🥥 Prüfe Kokosnuss-Ausbreitungsbedingungen zum Teltonika TRB500 ({ROUTER_IP})...")
 
@@ -124,10 +127,10 @@ class ChabisDashboard:
             p = int(pcid)
             if p == 54:
                 return "[bold cyan]Merishausen Südhang (eNodeB 116636)[/bold cyan]"
-            elif p == 227:
-                return "[bright_magenta]Bargen / A4 Korridor (Sektor 0)[/bright_magenta]"
+            elif p in [227, "1C74A17"]:
+                return "[bright_magenta]Bargen / A4 Korridor (eNodeB 119388)[/bright_magenta]"
             elif p == 239:
-                return "[magenta]Bargen / A4 Korridor (Sektor 2)[/magenta]"
+                return "[magenta]Bargen Sektor 2 / Weitsicht[/magenta]"
             elif p in [178, 951]:
                 return "[bold green]Salt 5G N1 Träger (Kokosnuss-Speed)[/bold green]"
             else:
@@ -136,6 +139,10 @@ class ChabisDashboard:
             return "[dim]Unbekannt[/dim]"
 
     def generate_layout(self, sid):
+        self.pulse_frame = (self.pulse_frame + 1) % 4
+        radar_icons = ["📡 ◜", "📡 ◝", "📡 ◞", "📡 ◟"]
+        current_radar = radar_icons[self.pulse_frame]
+
         modem_info_raw = call_gsmctl(sid, ["-E"])
         try:
             info = json.loads(modem_info_raw)
@@ -173,7 +180,7 @@ class ChabisDashboard:
         )
 
         # Serving Table
-        t_serv = Table(title="[bold chartreuse2]🥥 Aktive Funkzelle & Träger-Aggregation (Serving Cell / Carrier Aggregation) 🥬[/]", box=box.ROUNDED, expand=True)
+        t_serv = Table(title=f"[bold chartreuse2]🥥 Aktive Funkzelle & Träger-Aggregation ({current_radar}) 🥬[/]", box=box.ROUNDED, expand=True)
         t_serv.add_column("Kanal", style="cyan", width=12)
         t_serv.add_column("Technologie", style="bold white", width=12)
         t_serv.add_column("Frequenz & Band", style="chartreuse3", width=24)
@@ -319,8 +326,57 @@ def read_router_file(sid, path):
         return data["result"][1].get("data", "")
     return ""
 
-def run_speedtest_native(sid, timeout=60):
-    # Vorherigen Status aufräumen
+# =====================================================================
+# 🎬 TERMINAL ANIMATIONS (Radar Scopes, Coconut Launchers, Oscilloscope)
+# =====================================================================
+
+def render_oscilloscope(step, width=36):
+    """Erzeugt eine animierte Sinus-Welle im Terminal für HF-Tuning."""
+    chars = [" ", "▂", "▃", "▄", "▅", "▆", "▇", "█", "▇", "▆", "▅", "▄", "▃", "▂"]
+    wave = ""
+    for i in range(width):
+        idx = int((math.sin((i + step * 2) * 0.4) + 1.0) / 2.0 * (len(chars) - 1))
+        wave += chars[idx]
+    return wave
+
+def render_coconut_flight(progress_pct, width=32):
+    """Animiert eine fliegende Kokosnuss von Palme zu Funkmast."""
+    pos = int((progress_pct / 100.0) * (width - 1))
+    pos = max(0, min(width - 1, pos))
+    bar = list(" " * width)
+    bar[pos] = "🥥"
+    trail = "".join(["=" if i < pos else bar[i] for i in range(width)])
+    return f"🌴 {trail} 📡"
+
+def animate_radar_sweep(duration_sec=3.0, label="Scanne Funkbänder"):
+    """Animierter ASCII-Radar-Sweep für Sektor-Peilungen."""
+    radar_frames = [
+        "   .  :  .   \n .   /   . \n: -- 📡 -- :\n .   /   . \n   '  :  '   ",
+        "   .  |  .   \n .   |   . \n: -- 📡 -- :\n .   |   . \n   '  :  '   ",
+        "   .  :  .   \n .   \\   . \n: -- 📡 -- :\n .   \\   . \n   '  :  '   ",
+        "   .  :  .   \n .       . \n:====📡====:\n .       . \n   '  :  '   ",
+    ]
+    start = time.time()
+    idx = 0
+    with Live(auto_refresh=False) as live:
+        while time.time() - start < duration_sec:
+            frame = radar_frames[idx % len(radar_frames)]
+            wave = render_oscilloscope(idx, width=28)
+            content = Panel(
+                Align.center(f"[bold chartreuse2]{frame}[/]\n\n[bold white]{label}[/]\n[chartreuse3]{wave}[/]"),
+                border_style="chartreuse3",
+                box=box.ROUNDED,
+                title="[bold yellow]📡 HF RADAR SCANNER[/]"
+            )
+            live.update(content, refresh=True)
+            idx += 1
+            time.sleep(0.12)
+
+def animate_coconut_speedtest_run(sid, timeout=60):
+    """
+    Startet den nativen Ookla-Speedtest auf dem Gateway und rendert
+    eine fliegende Kokosnuss-Animation mit dynamischen Funkwellen.
+    """
     call_exec(sid, "rm", ["-f", "/tmp/speedtest.json"])
     
     url = f"http://{ROUTER_IP}/ubus"
@@ -332,36 +388,67 @@ def run_speedtest_native(sid, timeout=60):
     urllib.request.urlopen(req, timeout=5)
 
     start = time.time()
-    time.sleep(3)  # Kurz warten bis der Speedtest-Daemon gestartet ist
-    while time.time() - start < timeout:
-        raw = read_router_file(sid, "/tmp/speedtest.json")
-        if raw:
-            try:
-                data = json.loads(raw)
-                state = data.get("state", "")
-                if state == "FINISHED":
-                    dl_bytes = data.get("avgDownloadSpeed", 0)
-                    ul_bytes = data.get("avgUploadSpeed", 0)
-                    return {
-                        "download_mbps": round((dl_bytes * 8.0) / 1_000_000.0, 2),
-                        "upload_mbps": round((ul_bytes * 8.0) / 1_000_000.0, 2),
-                        "server": data.get("serverURL", "Salt Mobile CH"),
-                        "duration": round(time.time() - start, 1)
-                    }
-                elif state in ["ERROR", "FAILED"]:
-                    raise RuntimeError(f"Speedtest meldete: {state}")
-            except json.JSONDecodeError:
-                pass
-        time.sleep(2)
-    raise TimeoutError("Speedtest Timeout")
+    step = 0
+    phase_text = "Starte Ookla 5G-Daemon..."
+
+    with Live(auto_refresh=False) as live:
+        while time.time() - start < timeout:
+            elapsed = time.time() - start
+            progress_pct = min(95.0, (elapsed / 32.0) * 100.0)
+            
+            flight = render_coconut_flight(progress_pct, width=28)
+            wave = render_oscilloscope(step, width=32)
+
+            raw = read_router_file(sid, "/tmp/speedtest.json")
+            if raw:
+                try:
+                    data = json.loads(raw)
+                    state = data.get("state", "")
+                    if "DOWNLOAD" in state:
+                        phase_text = "[bold cyan]⬇️ DOWNLOAD-PHASE:[/] Schleudere Kokosnüsse durch den Randen-Wald..."
+                    elif "UPLOAD" in state:
+                        phase_text = "[bold chartreuse2]⬆️ UPLOAD-PHASE:[/] Kokosnuss-Turbo zündet (80+ Mbit/s Ziel)!"
+                    elif state == "FINISHED":
+                        dl_bytes = data.get("avgDownloadSpeed", 0)
+                        ul_bytes = data.get("avgUploadSpeed", 0)
+                        live.stop()
+                        return {
+                            "download_mbps": round((dl_bytes * 8.0) / 1_000_000.0, 2),
+                            "upload_mbps": round((ul_bytes * 8.0) / 1_000_000.0, 2),
+                            "server": data.get("serverURL", "Salt Mobile CH"),
+                            "duration": round(elapsed, 1)
+                        }
+                    elif state in ["ERROR", "FAILED"]:
+                        live.stop()
+                        raise RuntimeError(f"Speedtest meldete: {state}")
+                except json.JSONDecodeError:
+                    pass
+
+            card = Panel(
+                Align.center(
+                    f"\n[bold gold1]🚀 5G KOKOSNUSS-TURBO AKTIV • RandeLab 857 m ü. M. 🌴[/]\n\n"
+                    f"[bold white]{flight}[/]\n\n"
+                    f"{phase_text}\n"
+                    f"[chartreuse3]{wave}[/]\n\n"
+                    f"[dim]Gemessene Latenz & Durchsatz direkt auf Qualcomm X55 ({elapsed:.1f}s)[/dim]\n"
+                ),
+                border_style="chartreuse2",
+                box=box.ROUNDED,
+                title="[bold chartreuse2]⚡ LIVE 5G SPEEDTEST ENGINE[/]"
+            )
+            live.update(card, refresh=True)
+            step += 1
+            time.sleep(0.1)
+
+    raise TimeoutError("Speedtest Timeout überschritten")
 
 # --- Interactive Actions ---
 
 def action_watch_mode(dash, sid):
     console.clear()
     console.print(f"[bold {dash.theme_color}]Starte Live Kabis-Radar... Drücke Ctrl+C für Rückkehr ins Menü.[/]")
-    time.sleep(1)
-    with Live(dash.generate_layout(sid), refresh_per_second=1, screen=True) as live:
+    time.sleep(0.8)
+    with Live(dash.generate_layout(sid), refresh_per_second=2, screen=True) as live:
         try:
             while True:
                 time.sleep(2)
@@ -372,10 +459,9 @@ def action_watch_mode(dash, sid):
     console.clear()
 
 def action_speedtest(dash, sid):
-    console.print(f"\n[bold {dash.accent_color}]🥥🚀 Starte Ookla 5G-Speedtest (Kokosnuss-Beschleuniger auf dem Gateway)...[/]")
+    console.clear()
     try:
-        with console.status(f"[bold {dash.theme_color}]Schleudere 5G-Pakete durch den Randen-Wald (ca. 15-25s)...[/]"):
-            res = run_speedtest_native(sid)
+        res = animate_coconut_speedtest_run(sid, timeout=60)
         dash.log(f"Kokosnuss-Speedtest fertig: ⬇️ {res['download_mbps']} Mbit/s | ⬆️ {res['upload_mbps']} Mbit/s ({res['duration']}s)")
         
         t_spd = Table(title="[bold chartreuse2]⚡ Ookla Speedtest Ergebnis (TRB500 Gateway)[/]", box=box.ROUNDED)
@@ -398,6 +484,7 @@ def action_speedtest(dash, sid):
         return None
 
 def action_mast_antenna_check(dash, sid):
+    console.clear()
     console.print(f"\n[bold {dash.theme_color}]🛰️ Antennen- & Masten-Check (Auf der Suche nach fernen Kokosnüssen)[/]")
     console.print("[dim]Von der 857 m Kuppe sehen wir nicht nur ins Tal, sondern über die Hügelketten hinaus![/dim]\n")
 
@@ -424,12 +511,12 @@ def action_mast_antenna_check(dash, sid):
         return
 
     if choice == "R":
-        with console.status("[bold green]Setze Modem auf 'Auto / Alle Bänder' zurück und warte auf Re-Connect...[/]"):
-            send_at_cmd(sid, 'AT+QNWPREFCFG="restore_band"')
-            for _ in range(15):
-                time.sleep(2)
-                if call_gsmctl(sid, ["-j"]) == "Connected":
-                    break
+        animate_radar_sweep(2.0, "Stelle Auto-Bänder wieder her")
+        send_at_cmd(sid, 'AT+QNWPREFCFG="restore_band"')
+        for _ in range(15):
+            time.sleep(2)
+            if call_gsmctl(sid, ["-j"]) == "Connected":
+                break
         dash.log("Modem auf Standard 'Auto / Alle Bänder' zurückgesetzt")
         console.print("[bold green]✓ Modem ist auf Auto zurückgesetzt und wieder stabil online.[/bold green]")
         return
@@ -450,28 +537,28 @@ def action_mast_antenna_check(dash, sid):
         t_res.add_column("Klarheit (SINR)", style="white")
 
         for name, b in profiles:
-            with console.status(f"[bold cyan]Peile {name} an...[/]"):
-                send_at_cmd(sid, f'AT+QNWPREFCFG="lte_band",{b}')
-                time.sleep(6)
-                raw_cell = send_at_cmd(sid, 'AT+QENG="servingcell"')
-                rsrp_val = "-"
-                sinr_val = "-"
-                cid_val = "-"
-                for line in raw_cell.splitlines():
-                    if "LTE" in line and "servingcell" not in line:
-                        parts = line.split(",")
-                        if len(parts) >= 15:
-                            cid_val = parts[4]
-                            rsrp_val = parts[11]
-                            sinr_val = parts[14]
-                t_res.add_row(name, cid_val, dash.coconut_meter(rsrp_val), dash.sinr_badge(sinr_val))
+            animate_radar_sweep(2.0, f"Peile {name} an...")
+            send_at_cmd(sid, f'AT+QNWPREFCFG="lte_band",{b}')
+            time.sleep(4)
+            raw_cell = send_at_cmd(sid, 'AT+QENG="servingcell"')
+            rsrp_val = "-"
+            sinr_val = "-"
+            cid_val = "-"
+            for line in raw_cell.splitlines():
+                if "LTE" in line and "servingcell" not in line:
+                    parts = line.split(",")
+                    if len(parts) >= 15:
+                        cid_val = parts[4]
+                        rsrp_val = parts[11]
+                        sinr_val = parts[14]
+            t_res.add_row(name, cid_val, dash.coconut_meter(rsrp_val), dash.sinr_badge(sinr_val))
 
-        with console.status("[bold green]Stelle 'Auto / Alle Bänder' wieder her und warte auf Online-Status...[/]"):
-            send_at_cmd(sid, 'AT+QNWPREFCFG="restore_band"')
-            for _ in range(15):
-                time.sleep(2)
-                if call_gsmctl(sid, ["-j"]) == "Connected":
-                    break
+        animate_radar_sweep(2.5, "Re-Lock auf Auto & 5G-NSA...")
+        send_at_cmd(sid, 'AT+QNWPREFCFG="restore_band"')
+        for _ in range(15):
+            time.sleep(2)
+            if call_gsmctl(sid, ["-j"]) == "Connected":
+                break
 
         console.print(t_res)
         console.print("[bold green]✓ Verbindung ist wieder voll hergestellt.[/bold green]")
@@ -479,18 +566,18 @@ def action_mast_antenna_check(dash, sid):
 
     band_map = {"1": "3", "2": "20", "3": "1", "4": "28", "5": "7"}
     target_band = band_map.get(choice, "3")
-    with console.status(f"[bold cyan]Schalte Modem auf Band {target_band}...[/]"):
-        send_at_cmd(sid, f'AT+QNWPREFCFG="lte_band",{target_band}')
-        time.sleep(4)
-        dash.log(f"Band manuell auf {target_band} geschaltet")
+    animate_radar_sweep(2.0, f"Schalte Modem auf Band {target_band}...")
+    send_at_cmd(sid, f'AT+QNWPREFCFG="lte_band",{target_band}')
+    time.sleep(4)
+    dash.log(f"Band manuell auf {target_band} geschaltet")
     console.print(f"[bold green]✓ Modem ist nun auf Band {target_band} fixiert.[/bold green]")
     console.print("[dim]Hinweis: Im Menü 'R' wählen, um auf Auto zurückzukehren.[/dim]")
 
 def action_deep_cell_scan(dash, sid):
-    console.print(f"\n[bold {dash.theme_color}]🔬 Ausführliche Mast-Identifikation (Kabis- & Sektor-Analyse)[/]")
-    with console.status("[bold cyan]Lese Modem-Telemetrie und HF-Register...[/]"):
-        info_raw = call_gsmctl(sid, ["-E"])
-        neighbours_raw = call_gsmctl(sid, ["-I"])
+    console.clear()
+    animate_radar_sweep(1.8, "Tiefenscan: Dekodiere Sektoren & Signalregister...")
+    info_raw = call_gsmctl(sid, ["-E"])
+    neighbours_raw = call_gsmctl(sid, ["-I"])
 
     try:
         info = json.loads(info_raw)
@@ -523,6 +610,7 @@ def action_deep_cell_scan(dash, sid):
     console.print(t_id)
 
 def action_create_report(dash, sid):
+    console.clear()
     console.print(f"\n[bold {dash.theme_color}]🥥📝 Erstelle Kabis- & Kokosnuss-Messbericht...[/]")
     os.makedirs(REPORTS_DIR, exist_ok=True)
     ts_str = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -531,16 +619,16 @@ def action_create_report(dash, sid):
     md_path = os.path.join(REPORTS_DIR, md_filename)
     json_path = os.path.join(REPORTS_DIR, json_filename)
 
-    with console.status("[bold cyan]1/2: Erfasse HF-Signalmetriken & Masten...[/]"):
-        modem_raw = call_gsmctl(sid, ["-E"])
-        try:
-            modem_info = json.loads(modem_raw)
-        except:
-            modem_info = {}
-        cache = modem_info.get("cache", {})
-        neighbours = call_gsmctl(sid, ["-I"])
+    animate_radar_sweep(1.5, "1/2: Erfasse HF-Signalmetriken & Masten...")
+    modem_raw = call_gsmctl(sid, ["-E"])
+    try:
+        modem_info = json.loads(modem_raw)
+    except:
+        modem_info = {}
+    cache = modem_info.get("cache", {})
+    neighbours = call_gsmctl(sid, ["-I"])
 
-    console.print("[dim]   ✓ Signal-Snapshot erfasst[/dim]")
+    console.print("[dim]   ✓ Signal-Snapshot erfasst[/dim]\n")
     
     st_result = action_speedtest(dash, sid)
 
