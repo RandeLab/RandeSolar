@@ -325,10 +325,14 @@ static String   g_cellMode = "";        // e.g. "5G-NSA"
 static String   g_cellBand = "";        // e.g. "LTE B3 + 5G N1"
 static String   g_cellOperator = "";    // e.g. "GoMo"
 static String   g_cellId = "";          // Cell ID e.g. "29858817"
+static float    g_cellDownMbps = 0.0f;  // Real 5G WAN Download from TRB500 Ookla test
+static float    g_cellUpMbps = 0.0f;    // Real 5G WAN Upload from TRB500 Ookla test
+static String   g_cellSpeedState = "FINISHED"; // "FINISHED", "TESTING_DOWNLOAD", "TESTING_UPLOAD"
 static uint32_t g_lastCellFetchMs = 0;
 static String   g_ubusToken = "";
 static uint32_t g_ubusTokenExpires = 0;
 void fetchTeltonika5GMetrics(bool force = false);
+bool triggerRouterSpeedtest();
 
 // Local Microclimate Tracking (Open-Meteo / MeteoSwiss ICON-CH Underes Ätzisloo 189)
 static float g_wxTemp = 0.0f;
@@ -757,8 +761,18 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       </div>
       <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap:10px; font-size:0.82rem;">
         <div style="padding:8px; border:1px solid var(--border); border-radius:4px; background:rgba(0,0,0,0.15);">
+          <div style="color:var(--muted); font-size:0.72rem;">⬇️ 5G ROUTER DOWNLOAD</div>
+          <div style="font-size:1.35rem; font-weight:bold; color:var(--cyan);"><span id="cellDown">--</span> <small style="font-size:0.75rem;">Mbit/s</small></div>
+          <div style="font-size:0.72rem; color:var(--muted); margin-top:2px;">TRB500 Nativer Ookla Test</div>
+        </div>
+        <div style="padding:8px; border:1px solid var(--border); border-radius:4px; background:rgba(0,0,0,0.15);">
+          <div style="color:var(--muted); font-size:0.72rem;">⬆️ 5G ROUTER UPLOAD</div>
+          <div style="font-size:1.35rem; font-weight:bold; color:var(--pink);"><span id="cellUp">--</span> <small style="font-size:0.75rem;">Mbit/s</small></div>
+          <div style="font-size:0.72rem; color:var(--muted); margin-top:2px;">Snapdragon X55 WAN Uplink</div>
+        </div>
+        <div style="padding:8px; border:1px solid var(--border); border-radius:4px; background:rgba(0,0,0,0.15);">
           <div style="color:var(--muted); font-size:0.72rem;">📡 5G GATEWAY (TRB500)</div>
-          <div style="font-size:1.25rem; font-weight:bold; color:var(--cyan);"><span id="cellRsrp">--</span> <small style="font-size:0.75rem;">dBm</small></div>
+          <div style="font-size:1.25rem; font-weight:bold; color:var(--yellow);"><span id="cellRsrp">--</span> <small style="font-size:0.75rem;">dBm</small></div>
           <div style="font-size:0.72rem; color:var(--muted); margin-top:2px;">SINR <span id="cellSinr">--</span> dB • Güte <span id="cellQual">--</span>%</div>
         </div>
         <div style="padding:8px; border:1px solid var(--border); border-radius:4px; background:rgba(0,0,0,0.15);">
@@ -938,6 +952,12 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
           if (elId) elId.textContent = d.cell_id;
           const elTemp = document.getElementById('cellTemp');
           if (elTemp) elTemp.textContent = d.cell_temp.toFixed(1);
+          if (d.cell_down_mbps !== undefined && d.cell_down_mbps > 0) {
+            const elCd = document.getElementById('cellDown');
+            if (elCd) elCd.textContent = d.cell_down_mbps.toFixed(2);
+            const elCu = document.getElementById('cellUp');
+            if (elCu) elCu.textContent = d.cell_up_mbps.toFixed(2);
+          }
         }
         document.getElementById('beaconAge').textContent = d.age_sec + (curLang === 'de' ? ' Sek.' : 's ago');
       } catch (e) {
@@ -1210,7 +1230,7 @@ void handleLiveApi() {
     int wifiRssi = WiFi.RSSI();
     int wifiQual = constrain(2 * (wifiRssi + 100), 0, 100);
 
-    char json[1200];
+    char json[1350];
     snprintf(json, sizeof(json),
         "{\"has_data\":%s,\"solar_power\":%u,\"battery_voltage\":%.2f,\"battery_current\":%.2f,\"panel_voltage\":%.2f,"
         "\"yield_today_wh\":%lu,\"external_load\":%.2f,\"charge_state\":%u,\"state_str\":\"%s\","
@@ -1219,6 +1239,7 @@ void handleLiveApi() {
         "\"net_ping_ms\":%u,\"gw_ping_ms\":%u,\"dns_ms\":%u,\"ttfb_ms\":%u,"
         "\"cell_has_data\":%s,\"cell_rsrp\":%d,\"cell_sinr\":%d,\"cell_rsrq\":%d,\"cell_qual\":%d,"
         "\"cell_mode\":\"%s\",\"cell_band\":\"%s\",\"cell_operator\":\"%s\",\"cell_id\":\"%s\",\"cell_temp\":%.1f,"
+        "\"cell_down_mbps\":%.2f,\"cell_up_mbps\":%.2f,\"cell_speed_state\":\"%s\","
         "\"wx_temp\":%.1f,\"wx_solar_wm2\":%.1f,\"wx_cloud_pct\":%d,\"wx_rain_mm\":%.2f,\"wx_wind_kmh\":%.1f,\"wx_humidity\":%d,\"wx_pressure\":%.1f,"
         "\"buffered_records\":%u,\"ip\":\"%s\",\"gateway_ip\":\"%s\",\"age_sec\":%lu}",
         d.has_data ? "true" : "false",
@@ -1253,6 +1274,9 @@ void handleLiveApi() {
         g_cellOperator.c_str(),
         g_cellId.c_str(),
         g_cellTemp,
+        g_cellDownMbps,
+        g_cellUpMbps,
+        g_cellSpeedState.c_str(),
         g_wxTemp,
         g_wxSolarWm2,
         g_wxCloudPct,
@@ -1335,6 +1359,7 @@ void handleBufferCsv() {
 }
 
 void handleSpeedtestApi() {
+    triggerRouterSpeedtest();
     measureInternetSpeed(true);
     fetchTeltonika5GMetrics(true);
     handleLiveApi();
@@ -1564,8 +1589,10 @@ void fetchMeteoSwissWeather(bool force) {
 void fetchTeltonika5GMetrics(bool force) {
     if (WiFi.status() != WL_CONNECTED) return;
     uint32_t now = millis();
-    if (!force && g_cellHasData && (now - g_lastCellFetchMs < 60000)) {
-        return; // 60s cache
+    bool testInProgress = (g_cellSpeedState.length() > 0 && g_cellSpeedState != "FINISHED");
+    uint32_t cacheTimeout = testInProgress ? 5000 : 60000;
+    if (!force && g_cellHasData && (now - g_lastCellFetchMs < cacheTimeout)) {
+        return; // 60s cache normally, 5s during speedtest
     }
 
     WiFiClient client;
@@ -1660,6 +1687,66 @@ void fetchTeltonika5GMetrics(bool force) {
         }
         http.end();
     }
+
+    // 3. Read real router speedtest results from /tmp/speedtest.json
+    if (http.begin(client, "http://192.168.2.1/ubus")) {
+        http.addHeader("Content-Type", "application/json");
+        String stReq = "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"call\",\"params\":[\"" + g_ubusToken + "\",\"file\",\"read\",{\"path\":\"/tmp/speedtest.json\"}]}";
+        int code = http.POST(stReq);
+        if (code == HTTP_CODE_OK) {
+            String stResp = http.getString();
+            auto getVal = [](const String& src, const char* key) -> String {
+                int k = src.indexOf(key);
+                if (k < 0) return "";
+                int c = src.indexOf(':', k);
+                if (c < 0) return "";
+                int end = src.indexOf(',', c);
+                int endB = src.indexOf('}', c);
+                if (end < 0 || (endB > 0 && endB < end)) end = endB;
+                if (end < 0) return "";
+                String v = src.substring(c + 1, end);
+                v.trim();
+                v.replace("\"", "");
+                v.replace("\\", "");
+                return v;
+            };
+            String dl = getVal(stResp, "avgDownloadSpeed");
+            String ul = getVal(stResp, "avgUploadSpeed");
+            String st = getVal(stResp, "state");
+            if (dl.length() > 0 && dl != "0") g_cellDownMbps = (dl.toFloat() * 8.0f) / 1000000.0f;
+            if (ul.length() > 0 && ul != "0") g_cellUpMbps = (ul.toFloat() * 8.0f) / 1000000.0f;
+            if (st.length() > 0) g_cellSpeedState = st;
+            if (g_cellDownMbps > 0.0f) {
+                Serial.printf("[TRB500 🚀] Router 5G Speedtest: ⬇️ %.2f Mbit/s | ⬆️ %.2f Mbit/s (%s)\n",
+                    g_cellDownMbps, g_cellUpMbps, g_cellSpeedState.c_str());
+            }
+        }
+        http.end();
+    }
+}
+
+// Trigger an Ookla Speedtest directly on the Teltonika TRB500 Router
+bool triggerRouterSpeedtest() {
+    if (WiFi.status() != WL_CONNECTED) return false;
+    fetchTeltonika5GMetrics(true);
+    if (g_ubusToken.length() == 0) return false;
+
+    WiFiClient client;
+    client.setTimeout(3500);
+    HTTPClient http;
+    bool ok = false;
+    if (http.begin(client, "http://192.168.2.1/ubus")) {
+        http.addHeader("Content-Type", "application/json");
+        String runReq = "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"call\",\"params\":[\"" + g_ubusToken + "\",\"speedtest\",\"run\",{}]}";
+        int code = http.POST(runReq);
+        if (code == HTTP_CODE_OK) {
+            g_cellSpeedState = "TESTING_DOWNLOAD";
+            ok = true;
+            Serial.println("[TRB500 🚀] Native Ookla speedtest triggered on router!");
+        }
+        http.end();
+    }
+    return ok;
 }
 
 // Reconnect MQTT (non-blocking)
@@ -2080,46 +2167,38 @@ void checkTelegramUpdates() {
                             );
                             sendTelegramMessage(msg, fromChatId.c_str());
                         } else if (cmd.startsWith("/speed")) {
+                            triggerRouterSpeedtest();
                             measureInternetSpeed(true);
                             fetchTeltonika5GMetrics(true);
                             int wifiRssi = WiFi.RSSI();
                             int wifiQual = constrain(2 * (wifiRssi + 100), 0, 100);
-                            char spMsg[750];
+                            char spMsg[820];
                             if (g_cellHasData) {
                                 snprintf(spMsg, sizeof(spMsg),
-                                    "🚀 *RandeLab 5G Mobilfunk & Netzwerk* 🌐\n"
+                                    "🚀 *RandeLab 5G Speedtest (TRB500 Ookla)* 🌐\n"
                                     "━━━━━━━━━━━━━━━━━━━━\n"
-                                    "📡 *5G Router:* Teltonika TRB500\n"
-                                    "🏢 *Provider:* %s (%s)\n"
-                                    "📶 *Band:* %s\n"
-                                    "🎚️ *Signal (RSRP):* %d dBm\n"
-                                    "⚡ *SINR:* %d dB (Signal/Rauschen)\n"
-                                    "📊 *Güte:* %d%% (RSRQ: %d dB)\n"
-                                    "🏰 *Funkzelle:* ID %s\n"
+                                    "⬇️ *5G Download:* %.2f Mbit/s (Router WAN)\n"
+                                    "⬆️ *5G Upload:* %.2f Mbit/s\n"
+                                    "🎚️ *Signal (RSRP):* %d dBm (SINR: %d dB)\n"
+                                    "📶 *Bänder:* %s (%s)\n"
+                                    "🏢 *Provider:* %s • Cell %s\n"
                                     "🌡️ *Router-Temp:* %.1f °C\n"
                                     "━━━━━━━━━━━━━━━━━━━━\n"
                                     "💻 *ESP32-S3 Wi-Fi Hop:*\n"
-                                    "⬇️ *WLAN Stream:* %.2f Mbit/s\n"
+                                    "⬇️ *WLAN Stream:* %.2f Mbit/s (SoC Benchmark)\n"
                                     "⬆️ *WLAN Upload:* %.2f Mbit/s\n"
-                                    "🏓 *Internet-Ping:* %u ms (1.1.1.1)\n"
-                                    "🏠 *Router-Ping:* %u ms (%s)\n"
-                                    "🔍 *DNS Lookup:* %u ms • TTFB: %u ms\n"
-                                    "📶 *WLAN:* %d dBm (%d%%, Ch %d)\n"
-                                    "🌡️ *ESP32 Chip:* %.1f °C",
-                                    g_cellOperator.c_str(), g_cellMode.c_str(),
-                                    g_cellBand.c_str(),
-                                    g_cellRsrp,
-                                    g_cellSinr,
-                                    g_cellQual, g_cellRsrq,
-                                    g_cellId.c_str(),
+                                    "🏓 *Latenz:* %u ms (1.1.1.1) / %u ms (Router)\n"
+                                    "📶 *WLAN:* %d dBm (%d%% • Ch %d)",
+                                    g_cellDownMbps,
+                                    g_cellUpMbps,
+                                    g_cellRsrp, g_cellSinr,
+                                    g_cellBand.c_str(), g_cellMode.c_str(),
+                                    g_cellOperator.c_str(), g_cellId.c_str(),
                                     g_cellTemp,
                                     g_netSpeedMbps,
                                     g_netUpMbps,
-                                    (unsigned int)g_netPingMs,
-                                    (unsigned int)g_gwPingMs, WiFi.gatewayIP().toString().c_str(),
-                                    (unsigned int)g_dnsMs, (unsigned int)g_ttfbMs,
-                                    wifiRssi, wifiQual, WiFi.channel(),
-                                    temperatureRead()
+                                    (unsigned int)g_netPingMs, (unsigned int)g_gwPingMs,
+                                    wifiRssi, wifiQual, WiFi.channel()
                                 );
                             } else {
                                 snprintf(spMsg, sizeof(spMsg),
@@ -2382,6 +2461,15 @@ void loop() {
             triggerTxFlash();
             Serial.printf("[MQTT 📡] Published to %s: %s\n", MQTT_TOPIC, json);
         }
+    }
+
+    // Check router 5G metrics & ongoing speedtest state (every 60s normally, 5s during speedtest)
+    static uint32_t lastCellCheck = 0;
+    bool cellTestRunning = (g_cellSpeedState.length() > 0 && g_cellSpeedState != "FINISHED");
+    uint32_t cellInterval = cellTestRunning ? 5000 : 60000;
+    if (now - lastCellCheck >= cellInterval) {
+        lastCellCheck = now;
+        fetchTeltonika5GMetrics(false);
     }
 
     // Refresh Internet Speed (Mbps) every 5 minutes, and Ping (ms) every 20s

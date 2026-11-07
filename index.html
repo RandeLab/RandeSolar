@@ -391,10 +391,21 @@
     <section class="panel" style="border-top-color:var(--accent-blue); margin-top:10px;">
       <h2 id="lblNetDiagTitle">🚀 5G-Mobilfunk & ESP32-S3 Netzwerk-Diagnose</h2>
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:12px; margin-top:10px; font-family:var(--font-mono);">
-        <!-- 5G Router Metrics -->
+        <!-- 5G Router Native Speedtest Metrics -->
+        <div style="padding:10px 12px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">
+          <div style="font-size:0.72rem; color:var(--text-muted);">⬇️ 5G ROUTER DOWNLOAD</div>
+          <div style="font-size:1.45rem; font-weight:700; color:var(--accent-blue); margin-top:2px;"><span id="cellDownMbps">--</span> <small style="font-size:0.8rem;">Mbit/s</small></div>
+          <div style="font-size:0.74rem; color:var(--text-muted); margin-top:2px;">TRB500 Nativer Ookla Test</div>
+        </div>
+        <div style="padding:10px 12px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">
+          <div style="font-size:0.72rem; color:var(--text-muted);">⬆️ 5G ROUTER UPLOAD</div>
+          <div style="font-size:1.45rem; font-weight:700; color:var(--accent-pink); margin-top:2px;"><span id="cellUpMbps">--</span> <small style="font-size:0.8rem;">Mbit/s</small></div>
+          <div style="font-size:0.74rem; color:var(--text-muted); margin-top:2px;">Qualcomm X55 WAN Uplink</div>
+        </div>
+        <!-- 5G Router RF Metrics -->
         <div style="padding:10px 12px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">
           <div style="font-size:0.72rem; color:var(--text-muted);">📡 5G GATEWAY EMPFANG</div>
-          <div style="font-size:1.45rem; font-weight:700; color:var(--accent-blue); margin-top:2px;"><span id="cellRsrp">--</span> <small style="font-size:0.8rem;">dBm</small></div>
+          <div style="font-size:1.45rem; font-weight:700; color:var(--accent-yellow); margin-top:2px;"><span id="cellRsrp">--</span> <small style="font-size:0.8rem;">dBm</small></div>
           <div style="font-size:0.74rem; color:var(--text-muted); margin-top:2px;">SINR <span id="cellSinr">--</span> dB • Güte <span id="cellQual">--</span>%</div>
         </div>
         <div style="padding:10px 12px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">

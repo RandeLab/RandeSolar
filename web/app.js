@@ -1089,6 +1089,13 @@ function updateDashboard(data) {
     if (elId) elId.textContent = data.cell_id;
     const elTemp = document.getElementById('cellTemp');
     if (elTemp && data.cell_temp !== undefined) elTemp.textContent = Number(data.cell_temp).toFixed(1);
+
+    if (data.cell_down_mbps !== undefined && data.cell_down_mbps > 0) {
+      const elCellDown = document.getElementById('cellDownMbps');
+      if (elCellDown) elCellDown.textContent = Number(data.cell_down_mbps).toFixed(2);
+      const elCellUp = document.getElementById('cellUpMbps');
+      if (elCellUp) elCellUp.textContent = Number(data.cell_up_mbps).toFixed(2);
+    }
   }
 
   if (data.ip && el.statusText) {
