@@ -1,9 +1,10 @@
 # ☀️ RandeSolar Systemarchitektur & Auslegungsdokumentation
 
 **Standort:** RandeLab • Underes Ätzisloo 189, 8232 Merishausen / Randen  
-**Koordinaten:** 47.7701° N, 8.5738° E • ~857 m ü. M. (Amtl. Gebäudeadresse GWR / Swisstopo)  
+**Koordinaten:** 47.7701° N, 8.5738° E • **857 m ü. M.** (Amtl. Gebäudeadresse GWR / Swisstopo)  
 **Systemtyp:** Autonomes Off-Grid Solar-Inselnetz mit 12V-Batteriespeicher & 230V-Wechselrichter  
-**Stand:** November 2026
+**Stand:** November 2026  
+**Schwesterdokument:** 👉 [**`NETWORK_5G_INFRASTRUCTURE.md`**](./NETWORK_5G_INFRASTRUCTURE.md) (5G Gateway, ubus API, Band-Locking & Wi-Fi)
 
 ---
 
@@ -85,6 +86,10 @@ Die Live-Abfrage des Teltonika-Gateways bestätigt den direkten Einfluss des Ran
 | :---: | :---: |
 | ![Aussenantenne / 4G-5G Outdoor-CPE](./system_docu/router_outside.jpg) | ![TP-Link Omada WLAN Access Point im Gebäude](./system_docu/router_inside.jpg) |
 | *Wetterfeste Teltonika 4G/5G Station (192.168.2.1) geschützt unter dem Holzvordach* | *TP-Link Access Point (192.168.1.1) mit PoE-Speisung im RandeLab-Innenraum* |
+
+> [!NOTE]
+> Ausführliche Details zu den Hochfrequenz-Messwerten, Band-Locking (700 MHz / 3.5 GHz N78), der ubus-API-Architektur und der Asymmetrie-Analyse (80 Mbit/s Up vs. 20 Mbit/s Down) sind im separaten Dokument dokumentiert:  
+> 👉 [**`NETWORK_5G_INFRASTRUCTURE.md`**](./NETWORK_5G_INFRASTRUCTURE.md)
 
 ### 2.3 Batteriespeicher (4x VOLTIC) & RDDSPON 6000W Inverter
 Die 4 VOLTIC Batterien (DIN 595, je 95 Ah) sind parallel geschaltet und bilden eine massive 380 Ah Pufferbank (4.56 kWh Bruttospeicher). Darauf montiert sitzt der RDDSPON 6000W Reinsinus-Wechselrichter:
@@ -280,5 +285,14 @@ Die echten 5G-Modem-Werte, nativer WAN-Speedtest und die lokalen ESP32-WLAN-Wert
 * **MQTT:** Kontinuierliche Veröffentlichung auf `randelab/solar/telemetry`.
 * **Web-Dashboard:** Live-Karten für 5G-Gateway-Empfang, WAN-Durchsatz und Trägerbündelung.
 * **Telegram:** Befehle `/status` und `/speed` liefern sofort die echten Router-Leitungsdaten.
+
+---
+
+## 10. Weiterführende Netzwerk- & Telekommunikations-Dokumentation
+
+Für das vollständige Netzwerk-Engineering, 5G-HF-Physik, Band-Locking-Anleitungen (700 MHz B28 / 3.5 GHz N78), Funkzellen-Analyse und den 35'000-Datensatz LittleFS Flash-Puffer des ESP32:
+
+👉 [**`NETWORK_5G_INFRASTRUCTURE.md`**](./NETWORK_5G_INFRASTRUCTURE.md)
+
 
 

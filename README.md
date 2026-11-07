@@ -22,11 +22,17 @@ The **ESP32-S3** handles the entire pipeline autonomously 24/7 without requiring
 
 ---
 
-## 📖 System Architecture & Electrical Design
+## 📖 Systemarchitektur & Technische Dokumentation
 
-For complete hardware documentation, schematics, battery sizing (4x VOLTIC 95Ah = 380Ah), RDDSPON 6000W Pure Sine Wave inverter analysis, and the 8-panel (3 kWp) expansion plan, see:
+Das Gesamtsystem ist in zwei modulare Spezialdokumentationen aufgeteilt:
 
-👉 [**`SOLAR_SYSTEM_ARCHITECTURE.md`**](./SOLAR_SYSTEM_ARCHITECTURE.md)
+1. ☀️ **Photovoltaik-Inselnetz & Speicher:**  
+   👉 [**`SOLAR_SYSTEM_ARCHITECTURE.md`**](./SOLAR_SYSTEM_ARCHITECTURE.md)  
+   *PV-Modulfeld (Energetica 380 Wp), Victron MPPT 75|15, 4x VOLTIC 380Ah-Batteriebank, RDDSPON 6000W Reinsinus-Inverter, Peukert-Effekt, Mechatronik-Absicherung & 3 kWp Ausbauplan.*
+
+2. 🌐 **5G-Telekommunikation & Netzwerk-Infrastruktur:**  
+   👉 [**`NETWORK_5G_INFRASTRUCTURE.md`**](./NETWORK_5G_INFRASTRUCTURE.md)  
+   *Teltonika TRB500 Industrial Gateway, TP-Link Omada PoE Access Point, ubus JSON-RPC Schnittstelle, nativer Ookla 5G-Speedtest, 5G-HF-Physik auf 857m (RSRP/SINR), Frequenz-Tuning (700 MHz vs. 3.5 GHz N78) und 35'000-Datensatz LittleFS Flash-Puffer.*
 
 ---
 
