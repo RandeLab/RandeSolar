@@ -1,6 +1,7 @@
 // RandeSolar - openBrushograph Studio Edition
 let solarChartInstance = null;
 let chargeChartInstance = null;
+let netChartInstance = null;
 let lastChartAppendTime = 0;
 const CHART_THROTTLE_MS = 4000; // Update charts every 4-5 seconds for calm reading
 let currentLimit = 240; // Default 1 hour of history
@@ -382,6 +383,25 @@ window.setTheme = function(theme) {
     chargeChartInstance.options.scales.yCurrent.title.color = pal.curr;
     chargeChartInstance.update();
   }
+
+  // Update Network Speed Chart colors
+  if (netChartInstance) {
+    netChartInstance.data.datasets[0].borderColor = pal.volt || '#00F5FF';
+    netChartInstance.data.datasets[0].backgroundColor = pal.voltFill || 'rgba(0, 245, 255, 0.15)';
+    netChartInstance.data.datasets[1].borderColor = pal.curr || '#FF6BB5';
+    netChartInstance.data.datasets[1].backgroundColor = pal.currFill || 'rgba(255, 107, 181, 0.15)';
+    netChartInstance.data.datasets[2].borderColor = pal.load || '#39FF14';
+    netChartInstance.data.datasets[3].borderColor = pal.solar || '#FFD400';
+
+    netChartInstance.options.scales.x.grid.color = pal.grid;
+    netChartInstance.options.scales.x.ticks.color = pal.text;
+    netChartInstance.options.scales.ySpeed.grid.color = pal.grid;
+    netChartInstance.options.scales.ySpeed.ticks.color = pal.volt || '#00F5FF';
+    netChartInstance.options.scales.ySpeed.title.color = pal.volt || '#00F5FF';
+    netChartInstance.options.scales.yPing.ticks.color = pal.load || '#39FF14';
+    netChartInstance.options.scales.yPing.title.color = pal.load || '#39FF14';
+    netChartInstance.update();
+  }
 };
 
 window.connectToCustomEndpoint = function() {
@@ -553,6 +573,116 @@ function initChart() {
             ticks: { color: pal.curr, font: { family: 'JetBrains Mono', size: 10 } },
             suggestedMin: 0,
             suggestedMax: 10,
+          }
+        }
+      }
+    });
+  }
+
+  // Plot 3: Internet Speed & Network Latency (Mbit/s & ms)
+  const netCanvas = document.getElementById('netChart');
+  if (netCanvas) {
+    const ctxNet = netCanvas.getContext('2d');
+    netChartInstance = new Chart(ctxNet, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: 'Download (Mbit/s)',
+            data: [],
+            borderColor: pal.volt || '#00F5FF',
+            backgroundColor: pal.voltFill || 'rgba(0, 245, 255, 0.15)',
+            borderWidth: 2.2,
+            tension: 0.25,
+            fill: true,
+            yAxisID: 'ySpeed',
+            pointRadius: 2.5,
+            pointHoverRadius: 5,
+          },
+          {
+            label: 'Upload (Mbit/s)',
+            data: [],
+            borderColor: pal.curr || '#FF6BB5',
+            backgroundColor: pal.currFill || 'rgba(255, 107, 181, 0.15)',
+            borderWidth: 1.8,
+            tension: 0.25,
+            fill: false,
+            yAxisID: 'ySpeed',
+            pointRadius: 2,
+            pointHoverRadius: 4,
+          },
+          {
+            label: 'Internet Ping (ms)',
+            data: [],
+            borderColor: pal.load || '#39FF14',
+            borderWidth: 1.8,
+            borderDash: [3, 3],
+            tension: 0.2,
+            fill: false,
+            yAxisID: 'yPing',
+            pointRadius: 1.5,
+            pointHoverRadius: 4,
+          },
+          {
+            label: 'Router GW Ping (ms)',
+            data: [],
+            borderColor: pal.solar || '#FFD400',
+            borderWidth: 1.5,
+            borderDash: [2, 2],
+            tension: 0.2,
+            fill: false,
+            yAxisID: 'yPing',
+            pointRadius: 1.5,
+            pointHoverRadius: 4,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 250 },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            labels: {
+              color: pal.text,
+              font: { family: 'JetBrains Mono', size: 11, weight: '700' },
+              boxWidth: 12,
+              usePointStyle: true,
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(10, 0, 20, 0.95)',
+            titleFont: { family: 'Outfit', size: 12 },
+            bodyFont: { family: 'JetBrains Mono', size: 12 },
+            borderColor: 'rgba(0, 245, 255, 0.4)',
+            borderWidth: 1,
+            padding: 8,
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: pal.grid },
+            ticks: { color: pal.text, font: { family: 'JetBrains Mono', size: 10 }, maxTicksLimit: 6 }
+          },
+          ySpeed: {
+            type: 'linear',
+            position: 'left',
+            title: { display: true, text: 'Speed (Mbit/s)', color: pal.volt || '#00F5FF', font: { family: 'Outfit', size: 11 } },
+            grid: { color: pal.grid },
+            ticks: { color: pal.volt || '#00F5FF', font: { family: 'JetBrains Mono', size: 10 } },
+            suggestedMin: 0,
+            suggestedMax: 10,
+          },
+          yPing: {
+            type: 'linear',
+            position: 'right',
+            title: { display: true, text: 'Latenz (ms)', color: pal.load || '#39FF14', font: { family: 'Outfit', size: 11 } },
+            grid: { drawOnChartArea: false },
+            ticks: { color: pal.load || '#39FF14', font: { family: 'JetBrains Mono', size: 10 } },
+            suggestedMin: 0,
+            suggestedMax: 100,
           }
         }
       }
@@ -795,6 +925,24 @@ function appendChartPoint(item, force = false) {
     }
     chargeChartInstance.update('none');
   }
+
+  // 3. Internet Speed (Mbit/s) & Latency (ms)
+  if (netChartInstance && (item.net_mbps !== undefined || item.net_ping_ms !== undefined)) {
+    netChartInstance.data.labels.push(timeLabel);
+    netChartInstance.data.datasets[0].data.push(item.net_mbps || 0);
+    netChartInstance.data.datasets[1].data.push(item.net_up_mbps || 0);
+    netChartInstance.data.datasets[2].data.push(item.net_ping_ms || 0);
+    netChartInstance.data.datasets[3].data.push(item.gw_ping_ms || 0);
+
+    while (netChartInstance.data.labels.length > currentLimit) {
+      netChartInstance.data.labels.shift();
+      netChartInstance.data.datasets[0].data.shift();
+      netChartInstance.data.datasets[1].data.shift();
+      netChartInstance.data.datasets[2].data.shift();
+      netChartInstance.data.datasets[3].data.shift();
+    }
+    netChartInstance.update('none');
+  }
 }
 
 // Fetch live telemetry (try local API, custom endpoint, or demo mode)
@@ -933,6 +1081,14 @@ async function loadSupabaseHistory(limit = 240, hours = 1) {
       chargeChartInstance.data.datasets[1].data = [];
     }
 
+    if (netChartInstance) {
+      netChartInstance.data.labels = [];
+      netChartInstance.data.datasets[0].data = [];
+      netChartInstance.data.datasets[1].data = [];
+      netChartInstance.data.datasets[2].data = [];
+      netChartInstance.data.datasets[3].data = [];
+    }
+
     // Downsample chart data points if dataset is dense (e.g. 1 week), keeps 60fps rendering
     let displayRows = rows;
     if (rows.length > 500) {
@@ -967,10 +1123,19 @@ async function loadSupabaseHistory(limit = 240, hours = 1) {
         chargeChartInstance.data.datasets[0].data.push(item.battery_current || 0);
         chargeChartInstance.data.datasets[1].data.push(item.external_load || 0);
       }
+
+      if (netChartInstance && (item.net_mbps !== undefined || item.net_ping_ms !== undefined)) {
+        netChartInstance.data.labels.push(timeLabel);
+        netChartInstance.data.datasets[0].data.push(item.net_mbps || 0);
+        netChartInstance.data.datasets[1].data.push(item.net_up_mbps || 0);
+        netChartInstance.data.datasets[2].data.push(item.net_ping_ms || 0);
+        netChartInstance.data.datasets[3].data.push(item.gw_ping_ms || 0);
+      }
     });
 
     if (solarChartInstance) solarChartInstance.update('none');
     if (chargeChartInstance) chargeChartInstance.update('none');
+    if (netChartInstance) netChartInstance.update('none');
 
     // Populate dashboard cards with the latest record
     const latest = rows[rows.length - 1];

@@ -231,6 +231,17 @@
           <canvas id="chargeChart"></canvas>
         </div>
       </section>
+
+      <!-- Plot 3: Internet Speed & Network Latency (Mbit/s & ms) -->
+      <section class="panel panel-chart" style="grid-column: 1 / -1; border-top-color: var(--accent-blue);">
+        <div class="chart-header-row">
+          <h2 id="lblChartTitle3">🚀 Internet-Geschwindigkeit & Latenz (Mbit/s & ms)</h2>
+          <span style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono);">Cloudflare Speedtest • 4-Stream TCP</span>
+        </div>
+        <div class="chart-canvas-wrap">
+          <canvas id="netChart"></canvas>
+        </div>
+      </section>
     </div>
 
     <!-- ESP32-S3 Onboard NeoPixel LED Status Guide -->
@@ -425,6 +436,6 @@
     </footer>
   </div>
 
-  <script src="./web/app.js?v=3.0"></script>
+  <script src="./web/app.js?v=3.1"></script>
 </body>
 </html>
