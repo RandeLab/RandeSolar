@@ -1012,6 +1012,14 @@ function updateDashboard(data) {
     const fhDiag = document.getElementById('freeHeapDiag');
     if (fhDiag) fhDiag.textContent = data.free_heap_kb;
   }
+  if (data.buffered_records !== undefined) {
+    const bufDiag = document.getElementById('bufferCountDiag');
+    if (bufDiag) bufDiag.textContent = data.buffered_records;
+    const csvLink = document.getElementById('bufferCsvLink');
+    if (csvLink && activeEndpoint) {
+      csvLink.href = `${activeEndpoint}/api/buffer/csv`;
+    }
+  }
 
   if (data.net_mbps !== undefined) {
     const downStr = Number(data.net_mbps).toFixed(2);

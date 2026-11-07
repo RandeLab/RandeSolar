@@ -411,6 +411,11 @@
           <div style="font-size:0.72rem; color:var(--text-muted);">🌡️ ESP32-S3 CHIP & RAM</div>
           <div style="font-size:1.2rem; font-weight:700; margin-top:4px;"><span id="chipTempDiag">--</span> °C <small style="font-size:0.78rem; color:var(--text-muted);">(<span id="freeHeapDiag">--</span> KB RAM)</small></div>
         </div>
+        <div style="padding:10px 12px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">
+          <div style="font-size:0.72rem; color:var(--text-muted);">💾 OFFLINE FLASH PUFFER</div>
+          <div style="font-size:1.2rem; font-weight:700; margin-top:4px; color:var(--accent-pink);"><span id="bufferCountDiag">0</span> <small style="font-size:0.75rem; color:var(--text-muted);">/ 35'000</small></div>
+          <div style="font-size:0.72rem; margin-top:3px;"><a id="bufferCsvLink" href="http://randesolar.local/api/buffer/csv" target="_blank" style="color:var(--accent-yellow); text-decoration:underline;">📥 CSV Download</a></div>
+        </div>
       </div>
     </section>
 
@@ -447,6 +452,6 @@
     </footer>
   </div>
 
-  <script src="./app.js?v=3.3"></script>
+  <script src="./app.js?v=3.4"></script>
 </body>
 </html>
