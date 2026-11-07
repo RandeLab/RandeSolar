@@ -2,6 +2,7 @@
 let solarChartInstance = null;
 let chargeChartInstance = null;
 let netChartInstance = null;
+let weatherChartInstance = null;
 let lastChartAppendTime = 0;
 const CHART_THROTTLE_MS = 4000; // Update charts every 4-5 seconds for calm reading
 let currentLimit = 240; // Default 1 hour of history
@@ -402,6 +403,24 @@ window.setTheme = function(theme) {
     netChartInstance.options.scales.yPing.title.color = pal.load || '#39FF14';
     netChartInstance.update();
   }
+
+  // Update Weather & Microclimate Chart colors
+  if (weatherChartInstance) {
+    weatherChartInstance.data.datasets[0].borderColor = pal.solar || '#FFD400';
+    weatherChartInstance.data.datasets[0].backgroundColor = pal.solarFill || 'rgba(255, 212, 0, 0.12)';
+    weatherChartInstance.data.datasets[1].borderColor = '#FF7A00';
+    weatherChartInstance.data.datasets[3].borderColor = pal.volt || '#00F5FF';
+    weatherChartInstance.data.datasets[3].backgroundColor = pal.voltFill || 'rgba(0, 245, 255, 0.25)';
+
+    weatherChartInstance.options.scales.x.grid.color = pal.grid;
+    weatherChartInstance.options.scales.x.ticks.color = pal.text;
+    weatherChartInstance.options.scales.ySolar.grid.color = pal.grid;
+    weatherChartInstance.options.scales.ySolar.ticks.color = pal.solar || '#FFD400';
+    weatherChartInstance.options.scales.ySolar.title.color = pal.solar || '#FFD400';
+    weatherChartInstance.options.scales.yTemp.ticks.color = '#FF7A00';
+    weatherChartInstance.options.scales.yTemp.title.color = '#FF7A00';
+    weatherChartInstance.update();
+  }
 };
 
 window.connectToCustomEndpoint = function() {
@@ -635,6 +654,30 @@ function initChart() {
             yAxisID: 'yPing',
             pointRadius: 1.5,
             pointHoverRadius: 4,
+          },
+          {
+            label: 'Niederschlag (mm)',
+            data: [],
+            borderColor: '#00B4D8',
+            backgroundColor: 'rgba(0, 180, 216, 0.2)',
+            borderWidth: 1.8,
+            tension: 0.1,
+            fill: true,
+            yAxisID: 'yRain',
+            pointRadius: 2,
+            pointHoverRadius: 4,
+          },
+          {
+            label: 'Bewölkung (%)',
+            data: [],
+            borderColor: '#94A3B8',
+            borderWidth: 1.5,
+            borderDash: [2, 2],
+            tension: 0.2,
+            fill: false,
+            yAxisID: 'yCloud',
+            pointRadius: 1,
+            pointHoverRadius: 3,
           }
         ]
       },
@@ -683,6 +726,149 @@ function initChart() {
             ticks: { color: pal.load || '#39FF14', font: { family: 'JetBrains Mono', size: 10 } },
             suggestedMin: 0,
             suggestedMax: 100,
+          },
+          yRain: {
+            type: 'linear',
+            position: 'right',
+            display: false,
+            grid: { drawOnChartArea: false },
+            suggestedMin: 0,
+            suggestedMax: 5,
+          },
+          yCloud: {
+            type: 'linear',
+            position: 'right',
+            display: false,
+            grid: { drawOnChartArea: false },
+            min: 0,
+            max: 100,
+          }
+        }
+      }
+    });
+  }
+
+  // Plot 4: Local Weather & Microclimate History (Regen, Bewölkung, Temp & Einstrahlung)
+  const wxCanvas = document.getElementById('weatherChart');
+  if (wxCanvas) {
+    const ctxWx = wxCanvas.getContext('2d');
+    weatherChartInstance = new Chart(ctxWx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: 'Solar-Strahlung (W/m²)',
+            data: [],
+            borderColor: pal.solar || '#FFD400',
+            backgroundColor: pal.solarFill || 'rgba(255, 212, 0, 0.12)',
+            borderWidth: 2,
+            tension: 0.25,
+            fill: true,
+            yAxisID: 'ySolar',
+            pointRadius: 2,
+            pointHoverRadius: 5,
+          },
+          {
+            label: 'Aussentemp (°C)',
+            data: [],
+            borderColor: '#FF7A00',
+            backgroundColor: 'rgba(255, 122, 0, 0.1)',
+            borderWidth: 2,
+            tension: 0.25,
+            fill: false,
+            yAxisID: 'yTemp',
+            pointRadius: 2,
+            pointHoverRadius: 4,
+          },
+          {
+            label: 'Bewölkung (%)',
+            data: [],
+            borderColor: '#94A3B8',
+            backgroundColor: 'rgba(148, 163, 184, 0.15)',
+            borderWidth: 1.5,
+            borderDash: [3, 3],
+            tension: 0.2,
+            fill: false,
+            yAxisID: 'yPercent',
+            pointRadius: 1.5,
+            pointHoverRadius: 4,
+          },
+          {
+            label: 'Niederschlag (mm)',
+            data: [],
+            borderColor: '#00F5FF',
+            backgroundColor: 'rgba(0, 245, 255, 0.25)',
+            borderWidth: 1.8,
+            tension: 0.1,
+            fill: true,
+            yAxisID: 'yRain',
+            pointRadius: 2,
+            pointHoverRadius: 4,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 250 },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            labels: {
+              color: pal.text,
+              font: { family: 'JetBrains Mono', size: 11, weight: '700' },
+              boxWidth: 12,
+              usePointStyle: true,
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(10, 0, 20, 0.95)',
+            titleFont: { family: 'Outfit', size: 12 },
+            bodyFont: { family: 'JetBrains Mono', size: 12 },
+            borderColor: 'rgba(255, 212, 0, 0.4)',
+            borderWidth: 1,
+            padding: 8,
+          }
+        },
+        scales: {
+          x: {
+            grid: { color: pal.grid },
+            ticks: { color: pal.text, font: { family: 'JetBrains Mono', size: 10 }, maxTicksLimit: 6 }
+          },
+          ySolar: {
+            type: 'linear',
+            position: 'left',
+            title: { display: true, text: 'Strahlung (W/m²)', color: pal.solar || '#FFD400', font: { family: 'Outfit', size: 11 } },
+            grid: { color: pal.grid },
+            ticks: { color: pal.solar || '#FFD400', font: { family: 'JetBrains Mono', size: 10 } },
+            suggestedMin: 0,
+            suggestedMax: 400,
+          },
+          yTemp: {
+            type: 'linear',
+            position: 'right',
+            title: { display: true, text: 'Temp (°C)', color: '#FF7A00', font: { family: 'Outfit', size: 11 } },
+            grid: { drawOnChartArea: false },
+            ticks: { color: '#FF7A00', font: { family: 'JetBrains Mono', size: 10 } },
+            suggestedMin: 0,
+            suggestedMax: 25,
+          },
+          yPercent: {
+            type: 'linear',
+            position: 'right',
+            display: false,
+            grid: { drawOnChartArea: false },
+            min: 0,
+            max: 100,
+          },
+          yRain: {
+            type: 'linear',
+            position: 'right',
+            display: false,
+            grid: { drawOnChartArea: false },
+            suggestedMin: 0,
+            suggestedMax: 5,
           }
         }
       }
@@ -926,22 +1112,36 @@ function appendChartPoint(item, force = false) {
     chargeChartInstance.update('none');
   }
 
-  // 3. Internet Speed (Mbit/s) & Latency (ms)
+  // 3. Internet Speed (Mbit/s) & Latency (ms) & Weather Overlay
   if (netChartInstance && (item.net_mbps !== undefined || item.net_ping_ms !== undefined)) {
     netChartInstance.data.labels.push(timeLabel);
     netChartInstance.data.datasets[0].data.push(item.net_mbps || 0);
     netChartInstance.data.datasets[1].data.push(item.net_up_mbps || 0);
     netChartInstance.data.datasets[2].data.push(item.net_ping_ms || 0);
     netChartInstance.data.datasets[3].data.push(item.gw_ping_ms || 0);
+    if (netChartInstance.data.datasets[4]) netChartInstance.data.datasets[4].data.push(item.wx_rain_mm !== undefined ? item.wx_rain_mm : null);
+    if (netChartInstance.data.datasets[5]) netChartInstance.data.datasets[5].data.push(item.wx_cloud_pct !== undefined ? item.wx_cloud_pct : null);
 
     while (netChartInstance.data.labels.length > currentLimit) {
       netChartInstance.data.labels.shift();
-      netChartInstance.data.datasets[0].data.shift();
-      netChartInstance.data.datasets[1].data.shift();
-      netChartInstance.data.datasets[2].data.shift();
-      netChartInstance.data.datasets[3].data.shift();
+      netChartInstance.data.datasets.forEach(ds => ds.data.shift());
     }
     netChartInstance.update('none');
+  }
+
+  // 4. Local Weather & Microclimate History
+  if (weatherChartInstance && (item.wx_temp !== undefined || item.wx_solar_wm2 !== undefined || item.wx_cloud_pct !== undefined)) {
+    weatherChartInstance.data.labels.push(timeLabel);
+    weatherChartInstance.data.datasets[0].data.push(item.wx_solar_wm2 !== undefined ? item.wx_solar_wm2 : null);
+    weatherChartInstance.data.datasets[1].data.push(item.wx_temp !== undefined ? item.wx_temp : null);
+    weatherChartInstance.data.datasets[2].data.push(item.wx_cloud_pct !== undefined ? item.wx_cloud_pct : null);
+    weatherChartInstance.data.datasets[3].data.push(item.wx_rain_mm !== undefined ? item.wx_rain_mm : null);
+
+    while (weatherChartInstance.data.labels.length > currentLimit) {
+      weatherChartInstance.data.labels.shift();
+      weatherChartInstance.data.datasets.forEach(ds => ds.data.shift());
+    }
+    weatherChartInstance.update('none');
   }
 }
 
@@ -1087,6 +1287,16 @@ async function loadSupabaseHistory(limit = 240, hours = 1) {
       netChartInstance.data.datasets[1].data = [];
       netChartInstance.data.datasets[2].data = [];
       netChartInstance.data.datasets[3].data = [];
+      if (netChartInstance.data.datasets[4]) netChartInstance.data.datasets[4].data = [];
+      if (netChartInstance.data.datasets[5]) netChartInstance.data.datasets[5].data = [];
+    }
+
+    if (weatherChartInstance) {
+      weatherChartInstance.data.labels = [];
+      weatherChartInstance.data.datasets[0].data = [];
+      weatherChartInstance.data.datasets[1].data = [];
+      weatherChartInstance.data.datasets[2].data = [];
+      weatherChartInstance.data.datasets[3].data = [];
     }
 
     // Downsample chart data points if dataset is dense (e.g. 1 week), keeps 60fps rendering
@@ -1130,12 +1340,23 @@ async function loadSupabaseHistory(limit = 240, hours = 1) {
         netChartInstance.data.datasets[1].data.push(item.net_up_mbps || 0);
         netChartInstance.data.datasets[2].data.push(item.net_ping_ms || 0);
         netChartInstance.data.datasets[3].data.push(item.gw_ping_ms || 0);
+        if (netChartInstance.data.datasets[4]) netChartInstance.data.datasets[4].data.push(item.wx_rain_mm !== undefined && item.wx_rain_mm !== null ? item.wx_rain_mm : null);
+        if (netChartInstance.data.datasets[5]) netChartInstance.data.datasets[5].data.push(item.wx_cloud_pct !== undefined && item.wx_cloud_pct !== null ? item.wx_cloud_pct : null);
+      }
+
+      if (weatherChartInstance && (item.wx_temp !== undefined || item.wx_solar_wm2 !== undefined || item.wx_cloud_pct !== undefined)) {
+        weatherChartInstance.data.labels.push(timeLabel);
+        weatherChartInstance.data.datasets[0].data.push(item.wx_solar_wm2 !== undefined && item.wx_solar_wm2 !== null ? item.wx_solar_wm2 : null);
+        weatherChartInstance.data.datasets[1].data.push(item.wx_temp !== undefined && item.wx_temp !== null ? item.wx_temp : null);
+        weatherChartInstance.data.datasets[2].data.push(item.wx_cloud_pct !== undefined && item.wx_cloud_pct !== null ? item.wx_cloud_pct : null);
+        weatherChartInstance.data.datasets[3].data.push(item.wx_rain_mm !== undefined && item.wx_rain_mm !== null ? item.wx_rain_mm : null);
       }
     });
 
     if (solarChartInstance) solarChartInstance.update('none');
     if (chargeChartInstance) chargeChartInstance.update('none');
     if (netChartInstance) netChartInstance.update('none');
+    if (weatherChartInstance) weatherChartInstance.update('none');
 
     // Populate dashboard cards with the latest record
     const latest = rows[rows.length - 1];

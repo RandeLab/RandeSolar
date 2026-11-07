@@ -236,10 +236,21 @@
       <section class="panel panel-chart" style="grid-column: 1 / -1; border-top-color: var(--accent-blue);">
         <div class="chart-header-row">
           <h2 id="lblChartTitle3">🚀 Internet-Geschwindigkeit & Latenz (Mbit/s & ms)</h2>
-          <span style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono);">Cloudflare Speedtest • 4-Stream TCP</span>
+          <span style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono);">Cloudflare Speedtest • Wetter-Korrelation</span>
         </div>
         <div class="chart-canvas-wrap">
           <canvas id="netChart"></canvas>
+        </div>
+      </section>
+
+      <!-- Plot 4: Local Weather & Microclimate History (Regen, Bewölkung, Temp & Einstrahlung) -->
+      <section class="panel panel-chart" style="grid-column: 1 / -1; border-top-color: var(--accent-yellow);">
+        <div class="chart-header-row">
+          <h2 id="lblChartTitle4">🌦️ Wetter & Mikroklima • Korrelation mit Internet & Solar</h2>
+          <span style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono);">MeteoSwiss ICON-CH • Underes Ätzisloo 189 (~640m)</span>
+        </div>
+        <div class="chart-canvas-wrap">
+          <canvas id="weatherChart"></canvas>
         </div>
       </section>
     </div>
@@ -436,6 +447,6 @@
     </footer>
   </div>
 
-  <script src="./web/app.js?v=3.1"></script>
+  <script src="./web/app.js?v=3.2"></script>
 </body>
 </html>

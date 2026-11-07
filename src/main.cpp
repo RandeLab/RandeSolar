@@ -265,6 +265,18 @@ static float g_netUpMbps = 0.0f;      // Upload speed in Mbit/s
 static uint32_t g_lastSpeedTestMs = 0;
 void measureInternetSpeed(bool measureBandwidth = false);
 
+// Local Microclimate Tracking (Open-Meteo / MeteoSwiss ICON-CH Underes Ätzisloo 189)
+static float g_wxTemp = 0.0f;
+static float g_wxSolarWm2 = 0.0f;
+static int g_wxCloudPct = 0;
+static float g_wxRainMm = 0.0f;
+static float g_wxWindKmh = 0.0f;
+static int g_wxHumidity = 0;
+static float g_wxPressure = 0.0f;
+static bool g_wxHasData = false;
+static uint32_t g_lastWxFetchMs = 0;
+void fetchMeteoSwissWeather(bool force = false);
+
 // HiveMQ Broker
 static const char* MQTT_BROKER   = "broker.hivemq.com";
 static const int   MQTT_PORT     = 1883;
@@ -1097,13 +1109,14 @@ void handleLiveApi() {
     int wifiRssi = WiFi.RSSI();
     int wifiQual = constrain(2 * (wifiRssi + 100), 0, 100);
 
-    char json[760];
+    char json[960];
     snprintf(json, sizeof(json),
         "{\"has_data\":%s,\"solar_power\":%u,\"battery_voltage\":%.2f,\"battery_current\":%.2f,"
         "\"yield_today_wh\":%lu,\"external_load\":%.2f,\"charge_state\":%u,\"state_str\":\"%s\","
         "\"charger_error\":%u,\"ble_rssi\":%d,\"wifi_rssi\":%d,\"wifi_quality_pct\":%d,\"wifi_channel\":%d,"
         "\"chip_temp\":%.1f,\"free_heap_kb\":%u,\"net_mbps\":%.2f,\"net_up_mbps\":%.2f,"
         "\"net_ping_ms\":%u,\"gw_ping_ms\":%u,\"dns_ms\":%u,\"ttfb_ms\":%u,"
+        "\"wx_temp\":%.1f,\"wx_solar_wm2\":%.1f,\"wx_cloud_pct\":%d,\"wx_rain_mm\":%.2f,\"wx_wind_kmh\":%.1f,\"wx_humidity\":%d,\"wx_pressure\":%.1f,"
         "\"buffered_records\":%u,\"ip\":\"%s\",\"gateway_ip\":\"%s\",\"age_sec\":%lu}",
         d.has_data ? "true" : "false",
         d.solar_power,
@@ -1126,6 +1139,13 @@ void handleLiveApi() {
         (unsigned int)g_gwPingMs,
         (unsigned int)g_dnsMs,
         (unsigned int)g_ttfbMs,
+        g_wxTemp,
+        g_wxSolarWm2,
+        g_wxCloudPct,
+        g_wxRainMm,
+        g_wxWindKmh,
+        g_wxHumidity,
+        g_wxPressure,
         (unsigned int)g_bufferedRecordCount,
         WiFi.localIP().toString().c_str(),
         WiFi.gatewayIP().toString().c_str(),
@@ -1330,6 +1350,71 @@ void measureInternetSpeed(bool measureBandwidth) {
     }
 }
 
+// ==================== METEOSWISS / OPEN-METEO WEATHER CLIENT ====================
+void fetchMeteoSwissWeather(bool force) {
+    if (WiFi.status() != WL_CONNECTED) return;
+    uint32_t now = millis();
+    if (!force && g_wxHasData && (now - g_lastWxFetchMs < 600000)) {
+        return; // 10 minutes cache
+    }
+
+    WiFiClientSecure wxClient;
+    wxClient.setInsecure();
+    wxClient.setTimeout(4500);
+
+    HTTPClient wxHttp;
+    // High-resolution MeteoSwiss ICON-CH model data for Merishausen / Randen (47.7612° N, 8.5868° E, ~640m)
+    String wxUrl = "https://api.open-meteo.com/v1/forecast?latitude=47.7612&longitude=8.5868&elevation=640&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,surface_pressure,wind_speed_10m,wind_gusts_10m,shortwave_radiation&timezone=Europe%2FZurich";
+    
+    if (wxHttp.begin(wxClient, wxUrl)) {
+        int code = wxHttp.GET();
+        if (code == HTTP_CODE_OK) {
+            String payload = wxHttp.getString();
+            auto getJsonVal = [](const String& src, const char* key) -> String {
+                int curIdx = src.indexOf("\"current\":");
+                if (curIdx < 0) curIdx = 0;
+                int k = src.indexOf(key, curIdx);
+                if (k < 0) return "--";
+                int c = src.indexOf(':', k);
+                if (c < 0) return "--";
+                int end = src.indexOf(',', c);
+                int endB = src.indexOf('}', c);
+                if (end < 0 || (endB > 0 && endB < end)) end = endB;
+                if (end < 0) return "--";
+                String v = src.substring(c + 1, end);
+                v.trim();
+                v.replace("\"", "");
+                return v;
+            };
+
+            String t = getJsonVal(payload, "\"temperature_2m\"");
+            String rh = getJsonVal(payload, "\"relative_humidity_2m\"");
+            String pr = getJsonVal(payload, "\"precipitation\"");
+            String cc = getJsonVal(payload, "\"cloud_cover\"");
+            String sp = getJsonVal(payload, "\"surface_pressure\"");
+            String ws = getJsonVal(payload, "\"wind_speed_10m\"");
+            String rad = getJsonVal(payload, "\"shortwave_radiation\"");
+
+            if (t != "--") {
+                g_wxTemp = t.toFloat();
+                g_wxHumidity = rh.toInt();
+                g_wxRainMm = pr.toFloat();
+                g_wxCloudPct = cc.toInt();
+                g_wxPressure = sp.toFloat();
+                g_wxWindKmh = ws.toFloat();
+                g_wxSolarWm2 = rad.toFloat();
+                g_wxHasData = true;
+                g_lastWxFetchMs = now;
+                Serial.printf("[Weather 🌤️] Randen: %.1f°C | %d%% Cloud | %.1f mm Rain | %.0f W/m² Solar | %.1f hPa\n",
+                    g_wxTemp, g_wxCloudPct, g_wxRainMm, g_wxSolarWm2, g_wxPressure);
+            }
+        } else {
+            Serial.printf("[Weather ⚠️] Fetch failed (HTTP %d): %s\n", code, wxHttp.errorToString(code).c_str());
+        }
+        wxHttp.end();
+    }
+}
+
 // Reconnect MQTT (non-blocking)
 void reconnectMQTT() {
     if (WiFi.status() != WL_CONNECTED) return;
@@ -1438,22 +1523,61 @@ void logToSupabase(const SolarData& d) {
         http.addHeader("Authorization", authHeader.c_str());
         http.addHeader("Prefer", "return=minimal");
 
-        char json[380];
-        snprintf(json, sizeof(json),
-            "{\"solar_power\":%u,\"battery_voltage\":%.2f,\"battery_current\":%.2f,"
-            "\"yield_today_wh\":%lu,\"external_load\":%.2f,\"charge_state\":%u,\"state_str\":\"%s\","
-            "\"charger_error\":%u,\"ble_rssi\":%d,\"wifi_rssi\":%d}",
-            d.solar_power,
-            d.battery_voltage,
-            d.battery_current,
-            (unsigned long)d.yield_today_wh,
-            d.external_load,
-            d.charge_state,
-            getChargeStateName(d.charge_state),
-            d.charger_error,
-            d.rssi,
-            WiFi.RSSI()
-        );
+        char json[700];
+        if (g_wxHasData) {
+            snprintf(json, sizeof(json),
+                "{\"solar_power\":%u,\"battery_voltage\":%.2f,\"battery_current\":%.2f,"
+                "\"yield_today_wh\":%lu,\"external_load\":%.2f,\"charge_state\":%u,\"state_str\":\"%s\","
+                "\"charger_error\":%u,\"ble_rssi\":%d,\"wifi_rssi\":%d,"
+                "\"net_mbps\":%.2f,\"net_up_mbps\":%.2f,\"net_ping_ms\":%u,\"gw_ping_ms\":%u,\"chip_temp\":%.1f,"
+                "\"wx_temp\":%.1f,\"wx_solar_wm2\":%.1f,\"wx_cloud_pct\":%d,\"wx_rain_mm\":%.2f,"
+                "\"wx_wind_kmh\":%.1f,\"wx_humidity\":%d,\"wx_pressure\":%.1f}",
+                d.solar_power,
+                d.battery_voltage,
+                d.battery_current,
+                (unsigned long)d.yield_today_wh,
+                d.external_load,
+                d.charge_state,
+                getChargeStateName(d.charge_state),
+                d.charger_error,
+                d.rssi,
+                WiFi.RSSI(),
+                g_netSpeedMbps,
+                g_netUpMbps,
+                (unsigned int)g_netPingMs,
+                (unsigned int)g_gwPingMs,
+                temperatureRead(),
+                g_wxTemp,
+                g_wxSolarWm2,
+                g_wxCloudPct,
+                g_wxRainMm,
+                g_wxWindKmh,
+                g_wxHumidity,
+                g_wxPressure
+            );
+        } else {
+            snprintf(json, sizeof(json),
+                "{\"solar_power\":%u,\"battery_voltage\":%.2f,\"battery_current\":%.2f,"
+                "\"yield_today_wh\":%lu,\"external_load\":%.2f,\"charge_state\":%u,\"state_str\":\"%s\","
+                "\"charger_error\":%u,\"ble_rssi\":%d,\"wifi_rssi\":%d,"
+                "\"net_mbps\":%.2f,\"net_up_mbps\":%.2f,\"net_ping_ms\":%u,\"gw_ping_ms\":%u,\"chip_temp\":%.1f}",
+                d.solar_power,
+                d.battery_voltage,
+                d.battery_current,
+                (unsigned long)d.yield_today_wh,
+                d.external_load,
+                d.charge_state,
+                getChargeStateName(d.charge_state),
+                d.charger_error,
+                d.rssi,
+                WiFi.RSSI(),
+                g_netSpeedMbps,
+                g_netUpMbps,
+                (unsigned int)g_netPingMs,
+                (unsigned int)g_gwPingMs,
+                temperatureRead()
+            );
+        }
 
         int code = http.POST((uint8_t*)json, strlen(json));
         if (code == 200 || code == 201) {
@@ -1736,56 +1860,26 @@ void checkTelegramUpdates() {
                             String moodMsg = generateHumanMoodReport(d);
                             sendTelegramMessage(moodMsg, fromChatId.c_str());
                         } else if (cmd.startsWith("/weather") || cmd.startsWith("/wetter") || cmd.startsWith("/climate")) {
-                            WiFiClientSecure wxClient;
-                            wxClient.setInsecure();
-                            HTTPClient wxHttp;
-                            String wxUrl = "https://api.open-meteo.com/v1/forecast?latitude=47.7612&longitude=8.5868&elevation=640&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,shortwave_radiation&timezone=Europe%2FZurich";
-                            if (wxHttp.begin(wxClient, wxUrl)) {
-                                int code = wxHttp.GET();
-                                if (code == HTTP_CODE_OK) {
-                                    String payload = wxHttp.getString();
-                                    auto getJsonVal = [](const String& src, const char* key) -> String {
-                                        int k = src.indexOf(key);
-                                        if (k < 0) return "--";
-                                        int c = src.indexOf(':', k);
-                                        if (c < 0) return "--";
-                                        int end = src.indexOf(',', c);
-                                        int endB = src.indexOf('}', c);
-                                        if (end < 0 || (endB > 0 && endB < end)) end = endB;
-                                        if (end < 0) return "--";
-                                        String v = src.substring(c + 1, end);
-                                        v.trim();
-                                        return v;
-                                    };
-
-                                    String t = getJsonVal(payload, "\"temperature_2m\"");
-                                    String app = getJsonVal(payload, "\"apparent_temperature\"");
-                                    String rh = getJsonVal(payload, "\"relative_humidity_2m\"");
-                                    String rad = getJsonVal(payload, "\"shortwave_radiation\"");
-                                    String cc = getJsonVal(payload, "\"cloud_cover\"");
-                                    String ws = getJsonVal(payload, "\"wind_speed_10m\"");
-                                    String wg = getJsonVal(payload, "\"wind_gusts_10m\"");
-                                    String pr = getJsonVal(payload, "\"precipitation\"");
-
-                                    char wxMsg[500];
-                                    snprintf(wxMsg, sizeof(wxMsg),
-                                        "🌤️ *Mikroklima RandeLab (Ätzisloo 189)* 📍\n"
-                                        "━━━━━━━━━━━━━━━━━━━━\n"
-                                        "🌡️ *Aussentemperatur:* %s °C (Gefühlt: %s °C)\n"
-                                        "☀️ *Solare Einstrahlung:* %s W/m²\n"
-                                        "🌫️ *Bewölkung / Hochnebel:* %s %%\n"
-                                        "💧 *Luftfeuchtigkeit:* %s %%\n"
-                                        "🌧️ *Niederschlag:* %s mm\n"
-                                        "💨 *Wind:* %s km/h (Böen bis %s km/h)\n"
-                                        "━━━━━━━━━━━━━━━━━━━━\n"
-                                        "🏔️ _47.7612°N, 8.5868°E • ~640m ü.M. (MeteoSwiss ICON)_",
-                                        t.c_str(), app.c_str(), rad.c_str(), cc.c_str(), rh.c_str(), pr.c_str(), ws.c_str(), wg.c_str()
-                                    );
-                                    sendTelegramMessage(wxMsg, fromChatId.c_str());
-                                } else {
-                                    sendTelegramMessage("⚠️ Konnte Wetterdaten von Open-Meteo gerade nicht abrufen.", fromChatId.c_str());
-                                }
-                                wxHttp.end();
+                            fetchMeteoSwissWeather(true);
+                            if (g_wxHasData) {
+                                char wxMsg[550];
+                                snprintf(wxMsg, sizeof(wxMsg),
+                                    "🌤️ *Mikroklima RandeLab (Ätzisloo 189)* 📍\n"
+                                    "━━━━━━━━━━━━━━━━━━━━\n"
+                                    "🌡️ *Aussentemperatur:* %.1f °C\n"
+                                    "☀️ *Solare Einstrahlung:* %.0f W/m²\n"
+                                    "🌫️ *Bewölkung / Hochnebel:* %d %%\n"
+                                    "💧 *Luftfeuchtigkeit:* %d %%\n"
+                                    "🌧️ *Niederschlag:* %.2f mm\n"
+                                    "💨 *Wind:* %.1f km/h\n"
+                                    "⏲️ *Luftdruck:* %.1f hPa\n"
+                                    "━━━━━━━━━━━━━━━━━━━━\n"
+                                    "🏔️ _47.7612°N, 8.5868°E • ~640m ü.M. (MeteoSwiss ICON)_",
+                                    g_wxTemp, g_wxSolarWm2, g_wxCloudPct, g_wxHumidity, g_wxRainMm, g_wxWindKmh, g_wxPressure
+                                );
+                                sendTelegramMessage(wxMsg, fromChatId.c_str());
+                            } else {
+                                sendTelegramMessage("⚠️ Konnte Wetterdaten von Open-Meteo gerade nicht abrufen.", fromChatId.c_str());
                             }
                         } else if (cmd.startsWith("/ping")) {
                             sendTelegramMessage("🏓 *Pong!* RandeSolar ESP32-S3 ist online und empfängt Bluetooth-Telemetrie.", fromChatId.c_str());
@@ -1870,6 +1964,9 @@ void setup() {
 
         // Initial Internet Speed & Ping measurement (before BLE starts)
         measureInternetSpeed(true);
+
+        // Initial Microclimate fetch from Open-Meteo
+        fetchMeteoSwissWeather(true);
     } else {
         Serial.println("\n[WiFi] Connection timed out. Running offline BLE logger mode.");
         setPixel(30, 0, 0); // Red warning
@@ -1990,6 +2087,7 @@ void loop() {
     if (now - lastSupabaseLog >= 120000) {
         lastSupabaseLog = now;
         measureInternetSpeed(runFullSpeedTest);
+        fetchMeteoSwissWeather(false);
 
         SolarData d;
         portENTER_CRITICAL(&g_mux);
