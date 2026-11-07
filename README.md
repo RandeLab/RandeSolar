@@ -1,12 +1,8 @@
 # RandeSolar ☀️
 
-Standalone wireless telemetry monitor for the **Victron MPPT 75 | 15** charge controller with openBrushograph Studio styling.
+Standalone wireless solar & microclimate observatory for the **Victron MPPT 75 | 15** charge controller, **Teltonika TRB500 5G Gateway**, and 12V battery bank with openBrushograph Studio styling.
 
-This project supports two interchangeable setups:
-1. **ESP32-S3 Standalone Appliance**: Fully autonomous Wi-Fi + BLE device (no laptop needed).
-2. **Local Python Server**: Runs locally on your Linux machine or Raspberry Pi.
-
----
+📍 **Station:** RandeLab • Underes Ätzisloo 189, 8232 Merishausen / Randen (`47.7612° N, 8.5868° E`, ~`640m`)
 
 ---
 
@@ -14,12 +10,25 @@ This project supports two interchangeable setups:
 
 The **ESP32-S3** handles the entire pipeline autonomously 24/7 without requiring any laptop or local server:
 
-1. **BLE Decryption**: Hardware-accelerated AES-128-CTR decryption of Victron MPPT 75|15 Instant Readout beacons.
+1. **BLE Decryption**: Hardware-accelerated AES-128-CTR decryption of Victron MPPT 75|15 Instant Readout beacons (`0x02E1`).
 2. **HiveMQ MQTT**: Streams live telemetry packets every 5s over WebSocket/MQTT (`broker.hivemq.com`).
 3. **Supabase Cloud Database**: Posts dense time-series telemetry every 20s directly to PostgreSQL cloud database over HTTPS for long-term charts.
-4. **Standalone Telegram Bot**: Direct replies to commands (`/status`, `/mood`, `/wiegehts`, `/ping`) and automated 20:00 evening summary reports.
-5. **Onboard Web Server & OTA**: Runs openBrushograph Kraftwerk Studio on port 80 at **[http://randesolar.local](http://randesolar.local)** with wireless Over-The-Air firmware updates (`ArduinoOTA` + Web UI at `/update`).
-6. **GitHub Pages Cloud Dashboard**: Accessible worldwide at **[https://randelab.github.io/RandeSolar/](https://randelab.github.io/RandeSolar/)**.
+4. **35'000-Record LittleFS Flash Buffer**: Up to **48.6 days of complete offline resilience** during cell/internet outages, auto-draining back to Supabase on reconnection. CSV export available at `/api/buffer/csv`.
+5. **Teltonika TRB500 5G Gateway Telemetry**: Direct LAN integration via `ubus` JSON-RPC (`192.168.2.1`), querying cellular RF health (`RSRP`, `SINR`, `RSRQ`), band aggregation (`LTE B3 + 5G N1`), and running native Ookla speedtests on demand.
+6. **MeteoSwiss Microclimate Correlation**: Fetches high-resolution Open-Meteo / ICON-CH weather data (solar irradiance in $W/m^2$, cloud cover %, rain, barometric pressure) to correlate microclimate with solar yield and 5G signal attenuation.
+7. **Standalone Telegram Bot (`@RandeSolarBot`)**: Direct replies to commands (`/status`, `/weather`, `/mood`, `/speed`, `/ping`) and automated 20:00 evening summary reports.
+8. **Onboard Web Server & OTA**: Runs openBrushograph Kraftwerk Studio on port 80 at **[http://randesolar.local](http://randesolar.local)** with wireless Over-The-Air firmware updates (`ArduinoOTA` + Web UI at `/update`).
+9. **GitHub Pages Cloud Dashboard**: Accessible worldwide at **[https://randelab.github.io/RandeSolar/](https://randelab.github.io/RandeSolar/)** with 24-hour time formatting across all charts and metrics.
+
+---
+
+## 📖 System Architecture & Electrical Design
+
+For complete hardware documentation, schematics, battery sizing (4x VOLTIC 95Ah = 380Ah), RDDSPON 6000W Pure Sine Wave inverter analysis, and the 8-panel (3 kWp) expansion plan, see:
+
+👉 [**`SOLAR_SYSTEM_ARCHITECTURE.md`**](./SOLAR_SYSTEM_ARCHITECTURE.md)
+
+---
 
 ### Flash or Monitor Firmware:
 ```bash
@@ -51,3 +60,14 @@ Credentials and device settings are in [`config.json`](./config.json) (for Pytho
 - **Device MAC**: `cb:06:61:60:5a:c2`
 - **Encryption Key**: `16233767e72a76e15c04023274102c9d`
 - **Wi-Fi SSID**: `RandeLab`
+
+---
+
+<div align="center">
+
+[![Bruce Lee Showdown](docs/artwork/c64_bruce_showdown.gif)](https://dusseiller.ch/)
+
+*Bruce Lee rules · Open source — hack, remix, share.*
+
+</div>
+
