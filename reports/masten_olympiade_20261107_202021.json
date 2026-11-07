@@ -1,0 +1,66 @@
+{
+  "timestamp": "2026-11-07T20:20:21.824174",
+  "location": "RandeLab (857 m \u00fc. M.)",
+  "results": [
+    {
+      "id": "AUTO_5G",
+      "name": "Auto (LTE B3 + 5G N1)",
+      "mast": "Merishausen S\u00fcdhang (eNB 116636)",
+      "band": "1:3:5:7:8:20:28:32:38:40:41:42:43",
+      "cell_id": "1C79C01",
+      "rsrp_dbm": "-93",
+      "sinr_db": "9",
+      "download_mbps": 15.59,
+      "upload_mbps": 59.71,
+      "speedtest_server": "ookla-in.salt.ch"
+    },
+    {
+      "id": "B20_BARGEN",
+      "name": "Band 20 (800 MHz)",
+      "mast": "Bargen / A4 Korridor (eNB 119388)",
+      "band": "20",
+      "cell_id": "1692206",
+      "rsrp_dbm": "-91",
+      "sinr_db": "4",
+      "download_mbps": 0.33,
+      "upload_mbps": 1.92,
+      "speedtest_server": "ookla-in.salt.ch"
+    },
+    {
+      "id": "B3_MERISHAUSEN",
+      "name": "Band 3 (1800 MHz LTE)",
+      "mast": "Merishausen S\u00fcdhang (eNB 116636)",
+      "band": "3",
+      "cell_id": "1692202",
+      "rsrp_dbm": "-98",
+      "sinr_db": "5",
+      "download_mbps": null,
+      "upload_mbps": null,
+      "speedtest_server": null
+    },
+    {
+      "id": "B1_HERBLINGEN",
+      "name": "Band 1 (2100 MHz)",
+      "mast": "Schaffhausen / Herblingen Weitsicht",
+      "band": "1",
+      "cell_id": "-",
+      "rsrp_dbm": "-",
+      "sinr_db": "-",
+      "download_mbps": null,
+      "upload_mbps": null,
+      "speedtest_server": null
+    },
+    {
+      "id": "B28_RANDEN",
+      "name": "Band 28 (700 MHz)",
+      "mast": "Randen-Kamm Tiefenband",
+      "band": "28",
+      "cell_id": "-",
+      "rsrp_dbm": "-",
+      "sinr_db": "-",
+      "download_mbps": null,
+      "upload_mbps": null,
+      "speedtest_server": null
+    }
+  ]
+}
