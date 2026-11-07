@@ -473,6 +473,8 @@ def animate_coconut_speedtest_run(sid, timeout=60):
 
     raise TimeoutError("Speedtest Timeout überschritten")
 
+run_speedtest_native = animate_coconut_speedtest_run
+
 # --- Interactive Actions ---
 
 def action_watch_mode(dash, sid):
