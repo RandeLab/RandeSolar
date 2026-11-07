@@ -957,6 +957,15 @@ function updateDashboard(data) {
   const yieldWh = Number(data.yield_today_wh || data.yield_today || 0);
   if (el.yieldToday) el.yieldToday.textContent = (yieldWh / 1000).toFixed(2) + ' kWh';
 
+  const elPvV = document.getElementById('panelVoltage');
+  if (elPvV) {
+    if (data.panel_voltage !== undefined && Number(data.panel_voltage) > 1.0) {
+      elPvV.textContent = Number(data.panel_voltage).toFixed(1) + ' V';
+    } else {
+      elPvV.textContent = '-- V';
+    }
+  }
+
   const v = Number(data.battery_voltage || 0);
   if (el.batteryVoltage) el.batteryVoltage.textContent = v.toFixed(2);
 

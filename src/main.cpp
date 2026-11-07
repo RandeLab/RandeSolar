@@ -39,6 +39,7 @@ struct SolarData {
     uint8_t charge_state = 0;
     uint8_t charger_error = 0;
     int rssi = 0;
+    float panel_voltage = 0.0f; // Vpv from ADC divider (Solar Panel Voltage)
     unsigned long last_seen_ms = 0;
     bool has_data = false;
 };
@@ -66,6 +67,27 @@ static float g_minBattToday = 99.0f;
 static float g_maxBattToday = 0.0f;
 static int g_lastReportDay = -1;
 static int g_currentMday = -1;
+
+// ==================== PANEL VOLTAGE ADC (SOLAR PV VOLTAGE) ====================
+// Voltage divider: Solar(+) ---[ 100k ]---+---[ 4.7k ]--- Solar(-) / GND
+//                                         |
+//                                    GPIO 4 (ADC1_CH3 on ESP32-S3)
+#define SOLAR_ADC_PIN 4
+static const float SOLAR_DIVIDER_R1 = 100000.0f; // 100k Ohm
+static const float SOLAR_DIVIDER_R2 = 4700.0f;   // 4.7k Ohm
+static const float SOLAR_ADC_SCALE  = (SOLAR_DIVIDER_R1 + SOLAR_DIVIDER_R2) / SOLAR_DIVIDER_R2; // ~22.28
+
+float readSolarPanelVoltage() {
+    uint32_t mvSum = 0;
+    const int SAMPLES = 16;
+    for (int i = 0; i < SAMPLES; i++) {
+        mvSum += analogReadMilliVolts(SOLAR_ADC_PIN);
+        delayMicroseconds(50);
+    }
+    float pinVolts = (mvSum / (float)SAMPLES) / 1000.0f;
+    float panelVolts = pinVolts * SOLAR_ADC_SCALE;
+    return (panelVolts >= 1.5f) ? panelVolts : 0.0f;
+}
 
 // ==================== OFFLINE RESILIENT FLASH STORAGE (LittleFS) ====================
 // Compact 16-byte binary record for power-loss resilient ring buffer in onboard flash
@@ -475,6 +497,8 @@ class VictronScanCallbacks : public NimBLEScanCallbacks {
 
         int rssi = advertisedDevice->getRSSI();
 
+        float panelVoltage = readSolarPanelVoltage();
+
         portENTER_CRITICAL(&g_mux);
         g_data.solar_power = solarPower;
         g_data.battery_voltage = batteryVoltage;
@@ -484,6 +508,7 @@ class VictronScanCallbacks : public NimBLEScanCallbacks {
         g_data.charge_state = chargeState;
         g_data.charger_error = chargerError;
         g_data.rssi = rssi;
+        g_data.panel_voltage = panelVoltage;
         g_data.last_seen_ms = millis();
         g_data.has_data = true;
         g_newDataAvailable = true;
@@ -495,8 +520,13 @@ class VictronScanCallbacks : public NimBLEScanCallbacks {
         }
         portEXIT_CRITICAL(&g_mux);
 
-        Serial.printf("[☀️ BEACON] Solar: %uW | Batt: %.2fV, %.1fA | State: %s (%s) | Yield: %uWh | RSSI: %ddBm\n",
-            solarPower, batteryVoltage, batteryCurrent, getChargeStateName(chargeState), getChargeStateGerman(chargeState), yieldTodayWh, rssi);
+        if (panelVoltage > 1.0f) {
+            Serial.printf("[☀️ BEACON] Solar: %uW (PV: %.1fV) | Batt: %.2fV, %.1fA | State: %s (%s) | Yield: %uWh | RSSI: %ddBm\n",
+                solarPower, panelVoltage, batteryVoltage, batteryCurrent, getChargeStateName(chargeState), getChargeStateGerman(chargeState), yieldTodayWh, rssi);
+        } else {
+            Serial.printf("[☀️ BEACON] Solar: %uW | Batt: %.2fV, %.1fA | State: %s (%s) | Yield: %uWh | RSSI: %ddBm\n",
+                solarPower, batteryVoltage, batteryCurrent, getChargeStateName(chargeState), getChargeStateGerman(chargeState), yieldTodayWh, rssi);
+        }
     }
 };
 
@@ -1138,7 +1168,7 @@ void handleLiveApi() {
 
     char json[960];
     snprintf(json, sizeof(json),
-        "{\"has_data\":%s,\"solar_power\":%u,\"battery_voltage\":%.2f,\"battery_current\":%.2f,"
+        "{\"has_data\":%s,\"solar_power\":%u,\"battery_voltage\":%.2f,\"battery_current\":%.2f,\"panel_voltage\":%.2f,"
         "\"yield_today_wh\":%lu,\"external_load\":%.2f,\"charge_state\":%u,\"state_str\":\"%s\","
         "\"charger_error\":%u,\"ble_rssi\":%d,\"wifi_rssi\":%d,\"wifi_quality_pct\":%d,\"wifi_channel\":%d,"
         "\"chip_temp\":%.1f,\"free_heap_kb\":%u,\"net_mbps\":%.2f,\"net_up_mbps\":%.2f,"
@@ -1149,6 +1179,7 @@ void handleLiveApi() {
         d.solar_power,
         d.battery_voltage,
         d.battery_current,
+        d.panel_voltage,
         (unsigned long)d.yield_today_wh,
         d.external_load,
         d.charge_state,
@@ -1839,10 +1870,17 @@ void checkTelegramUpdates() {
                             int wifiRssi = WiFi.RSSI();
                             int wifiQual = constrain(2 * (wifiRssi + 100), 0, 100);
 
+                            char pwrLine[64];
+                            if (d.panel_voltage > 1.0f) {
+                                snprintf(pwrLine, sizeof(pwrLine), "%u W (%.1f V | Peak: %u W)", d.solar_power, d.panel_voltage, g_peakPowerToday);
+                            } else {
+                                snprintf(pwrLine, sizeof(pwrLine), "%u W (Peak: %u W)", d.solar_power, g_peakPowerToday);
+                            }
+
                             snprintf(msg, sizeof(msg),
                                 "☀️ *RandeSolar Kraftwerk Status* ⚡\n"
                                 "━━━━━━━━━━━━━━━━━━━━\n"
-                                "☀️ *Solar-Leistung:* %u W (Peak: %u W)\n"
+                                "☀️ *Solar-Leistung:* %s\n"
                                 "🔋 *Batteriespeicher:* %.2f V (~%d%% • %s)\n"
                                 "📉 *Batterie Min / Max:* %.2f V / %.2f V\n"
                                 "⚡ *Ladestrom:* %.1f A\n"
@@ -1857,8 +1895,7 @@ void checkTelegramUpdates() {
                                 "⏱️ *Letzter Empfang:* vor %lu Sek.\n"
                                 "━━━━━━━━━━━━━━━━━━━━\n"
                                 "📍 _ESP32-S3 Standalone Station_",
-                                d.solar_power,
-                                g_peakPowerToday,
+                                pwrLine,
                                 d.battery_voltage,
                                 soc,
                                 socStage,
@@ -1976,6 +2013,9 @@ void setup() {
 
     // Initialize local LittleFS flash memory for offline logging
     initOfflineStorage();
+
+    // Configure ADC1 for Solar Panel Voltage Divider
+    analogSetPinAttenuation(SOLAR_ADC_PIN, ADC_11db);
 
     Serial.println("\n========================================");
     Serial.println("  RandeSolar • ESP32-S3 BLE & Wi-Fi & MQTT");
@@ -2106,12 +2146,13 @@ void loop() {
             int wifiQual = constrain(2 * (wifiRssi + 100), 0, 100);
             char json[580];
             snprintf(json, sizeof(json),
-                "{\"solar_power\":%u,\"battery_voltage\":%.2f,\"battery_current\":%.2f,"
+                "{\"solar_power\":%u,\"panel_voltage\":%.2f,\"battery_voltage\":%.2f,\"battery_current\":%.2f,"
                 "\"yield_today_wh\":%lu,\"external_load\":%.2f,\"charge_state\":%u,\"state_str\":\"%s\","
                 "\"charger_error\":%u,\"ble_rssi\":%d,\"wifi_rssi\":%d,\"wifi_quality_pct\":%d,\"wifi_channel\":%d,"
                 "\"chip_temp\":%.1f,\"free_heap_kb\":%u,\"net_mbps\":%.2f,\"net_up_mbps\":%.2f,"
                 "\"net_ping_ms\":%u,\"gw_ping_ms\":%u,\"dns_ms\":%u,\"ttfb_ms\":%u,\"age_sec\":0}",
                 d.solar_power,
+                d.panel_voltage,
                 d.battery_voltage,
                 d.battery_current,
                 (unsigned long)d.yield_today_wh,
