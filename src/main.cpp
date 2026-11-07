@@ -1136,6 +1136,40 @@ void handleLiveApi() {
     server.send(200, "application/json", json);
 }
 
+void handleBufferApi() {
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    if (!g_littleFsReady || !LittleFS.exists(OFFLINE_BUFFER_PATH)) {
+        server.send(200, "application/json", "{\"count\":0,\"records\":[]}");
+        return;
+    }
+
+    File f = LittleFS.open(OFFLINE_BUFFER_PATH, "r");
+    if (!f) {
+        server.send(500, "application/json", "{\"error\":\"Could not open buffer file\"}");
+        return;
+    }
+
+    size_t count = f.size() / sizeof(OfflineSolarRecord);
+    String json = "{\"count\":" + String(count) + ",\"records\":[";
+
+    size_t readCount = 0;
+    OfflineSolarRecord rec;
+    while (f.read((uint8_t*)&rec, sizeof(OfflineSolarRecord)) == sizeof(OfflineSolarRecord) && readCount < 100) {
+        if (readCount > 0) json += ",";
+        char buf[200];
+        snprintf(buf, sizeof(buf),
+            "{\"timestamp\":%u,\"solar_w\":%u,\"batt_v\":%.2f,\"batt_a\":%.1f,\"yield_wh\":%lu,\"state\":\"%s\"}",
+            rec.timestamp, rec.solar_power, rec.battery_voltage / 100.0f, rec.battery_current / 10.0f,
+            (unsigned long)rec.yield_today_wh, getChargeStateName(rec.charge_state)
+        );
+        json += buf;
+        readCount++;
+    }
+    f.close();
+    json += "]}";
+    server.send(200, "application/json", json);
+}
+
 void handleSpeedtestApi() {
     measureInternetSpeed(true);
     handleLiveApi();
@@ -1814,6 +1848,7 @@ void setup() {
     // Setup Web Server
     server.on("/", handleRoot);
     server.on("/api/live", handleLiveApi);
+    server.on("/api/buffer", handleBufferApi);
     server.on("/api/speedtest", handleSpeedtestApi);
     server.on("/update", HTTP_GET, handleOtaPage);
     server.on("/update", HTTP_POST, handleOtaUploadDone, handleOtaUploadChunk);
