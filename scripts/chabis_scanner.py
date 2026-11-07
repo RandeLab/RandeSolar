@@ -424,15 +424,19 @@ def action_mast_antenna_check(dash, sid):
         return
 
     if choice == "R":
-        with console.status("[bold green]Setze Modem auf 'Auto / Alle Bänder' zurück...[/]"):
+        with console.status("[bold green]Setze Modem auf 'Auto / Alle Bänder' zurück und warte auf Re-Connect...[/]"):
             send_at_cmd(sid, 'AT+QNWPREFCFG="restore_band"')
-            time.sleep(3)
+            for _ in range(15):
+                time.sleep(2)
+                if call_gsmctl(sid, ["-j"]) == "Connected":
+                    break
         dash.log("Modem auf Standard 'Auto / Alle Bänder' zurückgesetzt")
-        console.print("[bold green]✓ Modem ist auf Auto zurückgesetzt (Volle Kokosnuss-Freiheit).[/bold green]")
+        console.print("[bold green]✓ Modem ist auf Auto zurückgesetzt und wieder stabil online.[/bold green]")
         return
 
     if choice == "A":
-        console.print("\n[bold yellow]Starte Multi-Mast Benchmark...[/bold yellow]")
+        console.print("\n[bold yellow]⚠️  Hinweis: Beim Durchtesten der Masten schaltet das Modem die Frequenzen durch.[/bold yellow]")
+        console.print("[dim]   Das gesamte RandeLab verliert für ca. 30-40s kurz die Internetverbindung, bis der Test fertig ist.[/dim]\n")
         profiles = [
             ("Band 3 (Merishausen 1800 MHz)", "3"),
             ("Band 20 (Bargen 800 MHz)", "20"),
@@ -448,7 +452,7 @@ def action_mast_antenna_check(dash, sid):
         for name, b in profiles:
             with console.status(f"[bold cyan]Peile {name} an...[/]"):
                 send_at_cmd(sid, f'AT+QNWPREFCFG="lte_band",{b}')
-                time.sleep(5)
+                time.sleep(6)
                 raw_cell = send_at_cmd(sid, 'AT+QENG="servingcell"')
                 rsrp_val = "-"
                 sinr_val = "-"
@@ -462,10 +466,15 @@ def action_mast_antenna_check(dash, sid):
                             sinr_val = parts[14]
                 t_res.add_row(name, cid_val, dash.coconut_meter(rsrp_val), dash.sinr_badge(sinr_val))
 
-        send_at_cmd(sid, 'AT+QNWPREFCFG="restore_band"')
-        time.sleep(3)
+        with console.status("[bold green]Stelle 'Auto / Alle Bänder' wieder her und warte auf Online-Status...[/]"):
+            send_at_cmd(sid, 'AT+QNWPREFCFG="restore_band"')
+            for _ in range(15):
+                time.sleep(2)
+                if call_gsmctl(sid, ["-j"]) == "Connected":
+                    break
+
         console.print(t_res)
-        console.print("[dim]Modem wurde nach dem Test sicher auf 'Auto' zurückgestellt.[/dim]")
+        console.print("[bold green]✓ Verbindung ist wieder voll hergestellt.[/bold green]")
         return
 
     band_map = {"1": "3", "2": "20", "3": "1", "4": "28", "5": "7"}
