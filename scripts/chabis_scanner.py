@@ -313,6 +313,37 @@ def call_gsmctl(sid, params, timeout=10):
 def send_at_cmd(sid, at_cmd, timeout=10):
     return call_gsmctl(sid, ["-A", at_cmd], timeout=timeout)
 
+DEFAULT_LTE_BANDS = "1:3:5:7:8:20:28:32:38:40:41:42:43"
+DEFAULT_5G_NSA_BANDS = "1:3:5:7:8:20:28:38:40:41:77:78"
+DEFAULT_5G_SA_BANDS = "1:3:5:7:8:20:28:38:40:41:77:78"
+
+def parse_servingcell(raw_text):
+    cid, rsrp, sinr = "-", "-", "-"
+    for line in raw_text.splitlines():
+        if "LTE" in line:
+            clean = line.replace("+QENG:", "").strip()
+            parts = [p.strip().strip('"') for p in clean.split(",") if p.strip()]
+            try:
+                idx = parts.index("LTE")
+                if len(parts) > idx + 14:
+                    cid = parts[idx + 4]
+                    rsrp = parts[idx + 11]
+                    sinr = parts[idx + 14]
+                    return cid, rsrp, sinr
+            except ValueError:
+                pass
+    return cid, rsrp, sinr
+
+def restore_all_bands_safe(sid):
+    """
+    Stellt alle 4G- und 5G-Bänder über explizite Quectel-Bandlisten wieder her.
+    (AT+QNWPREFCFG="restore_band" wirft auf RG501Q einen ERROR und darf nicht genutzt werden!)
+    """
+    send_at_cmd(sid, f'AT+QNWPREFCFG="lte_band",{DEFAULT_LTE_BANDS}')
+    send_at_cmd(sid, f'AT+QNWPREFCFG="nsa_nr5g_band",{DEFAULT_5G_NSA_BANDS}')
+    send_at_cmd(sid, f'AT+QNWPREFCFG="nr5g_band",{DEFAULT_5G_SA_BANDS}')
+    send_at_cmd(sid, 'AT+QNWPREFCFG="mode_pref",AUTO')
+
 def read_router_file(sid, path):
     url = f"http://{ROUTER_IP}/ubus"
     payload = {
@@ -511,8 +542,8 @@ def action_mast_antenna_check(dash, sid):
         return
 
     if choice == "R":
-        animate_radar_sweep(2.0, "Stelle Auto-Bänder wieder her")
-        send_at_cmd(sid, 'AT+QNWPREFCFG="restore_band"')
+        animate_radar_sweep(2.0, "Stelle Auto-Bänder über Standard-Listen wieder her...")
+        restore_all_bands_safe(sid)
         for _ in range(15):
             time.sleep(2)
             if call_gsmctl(sid, ["-j"]) == "Connected":
@@ -539,22 +570,13 @@ def action_mast_antenna_check(dash, sid):
         for name, b in profiles:
             animate_radar_sweep(2.0, f"Peile {name} an...")
             send_at_cmd(sid, f'AT+QNWPREFCFG="lte_band",{b}')
-            time.sleep(4)
+            time.sleep(5)
             raw_cell = send_at_cmd(sid, 'AT+QENG="servingcell"')
-            rsrp_val = "-"
-            sinr_val = "-"
-            cid_val = "-"
-            for line in raw_cell.splitlines():
-                if "LTE" in line and "servingcell" not in line:
-                    parts = line.split(",")
-                    if len(parts) >= 15:
-                        cid_val = parts[4]
-                        rsrp_val = parts[11]
-                        sinr_val = parts[14]
+            cid_val, rsrp_val, sinr_val = parse_servingcell(raw_cell)
             t_res.add_row(name, cid_val, dash.coconut_meter(rsrp_val), dash.sinr_badge(sinr_val))
 
         animate_radar_sweep(2.5, "Re-Lock auf Auto & 5G-NSA...")
-        send_at_cmd(sid, 'AT+QNWPREFCFG="restore_band"')
+        restore_all_bands_safe(sid)
         for _ in range(15):
             time.sleep(2)
             if call_gsmctl(sid, ["-j"]) == "Connected":
