@@ -1,0 +1,37 @@
+{
+  "timestamp": "2026-11-07T20:05:20.169931",
+  "mission": "Chabis Radio 5G & Coconut Exploration",
+  "location": {
+    "name": "RandeLab",
+    "address": "Underes \u00c4tzisloo 189, 8232 Merishausen",
+    "altitude_m": 857.0,
+    "coordinates": {
+      "lat": 47.7701,
+      "lon": 8.5738
+    }
+  },
+  "gateway": {
+    "model": "RG501Q-EU",
+    "ip": "192.168.2.1",
+    "firmware": "RG501QEUAAR12A10M4G_04.200.00.000",
+    "temperature_c": 22.0
+  },
+  "serving_cell": {
+    "operator": "GoMo",
+    "net_mode": "5G-NSA",
+    "cell_id": "29858817",
+    "enodeb": 116636,
+    "sector": 1,
+    "rsrp_dbm": -94,
+    "sinr_db": -2,
+    "rsrq_db": -15,
+    "band": "LTE B3"
+  },
+  "neighbours_raw": "\"neighbourcell intra\",\"LTE\",1601,54,-14,-93,-57,-,-,-,-,-,-",
+  "speedtest": {
+    "download_mbps": 13.11,
+    "upload_mbps": 67.71,
+    "server": "ookla-in.salt.ch",
+    "duration": 33.3
+  }
+}
