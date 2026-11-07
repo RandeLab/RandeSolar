@@ -1132,6 +1132,7 @@ def main():
     parser.add_argument("--watch", "-w", action="store_true", help="Direkt Live-Kabis-Radar (Watch Mode)")
     parser.add_argument("--speed", "-s", action="store_true", help="Direkt Ookla Speedtest ausführen")
     parser.add_argument("--benchmark", "-b", action="store_true", help="Alle Antennen testen & Benchmark-Report erstellen")
+    parser.add_argument("--border", "-g", action="store_true", help="Direkt Grenznetz- & Auslands-Operator-Scan ausführen")
     parser.add_argument("--report", "-r", action="store_true", help="Direkt Snapshot-Bericht erstellen")
     args = parser.parse_args()
 
@@ -1151,6 +1152,8 @@ def main():
         action_speedtest(dash, sid)
     elif args.benchmark:
         action_multi_antenna_benchmark(dash, sid)
+    elif args.border:
+        action_border_operator_scan(dash, sid)
     elif args.report:
         action_create_report(dash, sid)
     else:
