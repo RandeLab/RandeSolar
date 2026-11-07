@@ -264,11 +264,21 @@ Um die **echte physikalische Mobilfunkqualität** zu erfassen, verbindet sich de
   * **Basisstations-ID:** Cell ID `29858817` (TAC `47007`)
   * **Modem-Temperatur:** **`24.0 °C`**
 
-### 9.3 End-to-End Transparenz auf allen Kanälen
-Die echten 5G-Modem-Werte und die ESP32-WLAN-Werte werden nun nebeneinander dargestellt:
-* **REST-API:** `GET /api/live` liefert `cell_rsrp`, `cell_sinr`, `cell_band`, `cell_operator`, `cell_temp`, etc.
+### 9.3 Nativer Ookla 5G-Speedtest auf dem Teltonika Gateway
+Statt den ESP32 mit künstlichen HTTP-Downloads zu überlasten, triggert das System nun direkt auf dem Router den nativen Ookla-Speedtest des RutOS:
+* **Trigger:** POST an `http://192.168.2.1/ubus` mit `speedtest -> run`.
+* **Ergebnisauswertung:** Der ESP32 liest das strukturierte JSON-Ergebnis aus `/tmp/speedtest.json` über `file -> read`.
+* **Reale Messwerte an der RandeLab-Station (Server: Ookla WWZ / Salt Mobile):**
+  * **Download:** **20.24 – 22.21 Mbit/s** *(entspricht exakt der Laptop-Referenzmessung)*
+  * **Upload:** **78.33 – 80.56 Mbit/s**
+  * **Latenz:** **~27 ms** (ohne TCP-Bufferbloat)
+* **Status:** `FINISHED` (automatische Umschaltung während aktiven Messungen)
+
+### 9.4 End-to-End Transparenz auf allen Kanälen
+Die echten 5G-Modem-Werte, nativer WAN-Speedtest und die lokalen ESP32-WLAN-Werte werden nun nebeneinander dargestellt:
+* **REST-API:** `GET /api/live` liefert `net_mbps`, `net_up_mbps`, `cell_down_mbps`, `cell_up_mbps`, `cell_speed_state`, `cell_rsrp`, `cell_sinr`, `cell_band`, `cell_operator`, `cell_temp`.
 * **MQTT:** Kontinuierliche Veröffentlichung auf `randelab/solar/telemetry`.
-* **Web-Dashboard:** Live-Karten für 5G-Gateway-Empfang, Trägerbündelung und Router-Temperatur.
-* **Telegram:** Neuer Befehl `/speed` liefert eine vollständige zweistufige Diagnose (5G-Tower-Verbindung + ESP32-Wi-Fi-Hop).
+* **Web-Dashboard:** Live-Karten für 5G-Gateway-Empfang, WAN-Durchsatz und Trägerbündelung.
+* **Telegram:** Befehle `/status` und `/speed` liefern sofort die echten Router-Leitungsdaten.
 
 
