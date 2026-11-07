@@ -80,7 +80,7 @@ struct __attribute__((packed)) OfflineSolarRecord {
 };
 
 static const char* OFFLINE_BUFFER_PATH = "/solar_buffer.bin";
-static const size_t MAX_OFFLINE_RECORDS = 5000; // ~80 KB of flash (holds ~17 days of 5-min samples)
+static const size_t MAX_OFFLINE_RECORDS = 35000; // ~560 KB of flash (holds ~48.6 days of 24/7 continuous 2-min samples)
 static uint32_t g_bufferedRecordCount = 0;
 static bool g_littleFsReady = false;
 
@@ -106,13 +106,39 @@ void initOfflineStorage() {
 void storeOfflineRecord(const SolarData& d) {
     if (!g_littleFsReady || !d.has_data) return;
 
+    uint32_t nowMs = millis();
+
+    // Ring-buffer overflow protection: if buffer reaches MAX_OFFLINE_RECORDS, trim the oldest 15%
+    if (g_bufferedRecordCount >= MAX_OFFLINE_RECORDS) {
+        Serial.println("[LittleFS ⚠️] Buffer full (35,000 records)! Trimming oldest ~16% to preserve newest data...");
+        File fRead = LittleFS.open(OFFLINE_BUFFER_PATH, "r");
+        if (fRead) {
+            size_t total = fRead.size() / sizeof(OfflineSolarRecord);
+            size_t dropCount = total / 6; // Drop oldest ~16% (~5800 records)
+            fRead.seek(dropCount * sizeof(OfflineSolarRecord));
+            File fTemp = LittleFS.open("/temp_buf.bin", "w");
+            if (fTemp) {
+                uint8_t chunk[512];
+                while (fRead.available()) {
+                    size_t r = fRead.read(chunk, sizeof(chunk));
+                    fTemp.write(chunk, r);
+                }
+                fTemp.close();
+            }
+            fRead.close();
+            LittleFS.remove(OFFLINE_BUFFER_PATH);
+            LittleFS.rename("/temp_buf.bin", OFFLINE_BUFFER_PATH);
+            g_bufferedRecordCount = total - dropCount;
+        }
+    }
+
     OfflineSolarRecord rec;
     time_t nowTime = time(nullptr);
     if (nowTime > 1700000000) {
         rec.timestamp = (uint32_t)nowTime;
         rec.flags = 1; // Real NTP
     } else {
-        rec.timestamp = (uint32_t)(millis() / 1000);
+        rec.timestamp = (uint32_t)(nowMs / 1000);
         rec.flags = 0; // Uptime relative
     }
 
@@ -128,8 +154,8 @@ void storeOfflineRecord(const SolarData& d) {
         f.write((uint8_t*)&rec, sizeof(OfflineSolarRecord));
         f.close();
         g_bufferedRecordCount++;
-        Serial.printf("[LittleFS 📦] Appended record #%u to flash (%u W, %.2f V)\n", 
-            g_bufferedRecordCount, d.solar_power, d.battery_voltage);
+        Serial.printf("[LittleFS 📦] Buffered record #%u to flash (%u W, %.2f V, %.1f A)\n", 
+            g_bufferedRecordCount, d.solar_power, d.battery_voltage, d.battery_current);
     }
 }
 
@@ -150,16 +176,16 @@ void drainOfflineRecordsToCloud() {
 
     Serial.printf("[LittleFS 🔄] Starting cloud sync for %u buffered records...\n", (unsigned int)totalRecords);
 
-    // Read and upload in batches of 10 records
-    const size_t BATCH_SIZE = 10;
+    // Read and upload in fast bulk batches of 50 records
+    const size_t BATCH_SIZE = 50;
     OfflineSolarRecord batch[BATCH_SIZE];
 
     WiFiClientSecure secClient;
     secClient.setInsecure();
-    secClient.setTimeout(4500);
+    secClient.setTimeout(6500);
 
     size_t recordsProcessed = 0;
-    while (f.available() >= (int)sizeof(OfflineSolarRecord) && recordsProcessed < 40) { // Limit to 40 per loop run to avoid blocking
+    while (f.available() >= (int)sizeof(OfflineSolarRecord) && recordsProcessed < 250) { // Sync up to 250 records per 2-min cycle
         size_t count = 0;
         for (size_t i = 0; i < BATCH_SIZE && f.available() >= (int)sizeof(OfflineSolarRecord); i++) {
             if (f.read((uint8_t*)&batch[i], sizeof(OfflineSolarRecord)) == sizeof(OfflineSolarRecord)) {
@@ -169,6 +195,7 @@ void drainOfflineRecordsToCloud() {
 
         if (count > 0) {
             String jsonArray = "[";
+            jsonArray.reserve(count * 200);
             for (size_t i = 0; i < count; i++) {
                 char item[260];
                 float v = batch[i].battery_voltage / 100.0f;
@@ -1190,6 +1217,36 @@ void handleBufferApi() {
     server.send(200, "application/json", json);
 }
 
+void handleBufferCsv() {
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    server.sendHeader("Content-Disposition", "attachment; filename=\"randesolar_buffer.csv\"");
+    if (!g_littleFsReady || !LittleFS.exists(OFFLINE_BUFFER_PATH)) {
+        server.send(200, "text/csv", "timestamp,solar_w,batt_v,batt_a,yield_wh,state\n");
+        return;
+    }
+
+    File f = LittleFS.open(OFFLINE_BUFFER_PATH, "r");
+    if (!f) {
+        server.send(500, "text/plain", "Could not open buffer");
+        return;
+    }
+
+    server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+    server.send(200, "text/csv", "");
+    server.sendContent("timestamp,solar_w,batt_v,batt_a,yield_wh,state\n");
+
+    OfflineSolarRecord rec;
+    char line[128];
+    while (f.read((uint8_t*)&rec, sizeof(OfflineSolarRecord)) == sizeof(OfflineSolarRecord)) {
+        snprintf(line, sizeof(line), "%u,%u,%.2f,%.1f,%lu,%s\n",
+            rec.timestamp, rec.solar_power, rec.battery_voltage / 100.0f, rec.battery_current / 10.0f,
+            (unsigned long)rec.yield_today_wh, getChargeStateName(rec.charge_state));
+        server.sendContent(line);
+    }
+    f.close();
+    server.sendContent("");
+}
+
 void handleSpeedtestApi() {
     measureInternetSpeed(true);
     handleLiveApi();
@@ -1584,8 +1641,13 @@ void logToSupabase(const SolarData& d) {
             Serial.printf("[Supabase 💾] Logged row to cloud: %.2fV | %uW | %.1fA\n", d.battery_voltage, d.solar_power, d.battery_current);
         } else {
             Serial.printf("[Supabase ⚠️] Insert failed (HTTP %d): %s\n", code, http.errorToString(code).c_str());
+            // Router Wi-Fi is connected, but 5G cellular uplink is down: buffer to flash!
+            storeOfflineRecord(d);
         }
         http.end();
+    } else {
+        Serial.println("[Supabase ⚠️] Connection failed (DNS or cellular offline). Buffering to flash...");
+        storeOfflineRecord(d);
     }
 }
 
@@ -1943,6 +2005,7 @@ void setup() {
     server.on("/", handleRoot);
     server.on("/api/live", handleLiveApi);
     server.on("/api/buffer", handleBufferApi);
+    server.on("/api/buffer/csv", handleBufferCsv);
     server.on("/api/speedtest", handleSpeedtestApi);
     server.on("/update", HTTP_GET, handleOtaPage);
     server.on("/update", HTTP_POST, handleOtaUploadDone, handleOtaUploadChunk);
