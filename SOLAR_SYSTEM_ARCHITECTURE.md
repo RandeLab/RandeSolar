@@ -100,10 +100,10 @@ Die Live-Abfrage des Teltonika-Gateways bestätigt den direkten Einfluss des Ran
 ### 2.3 Batteriespeicher (4x VOLTIC) & RDDSPON 6000W Inverter
 Die 4 VOLTIC Batterien (DIN 595, je 95 Ah) sind parallel geschaltet und bilden eine massive 380 Ah Pufferbank (4.56 kWh Bruttospeicher). Darauf montiert sitzt der RDDSPON 6000W Reinsinus-Wechselrichter:
 
-| 4-fach Batteriebank & 6000W Inverter |
-| :---: |
-| ![4x VOLTIC Batterien und RDDSPON 6000W Wechselrichter](./system_docu/batteries_and_inverter.jpg) |
-| *4x VOLTIC DIN 595 parallel (380 Ah @ 12V) mit RDDSPON 6000W Pure Sine Wave Inverter* |
+| 4-fach Batteriebank & 6000W Inverter | 230V Hauptschalter & AC-Trennschalter |
+| :---: | :---: |
+| ![4x VOLTIC Batterien und RDDSPON 6000W Wechselrichter](./system_docu/batteries_and_inverter.jpg) | ![230V Hauptschalter und Installation vor Ort](./system_docu/hauptschalter_230V.jpg) |
+| *4x VOLTIC DIN 595 parallel (380 Ah @ 12V) mit RDDSPON 6000W Pure Sine Wave Inverter* | *Robuster 230V AC-Haupttrennschalter zur sicheren Trennung des Labor-Netzes* |
 
 ---
 
