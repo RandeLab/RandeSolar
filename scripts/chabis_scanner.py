@@ -1050,7 +1050,13 @@ gsmctl -A AT+COPS=0
         console.print("[yellow]⚠️ Der Scan hat noch keine Rückmeldung geliefert oder wurde abgebrochen.[/yellow]")
         return
 
-    matches = re.findall(r'\((\d+),"([^"]*)","([^"]*)","(\d+)",(\d+)\)', raw_cops)
+    try:
+        parsed_json = json.loads(raw_cops)
+        cops_text = parsed_json.get("response", raw_cops)
+    except Exception:
+        cops_text = raw_cops
+
+    matches = re.findall(r'\((\d+),[\\]?"([^"\\]*)[\\]?",[\\]?"([^"\\]*)[\\]?",[\\]?"(\d+)[\\]?",(\d+)\)', cops_text)
     if not matches:
         console.print("[yellow]⚠️ Keine Netzbetreiber in der Antwort gefunden.[/yellow]")
         console.print(f"[dim]{raw_cops}[/dim]")
