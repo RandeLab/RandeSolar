@@ -1529,9 +1529,9 @@ async function resolveTelegramBotLink() {
 
 // Hyper-Localized Weather & Solar Radiation for RandeLab (Underes Ätzisloo 189, 8232 Merishausen / Randen)
 // High-resolution MeteoSwiss ICON-CH model via Open-Meteo API
-const RANDELAB_LAT = 47.7612;
-const RANDELAB_LON = 8.5868;
-const RANDELAB_ELEVATION = 640;
+const RANDELAB_LAT = 47.7701;
+const RANDELAB_LON = 8.5738;
+const RANDELAB_ELEVATION = 857;
 
 const WMO_WEATHER_CODES = {
   0: { de: "Wolkenlos", en: "Clear sky", icon: "☀️" },

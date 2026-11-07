@@ -715,7 +715,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
     <div class="panel" style="border-top-color: var(--yellow)">
       <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--border); padding-bottom:6px; margin-bottom:10px; flex-wrap:wrap; gap:6px;">
         <h2 id="lblPanelWeather" style="border:none; margin:0; padding:0;">🌤️ Mikroklima & Solar-Strahlung • Underes Ätzisloo 189</h2>
-        <span style="font-size:0.72rem; color:var(--muted); font-family:monospace;">47.7612°N, 8.5868°E • ~640m ü.M. (MeteoSwiss ICON)</span>
+        <span style="font-size:0.72rem; color:var(--muted); font-family:monospace;">47.7701°N, 8.5738°E • ~857m ü.M. (MeteoSwiss ICON)</span>
       </div>
       <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap:10px; font-size:0.82rem;">
         <div style="padding:8px; border:1px solid var(--border); border-radius:4px;">
@@ -982,7 +982,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
     async function fetchWeather() {
       try {
-        const url = 'https://api.open-meteo.com/v1/forecast?latitude=47.7612&longitude=8.5868&elevation=640&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,shortwave_radiation,direct_normal_irradiance,diffuse_radiation,global_tilted_irradiance&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset,sunshine_duration&timezone=Europe%2FZurich&tilt=35';
+        const url = 'https://api.open-meteo.com/v1/forecast?latitude=47.7701&longitude=8.5738&elevation=857&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,shortwave_radiation,direct_normal_irradiance,diffuse_radiation,global_tilted_irradiance&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset,sunshine_duration&timezone=Europe%2FZurich&tilt=35';
         const res = await fetch(url);
         if (!res.ok) return;
         const d = await res.json();
@@ -1405,8 +1405,8 @@ void fetchMeteoSwissWeather(bool force) {
     wxClient.setTimeout(4500);
 
     HTTPClient wxHttp;
-    // High-resolution MeteoSwiss ICON-CH model data for Merishausen / Randen (47.7612° N, 8.5868° E, ~640m)
-    String wxUrl = "https://api.open-meteo.com/v1/forecast?latitude=47.7612&longitude=8.5868&elevation=640&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,surface_pressure,wind_speed_10m,wind_gusts_10m,shortwave_radiation&timezone=Europe%2FZurich";
+    // High-resolution MeteoSwiss ICON-CH model data for Merishausen / Randen (47.7701° N, 8.5738° E, ~857m)
+    String wxUrl = "https://api.open-meteo.com/v1/forecast?latitude=47.7701&longitude=8.5738&elevation=857&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,surface_pressure,wind_speed_10m,wind_gusts_10m,shortwave_radiation&timezone=Europe%2FZurich";
     
     if (wxHttp.begin(wxClient, wxUrl)) {
         int code = wxHttp.GET();
@@ -2122,7 +2122,7 @@ void checkTelegramUpdates() {
                                     "💨 *Wind:* %.1f km/h\n"
                                     "⏲️ *Luftdruck:* %.1f hPa\n"
                                     "━━━━━━━━━━━━━━━━━━━━\n"
-                                    "🏔️ _47.7612°N, 8.5868°E • ~640m ü.M. (MeteoSwiss ICON)_",
+                                    "🏔️ _47.7701°N, 8.5738°E • ~857m ü.M. (MeteoSwiss ICON)_",
                                     g_wxTemp, g_wxSolarWm2, g_wxCloudPct, g_wxHumidity, g_wxRainMm, g_wxWindKmh, g_wxPressure
                                 );
                                 sendTelegramMessage(wxMsg, fromChatId.c_str());

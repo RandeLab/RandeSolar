@@ -2,7 +2,7 @@
 
 Standalone wireless solar & microclimate observatory for the **Victron MPPT 75 | 15** charge controller, **Teltonika TRB500 5G Gateway**, and 12V battery bank with openBrushograph Studio styling.
 
-📍 **Station:** RandeLab • Underes Ätzisloo 189, 8232 Merishausen / Randen (`47.7612° N, 8.5868° E`, ~`640m`)
+📍 **Station:** RandeLab • Underes Ätzisloo 189, 8232 Merishausen / Randen (`47.7701° N, 8.5738° E`, ~`857m ü. M.`)
 
 ---
 

@@ -1,7 +1,7 @@
 # ☀️ RandeSolar Systemarchitektur & Auslegungsdokumentation
 
 **Standort:** RandeLab • Underes Ätzisloo 189, 8232 Merishausen / Randen  
-**Koordinaten:** 47.7612° N, 8.5868° E • ~640 m ü. M.  
+**Koordinaten:** 47.7701° N, 8.5738° E • ~857 m ü. M. (Amtl. Gebäudeadresse GWR / Swisstopo)  
 **Systemtyp:** Autonomes Off-Grid Solar-Inselnetz mit 12V-Batteriespeicher & 230V-Wechselrichter  
 **Stand:** November 2026
 
