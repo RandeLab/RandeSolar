@@ -685,17 +685,32 @@ def action_multi_antenna_benchmark(dash, sid):
 
             console.print(f"  📍 [cyan]Cell ID:[/] {cid_val} | [magenta]RSRP:[/] {dash.coconut_meter(rsrp_val)} | [green]SINR:[/] {dash.sinr_badge(sinr_val)}")
 
-            # Optional Speedtest
+            # Speedtest nur ausführen, wenn auch tatsächlich eine Funkzelle empfangen wurde!
             if include_speedtest:
-                try:
-                    console.print(f"  🥥 [bold yellow]Starte Ookla 5G-Speedtest auf {p['name']}...[/]")
-                    st = run_speedtest_native(sid, timeout=45)
-                    res_entry["download_mbps"] = st["download_mbps"]
-                    res_entry["upload_mbps"] = st["upload_mbps"]
-                    res_entry["speedtest_server"] = st["server"]
-                    console.print(f"     ✓ ⬇️ [bold green]{st['download_mbps']:.2f} Mbit/s[/] | ⬆️ [bold green]{st['upload_mbps']:.2f} Mbit/s[/] ({st['server']})")
-                except Exception as e:
-                    console.print(f"     ⚠️ Speedtest übersprungen oder nicht registriert: {e}")
+                if cid_val == "-" or rsrp_val == "-":
+                    console.print(f"     [dim]ℹ️ Speedtest übersprungen: Kein Mobilfunknetz auf {p['name']} empfangbar.[/dim]")
+                else:
+                    # Warten bis IP-Verbindung (WAN) vom Router vollständig aufgebaut wurde
+                    with console.status(f"[bold cyan]Warte auf Datenverbindung (WAN) für {p['name']}...[/]"):
+                        wan_ready = False
+                        for _ in range(8):
+                            if call_gsmctl(sid, ["-j"]) == "Connected":
+                                wan_ready = True
+                                break
+                            time.sleep(1.5)
+
+                    if not wan_ready:
+                        console.print(f"     [yellow]⚠️ Keine IP-Datenverbindung auf {p['name']} zustande gekommen.[/yellow]")
+                    else:
+                        try:
+                            console.print(f"  🥥 [bold yellow]Starte Ookla 5G-Speedtest auf {p['name']}...[/]")
+                            st = run_speedtest_native(sid, timeout=45)
+                            res_entry["download_mbps"] = st["download_mbps"]
+                            res_entry["upload_mbps"] = st["upload_mbps"]
+                            res_entry["speedtest_server"] = st["server"]
+                            console.print(f"     ✓ ⬇️ [bold green]{st['download_mbps']:.2f} Mbit/s[/] | ⬆️ [bold green]{st['upload_mbps']:.2f} Mbit/s[/] ({st['server']})")
+                        except Exception as e:
+                            console.print(f"     ⚠️ Speedtest-Fehler auf {p['name']}: {e}")
 
             benchmark_results.append(res_entry)
 
@@ -751,9 +766,13 @@ def action_multi_antenna_benchmark(dash, sid):
     # Markdown Report zusammenstellen
     table_rows_md = ""
     for r in benchmark_results:
-        dl_s = f"{r['download_mbps']:.2f} Mbit/s" if r['download_mbps'] is not None else "N/A"
-        ul_s = f"{r['upload_mbps']:.2f} Mbit/s" if r['upload_mbps'] is not None else "N/A"
-        table_rows_md += f"| **{r['name']}** | `{r['cell_id']}` | {r['rsrp_dbm']} dBm | {r['sinr_db']} dB | **{dl_s}** | **{ul_s}** |\n"
+        if r["cell_id"] == "-":
+            dl_s = "*Kein 4G-Empfang*"
+            ul_s = "*Kein 4G-Empfang*"
+        else:
+            dl_s = f"**{r['download_mbps']:.2f} Mbit/s**" if r['download_mbps'] is not None else "*Keine IP-Route*"
+            ul_s = f"**{r['upload_mbps']:.2f} Mbit/s**" if r['upload_mbps'] is not None else "*Keine IP-Route*"
+        table_rows_md += f"| **{r['name']}** | `{r['cell_id']}` | {r['rsrp_dbm']} dBm | {r['sinr_db']} dB | {dl_s} | {ul_s} |\n"
 
     md_report = f"""# 🏆 RandeLab 5G Masten-Olympiade & Multi-Antennen-Vergleich
 
