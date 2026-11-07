@@ -30,27 +30,33 @@ flowchart TD
         BATT3["VOLTIC DIN 595 (95 Ah)"]
         BATT4["VOLTIC DIN 595 (95 Ah)"]
         BATT_BANK["380 Ah @ 12V (4.56 kWh Brutto / ~2.3 kWh Nutzbar)"]
-        BATT1 & BATT2 & BATT3 & BATT4 --- BATT_BANK
         FUSE_INV["150A–200A Mega/ANL Sicherung (Dringend empfohlen!)"]
     end
 
     subgraph INVERTER_UNIT["⚡ 230V AC Stromnetz"]
-        INV["RDDSPON 6000W Pure Sine Wave Inverter<br/>DC 12V ➔ AC 220V 50Hz Echte Sinuswelle<br/>6000W Peak / ~3000W Dauerlast"]
+        INV["RDDSPON 6000W Pure Sine Wave Inverter<br/>DC 12V zu AC 230V 50Hz Echte Sinuswelle<br/>6000W Peak / ~3000W Dauerlast"]
         AC_SOCKETS["2x EU-Schuko Steckdosen<br/>(Laptops, Werkzeuge, Ladegeräte)"]
-        INV --> AC_SOCKETS
     end
 
     subgraph MONITORING["📡 Telemetrie & Microclimate Observatory"]
-        ESP32["ESP32-S3 Station (randesolar.local)<br/>• Hardware-AES BLE Scanner<br/>• 35'000 Flash-Puffer (48 Tage)<br/>• 5G Speedtest & Latenz-Benchmarking<br/>• GPIO 4 Vorbereitung für Panel-ADC"]
+        ESP32["ESP32-S3 Station (randesolar.local)<br/>• Hardware-AES BLE Scanner<br/>• 35'000 Flash-Puffer (48 Tage)<br/>• 5G Speedtest & Latenz-Benchmarking"]
         ROUTER["5G Cellular Router (RandeLab WLAN)"]
         CLOUD["Supabase PostgreSQL & HiveMQ MQTT"]
     end
 
-    P1 & P2 ==>|Parallel 1S2P (Voc 41.9V / ~22A Isc)| MPPT
-    MPPT ==>|12V Ladekabel (max 15A)| BATT_BANK
-    BATT_BANK ==>|25-35 mm² Batteriekabel| FUSE_INV ==> INV
-    DONGLE -.->|Drahtlose BLE Instant Beacons| ESP32
-    ESP32 <-->|WLAN & MQTT| ROUTER <-->|5G Uplink| CLOUD
+    P1 -->|Parallel 1S2P| MPPT
+    P2 -->|Parallel 1S2P| MPPT
+    MPPT -->|12V Ladekabel max 15A| BATT_BANK
+    BATT1 --- BATT_BANK
+    BATT2 --- BATT_BANK
+    BATT3 --- BATT_BANK
+    BATT4 --- BATT_BANK
+    BATT_BANK ==>|25-35 mm² Batteriekabel| FUSE_INV
+    FUSE_INV ==> INV
+    INV --> AC_SOCKETS
+    DONGLE -.->|BLE Instant Beacons| ESP32
+    ESP32 <-->|WLAN & MQTT| ROUTER
+    ROUTER <-->|5G Uplink| CLOUD
 ```
 
 ---

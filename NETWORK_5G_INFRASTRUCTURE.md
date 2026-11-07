@@ -19,20 +19,17 @@ flowchart TD
     end
 
     subgraph OUTDOOR_CPE["🏔️ Outdoor-Telekommunikation (Wetterfest unter Holzvordach)"]
-        TRB500["<b>Teltonika TRB500 Industrial 5G Gateway</b><br/>IP: 192.168.2.1 • Hostname: Randen5G<br/>RutOS R_00.07.24.7 • Quectel RG501Q-EU (Snapdragon X55)<br/>• Nativer Ookla Speedtest-Daemon<br/>• ubus JSON-RPC Server (/ubus)"]
+        TRB500["Teltonika TRB500 Industrial 5G Gateway<br/>IP: 192.168.2.1 • Hostname: Randen5G<br/>RutOS R_00.07.24.7 • Quectel RG501Q-EU (Snapdragon X55)<br/>• Nativer Ookla Speedtest-Daemon<br/>• ubus JSON-RPC Server (/ubus)"]
     end
 
     subgraph INDOOR_LAN["🏠 Indoor RandeLab Netzwerk (857 m ü. M.)"]
         POE["PoE-Injektor (Power over Ethernet)"]
-        AP["<b>TP-Link Omada WLAN Access Point</b><br/>IP: 192.168.1.1 • SSID: RandeLab<br/>2.4 GHz + 5 GHz Dual-Band"]
-        TRB500 ==>|Gigabit Ethernet / PoE| POE ==> AP
+        AP["TP-Link Omada WLAN Access Point<br/>IP: 192.168.1.1 • SSID: RandeLab<br/>2.4 GHz + 5 GHz Dual-Band"]
     end
 
     subgraph CLIENTS["💻 Lokale Clients & Sensor-Knoten"]
-        ESP32["<b>ESP32-S3 Kraftwerk-Controller</b><br/>IP: 192.168.1.100 (randesolar.local)<br/>• Hardware-AES BLE Scanner (Victron 0x02E1)<br/>• 35'000 LittleFS Flash-Puffer (48 Tage)<br/>• ubus JSON-RPC Client (/ubus Polling)<br/>• Webserver Port 80 & OTA (/update)"]
+        ESP32["ESP32-S3 Kraftwerk-Controller<br/>IP: 192.168.1.100 (randesolar.local)<br/>• Hardware-AES BLE Scanner (Victron 0x02E1)<br/>• 35'000 LittleFS Flash-Puffer (48 Tage)<br/>• ubus JSON-RPC Client (/ubus Polling)<br/>• Webserver Port 80 & OTA (/update)"]
         LAPTOP["Labor-Laptops, Tablets & Smartphones<br/>(Speedtest: ~22 Mbit/s Down / ~80 Mbit/s Up)"]
-        AP -.->|2.4 GHz Wi-Fi Ch 1| ESP32
-        AP -.->|Wi-Fi 5 GHz / 2.4 GHz| LAPTOP
     end
 
     subgraph CLOUD_SERVICES["☁️ Cloud-Dienste & Messaging"]
@@ -42,10 +39,14 @@ flowchart TD
         GH["GitHub Pages Dashboard<br/>(randelab.github.io/RandeSolar)"]
     end
 
-    TOWER <==|5G-NSA Funkfeld (RSRP -93 dBm)|==> TRB500
-    ESP32 ==>|HTTPS REST API| SUBA
-    ESP32 ==>|MQTTS WebSocket| MQTT
-    ESP32 <==|Long Polling HTTP|==> TG
+    TOWER <-->|5G-NSA Funkfeld RSRP -93 dBm| TRB500
+    TRB500 -->|Gigabit Ethernet| POE
+    POE -->|PoE Link| AP
+    AP -.->|2.4 GHz Wi-Fi Ch 1| ESP32
+    AP -.->|Wi-Fi 5 GHz / 2.4 GHz| LAPTOP
+    ESP32 -->|HTTPS REST API| SUBA
+    ESP32 -->|MQTTS WebSocket| MQTT
+    ESP32 <-->|Long Polling HTTP| TG
     SUBA -.->|Historische Zeitreihen| GH
 ```
 
