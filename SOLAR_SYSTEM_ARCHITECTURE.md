@@ -51,8 +51,8 @@ flowchart TD
     BATT2 --- BATT_BANK
     BATT3 --- BATT_BANK
     BATT4 --- BATT_BANK
-    BATT_BANK ==>|25-35 mm² Batteriekabel| FUSE_INV
-    FUSE_INV ==> INV
+    BATT_BANK -->|25-35 mm² Batteriekabel| FUSE_INV
+    FUSE_INV --> INV
     INV --> AC_SOCKETS
     DONGLE -.->|BLE Instant Beacons| ESP32
     ESP32 <-->|WLAN & MQTT| ROUTER
