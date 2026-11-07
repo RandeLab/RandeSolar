@@ -376,17 +376,20 @@ def restore_all_bands_safe(sid):
     # Zusätzliche Failsafe-AT-Absicherung
     send_at_cmd(sid, 'AT+QNWPREFCFG="mode_pref",AUTO', timeout=10)
 
-def read_router_file(sid, path):
+def read_router_file(sid, path, timeout=6):
     url = f"http://{ROUTER_IP}/ubus"
     payload = {
         "jsonrpc": "2.0", "id": 10, "method": "call",
         "params": [sid, "file", "read", {"path": path}]
     }
-    req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'))
-    resp = urllib.request.urlopen(req, timeout=5)
-    data = json.loads(resp.read().decode('utf-8'))
-    if "result" in data and len(data["result"]) > 1:
-        return data["result"][1].get("data", "")
+    try:
+        req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'))
+        resp = urllib.request.urlopen(req, timeout=timeout)
+        data = json.loads(resp.read().decode('utf-8'))
+        if "result" in data and len(data["result"]) > 1:
+            return data["result"][1].get("data", "")
+    except Exception:
+        pass
     return ""
 
 # =====================================================================
@@ -1012,6 +1015,9 @@ def action_border_operator_scan(dash, sid):
     if not confirm:
         return
 
+    # Alten Cache löschen
+    call_exec(sid, "rm", ["-f", "/tmp/border_plmn_scan.json"])
+
     script = """
 gsmctl -A AT+COPS=2
 sleep 2
@@ -1024,12 +1030,12 @@ gsmctl -A AT+COPS=0
     t_start = time.time()
     raw_cops = ""
     with console.status("[bold chartreuse2]HF-Empfänger horcht über die Grenze nach Deutschland...[/]") as status:
-        for i in range(120):
+        for i in range(50):
             elapsed = time.time() - t_start
             wave = render_oscilloscope(i, width=32)
             status.update(f"[bold chartreuse2]HF-Radar horcht über die Grenze ({elapsed:.0f}s / max 90s) [green]{wave}[/][/]")
-            time.sleep(1.5)
-            content = read_router_file(sid, "/tmp/border_plmn_scan.json")
+            time.sleep(2.5)
+            content = read_router_file(sid, "/tmp/border_plmn_scan.json", timeout=4)
             if "+COPS:" in content:
                 raw_cops = content
                 break
