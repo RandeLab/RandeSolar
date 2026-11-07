@@ -19,6 +19,7 @@ import sys
 import time
 import json
 import math
+import re
 import argparse
 import urllib.request
 from datetime import datetime
@@ -31,7 +32,7 @@ try:
     from rich.text import Text
     from rich.layout import Layout
     from rich.live import Live
-    from rich.prompt import Prompt, IntPrompt
+    from rich.prompt import Prompt, IntPrompt, Confirm
     from rich.align import Align
     from rich import box
 except ImportError:
@@ -296,21 +297,40 @@ def get_ubus_session():
     data = json.loads(resp.read().decode('utf-8'))
     return data["result"][1]["ubus_rpc_session"]
 
-def call_exec(sid, command, params, timeout=10):
+def call_exec(sid, command, params, timeout=20):
     url = f"http://{ROUTER_IP}/ubus"
     payload = {
         "jsonrpc": "2.0", "id": 2, "method": "call",
         "params": [sid, "file", "exec", {"command": command, "params": params}]
     }
-    req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'))
-    resp = urllib.request.urlopen(req, timeout=timeout)
-    data = json.loads(resp.read().decode('utf-8'))
-    return data.get("result", [None, {}])[1].get("stdout", "").strip()
+    try:
+        req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'))
+        resp = urllib.request.urlopen(req, timeout=timeout)
+        data = json.loads(resp.read().decode('utf-8'))
+        return data.get("result", [None, {}])[1].get("stdout", "").strip()
+    except Exception as e:
+        return ""
 
-def call_gsmctl(sid, params, timeout=10):
+def call_ubus_method(sid, ubus_service, method, params=None, timeout=20):
+    if params is None:
+        params = {}
+    url = f"http://{ROUTER_IP}/ubus"
+    payload = {
+        "jsonrpc": "2.0", "id": 3, "method": "call",
+        "params": [sid, ubus_service, method, params]
+    }
+    try:
+        req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'))
+        resp = urllib.request.urlopen(req, timeout=timeout)
+        data = json.loads(resp.read().decode('utf-8'))
+        return data.get("result", [0, {}])
+    except Exception as e:
+        return [1, {}]
+
+def call_gsmctl(sid, params, timeout=20):
     return call_exec(sid, "gsmctl", params, timeout=timeout)
 
-def send_at_cmd(sid, at_cmd, timeout=10):
+def send_at_cmd(sid, at_cmd, timeout=20):
     return call_gsmctl(sid, ["-A", at_cmd], timeout=timeout)
 
 DEFAULT_LTE_BANDS = "1:3:5:7:8:20:28:32:38:40:41:42:43"
@@ -334,15 +354,27 @@ def parse_servingcell(raw_text):
                 pass
     return cid, rsrp, sinr
 
+def wait_for_cell_attach(sid, timeout_sec=16):
+    """Wartet aktiv bis das Modem sich auf einer Funkzelle synchronisiert hat."""
+    t_end = time.time() + timeout_sec
+    while time.time() < t_end:
+        time.sleep(1.5)
+        raw = send_at_cmd(sid, 'AT+QENG="servingcell"', timeout=5)
+        cid, rsrp, sinr = parse_servingcell(raw)
+        if cid != "-" and rsrp != "-":
+            return cid, rsrp, sinr
+    # Letzter Versuch
+    raw = send_at_cmd(sid, 'AT+QENG="servingcell"', timeout=5)
+    return parse_servingcell(raw)
+
 def restore_all_bands_safe(sid):
     """
-    Stellt alle 4G- und 5G-Bänder über explizite Quectel-Bandlisten wieder her.
-    (AT+QNWPREFCFG="restore_band" wirft auf RG501Q einen ERROR und darf nicht genutzt werden!)
+    Stellt alle 4G- und 5G-Bänder über den nativen RutOS-Ubus-Treiber wieder her.
+    Nutzt 'set_default_bands' und setzt den Modus sicher auf AUTO zurück.
     """
-    send_at_cmd(sid, f'AT+QNWPREFCFG="lte_band",{DEFAULT_LTE_BANDS}')
-    send_at_cmd(sid, f'AT+QNWPREFCFG="nsa_nr5g_band",{DEFAULT_5G_NSA_BANDS}')
-    send_at_cmd(sid, f'AT+QNWPREFCFG="nr5g_band",{DEFAULT_5G_SA_BANDS}')
-    send_at_cmd(sid, 'AT+QNWPREFCFG="mode_pref",AUTO')
+    res = call_ubus_method(sid, "gsm.modem0", "set_default_bands", {"reboot": False, "skip": []}, timeout=20)
+    # Zusätzliche Failsafe-AT-Absicherung
+    send_at_cmd(sid, 'AT+QNWPREFCFG="mode_pref",AUTO', timeout=10)
 
 def read_router_file(sid, path):
     url = f"http://{ROUTER_IP}/ubus"
@@ -572,9 +604,7 @@ def action_mast_antenna_check(dash, sid):
         for name, b in profiles:
             animate_radar_sweep(2.0, f"Peile {name} an...")
             send_at_cmd(sid, f'AT+QNWPREFCFG="lte_band",{b}')
-            time.sleep(5)
-            raw_cell = send_at_cmd(sid, 'AT+QENG="servingcell"')
-            cid_val, rsrp_val, sinr_val = parse_servingcell(raw_cell)
+            cid_val, rsrp_val, sinr_val = wait_for_cell_attach(sid, timeout_sec=16)
             t_res.add_row(name, cid_val, dash.coconut_meter(rsrp_val), dash.sinr_badge(sinr_val))
 
         animate_radar_sweep(2.5, "Re-Lock auf Auto & 5G-NSA...")
@@ -662,13 +692,9 @@ def action_multi_antenna_benchmark(dash, sid):
             console.print(f"\n[bold chartreuse2]━━━ [{idx}/{len(profiles)}] Teste {p['name']} ({p['mast']}) ━━━[/]")
             animate_radar_sweep(2.0, f"Schalte auf {p['name']}...")
             
-            # Band setzen
+            # Band setzen & aktiv warten bis Zelle einbucht
             send_at_cmd(sid, f'AT+QNWPREFCFG="lte_band",{p["band_lte"]}')
-            time.sleep(5)
-
-            # Signal auslesen
-            raw_cell = send_at_cmd(sid, 'AT+QENG="servingcell"')
-            cid_val, rsrp_val, sinr_val = parse_servingcell(raw_cell)
+            cid_val, rsrp_val, sinr_val = wait_for_cell_attach(sid, timeout_sec=16)
 
             res_entry = {
                 "id": p["id"],
@@ -971,6 +997,80 @@ def action_create_report(dash, sid):
     console.print(f"  📄 [bold white]Markdown:[/] [cyan]{md_path}[/cyan]")
     console.print(f"  📊 [bold white]JSON Telemetrie:[/] [cyan]{json_path}[/cyan]\n")
 
+# --- Grenznetz- & Auslands-Operator-Scan ---
+
+def action_border_operator_scan(dash, sid):
+    console.clear()
+    console.print("\n[bold gold1]🇩🇪🇨🇭 GRENZNETZ- & AUSLANDS-OPERATOR-SCAN 📡[/bold gold1]")
+    console.print("[dim]Auf 857 m ü. M. scannen wir über die Bergkämme bis nach Baden-Württemberg (Hegau & Schwarzwald-Baar).[/dim]\n")
+    console.print("[bold yellow]⚠️  Wichtiger Hinweis zum 3GPP-Grenzscan:[/bold yellow]")
+    console.print("   Um alle sichtbaren Schweizer und deutschen Mobilfunkmasten (MCC 228 & 262) zu erfassen,")
+    console.print("   muss sich das Funkmodem für ca. 45-75 Sekunden kurzzeitig von der Datenverbindung trennen.")
+    console.print("   Das RandeLab-WLAN bleibt voll aktiv; das Gateway reconnectet nach dem Scan automatisch.\n")
+
+    confirm = Confirm.ask("Möchtest du den grenzüberschreitenden Operator-Scan jetzt starten?", default=True)
+    if not confirm:
+        return
+
+    script = """
+gsmctl -A AT+COPS=2
+sleep 2
+ubus -t 200 call gsm.modem0 exec '{"command": "AT+COPS=?", "timeout": 180}' > /tmp/border_plmn_scan.json 2>&1
+gsmctl -A AT+COPS=0
+"""
+    # Start script asynchronously on the router
+    call_exec(sid, "sh", ["-c", f"{script} &"])
+
+    t_start = time.time()
+    raw_cops = ""
+    with console.status("[bold chartreuse2]HF-Empfänger horcht über die Grenze nach Deutschland...[/]") as status:
+        for i in range(120):
+            elapsed = time.time() - t_start
+            wave = render_oscilloscope(i, width=32)
+            status.update(f"[bold chartreuse2]HF-Radar horcht über die Grenze ({elapsed:.0f}s / max 90s) [green]{wave}[/][/]")
+            time.sleep(1.5)
+            content = read_router_file(sid, "/tmp/border_plmn_scan.json")
+            if "+COPS:" in content:
+                raw_cops = content
+                break
+
+    # Restore check
+    for _ in range(15):
+        if call_gsmctl(sid, ["-j"]) == "Connected":
+            break
+        time.sleep(1.5)
+
+    if not raw_cops:
+        console.print("[yellow]⚠️ Der Scan hat noch keine Rückmeldung geliefert oder wurde abgebrochen.[/yellow]")
+        return
+
+    matches = re.findall(r'\((\d+),"([^"]*)","([^"]*)","(\d+)",(\d+)\)', raw_cops)
+    if not matches:
+        console.print("[yellow]⚠️ Keine Netzbetreiber in der Antwort gefunden.[/yellow]")
+        console.print(f"[dim]{raw_cops}[/dim]")
+        return
+
+    t_ops = Table(title="[bold green]📡 Empfangene Mobilfunk-Betreiber an der Grenze (857 m Randen)[/bold green]", box=box.ROUNDED)
+    t_ops.add_column("Land", style="bold white", width=16)
+    t_ops.add_column("Netzbetreiber", style="bold chartreuse3", width=22)
+    t_ops.add_column("MCC / MNC", style="cyan", width=12)
+    t_ops.add_column("Funktechnik (RAT)", style="bold yellow", width=16)
+    t_ops.add_column("Status am Randen", style="white", width=24)
+
+    stat_map = {"0": "Sichtbar / Broadcast", "1": "Verfügbar", "2": "Aktuell verbunden 🟢", "3": "Gesperrt / Roaming-Regel"}
+    rat_map = {0: "2G GSM", 2: "3G UTRAN / UMTS", 7: "4G LTE", 11: "5G NSA", 12: "5G NR"}
+
+    for stat, long_name, short_name, mccmnc, rat in matches:
+        country = "🇩🇪 Deutschland" if mccmnc.startswith("262") else "🇨🇭 Schweiz"
+        rat_label = rat_map.get(int(rat), f"RAT {rat}")
+        status_label = stat_map.get(stat, "Erfasst")
+        t_ops.add_row(country, long_name, mccmnc, rat_label, status_label)
+
+    console.print("\n")
+    console.print(t_ops)
+    dash.log(f"Grenznetz-Scan erfolgreich abgeschlossen: {len(matches)} Betreiber-Carrier erfasst")
+    console.print(f"\n[bold green]✓ Funkverbindung zu Salt/GoMo ist wieder voll hergestellt.[/bold green]")
+
 # --- Hauptmenü-Schleife ---
 
 def interactive_menu(dash, sid):
@@ -988,13 +1088,14 @@ def interactive_menu(dash, sid):
         menu_table.add_row("[2]", "⚡ Ookla 5G Speedtest", "Kokosnuss-Turbo auf dem Gateway messen")
         menu_table.add_row("[3]", "🛰️ Masten & Bänder manuell prüfen", "Vergleicht Merishausen, Bargen, 800 MHz, etc.")
         menu_table.add_row("[4]", "🏆 Masten-Olympiade (Gesamt-Test)", "Alle Antennen benchmarken & Report erstellen")
-        menu_table.add_row("[5]", "🔬 Tiefen-Zell-Analyse", "eNodeB, Sektoren, TAC, PCID & Trägerdetails")
-        menu_table.add_row("[6]", "🥥📝 Statusbericht erstellen", "Speichert aktuellen Snapshot nach reports/")
+        menu_table.add_row("[5]", "🇩🇪🇨🇭 Grenznetz- & Auslands-Scan", "Deutsche & Schweizer Mobilfunknetze listen")
+        menu_table.add_row("[6]", "🔬 Tiefen-Zell-Analyse", "eNodeB, Sektoren, TAC, PCID & Trägerdetails")
+        menu_table.add_row("[7]", "🥥📝 Statusbericht erstellen", "Speichert aktuellen Snapshot nach reports/")
         menu_table.add_row("[0]", "❌ Beenden", "Ab ins Kabisfeld")
 
         console.print(menu_table)
 
-        choice = Prompt.ask("\nWähle eine Option", choices=["1", "2", "3", "4", "5", "6", "0"], default="1")
+        choice = Prompt.ask("\nWähle eine Option", choices=["1", "2", "3", "4", "5", "6", "7", "0"], default="1")
 
         if choice == "1":
             action_watch_mode(dash, sid)
@@ -1008,9 +1109,12 @@ def interactive_menu(dash, sid):
             action_multi_antenna_benchmark(dash, sid)
             Prompt.ask("\n[dim]Drücke Enter für Hauptmenü...[/dim]")
         elif choice == "5":
-            action_deep_cell_scan(dash, sid)
+            action_border_operator_scan(dash, sid)
             Prompt.ask("\n[dim]Drücke Enter für Hauptmenü...[/dim]")
         elif choice == "6":
+            action_deep_cell_scan(dash, sid)
+            Prompt.ask("\n[dim]Drücke Enter für Hauptmenü...[/dim]")
+        elif choice == "7":
             action_create_report(dash, sid)
             Prompt.ask("\n[dim]Drücke Enter für Hauptmenü...[/dim]")
         elif choice == "0":
