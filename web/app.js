@@ -435,6 +435,42 @@ window.connectToCustomEndpoint = function() {
 function initChart() {
   const pal = studioThemePalettes[currentTheme] || studioThemePalettes.pinkograph;
 
+  const createXScaleConfig = (p) => ({
+    type: 'linear',
+    grid: { color: p.grid },
+    ticks: {
+      color: p.text,
+      font: { family: 'JetBrains Mono', size: 10 },
+      maxTicksLimit: 7,
+      callback: function(val) {
+        const dt = new Date(val);
+        if (currentHours >= 48) {
+          return dt.toLocaleDateString([], { weekday: 'short' }) + ' ' + dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        } else if (currentHours >= 2) {
+          return dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        } else {
+          return dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+      }
+    }
+  });
+
+  const createTooltipConfig = (borderColor) => ({
+    backgroundColor: 'rgba(10, 0, 20, 0.95)',
+    titleFont: { family: 'Outfit', size: 12 },
+    bodyFont: { family: 'JetBrains Mono', size: 12 },
+    borderColor: borderColor,
+    borderWidth: 1,
+    padding: 8,
+    callbacks: {
+      title: function(items) {
+        if (!items || !items.length) return '';
+        const dt = new Date(items[0].parsed.x);
+        return dt.toLocaleDateString([], { weekday: 'short', day: '2-digit', month: '2-digit' }) + ' ' + dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      }
+    }
+  });
+
   // Plot 1: Solar & Battery
   const solarCanvas = document.getElementById('solarChart');
   if (solarCanvas) {
@@ -442,7 +478,6 @@ function initChart() {
     solarChartInstance = new Chart(ctxSolar, {
       type: 'line',
       data: {
-        labels: [],
         datasets: [
           {
             label: 'Solar (W)',
@@ -452,6 +487,7 @@ function initChart() {
             borderWidth: 2.5,
             tension: 0.25,
             fill: true,
+            spanGaps: true,
             yAxisID: 'yPower',
             pointRadius: 2,
             pointHoverRadius: 5,
@@ -464,6 +500,7 @@ function initChart() {
             borderWidth: 2,
             tension: 0.25,
             fill: false,
+            spanGaps: true,
             yAxisID: 'yVoltage',
             pointRadius: 2,
             pointHoverRadius: 5,
@@ -474,7 +511,7 @@ function initChart() {
         responsive: true,
         maintainAspectRatio: false,
         animation: { duration: 250 },
-        interaction: { mode: 'index', intersect: false },
+        interaction: { mode: 'nearest', axis: 'x', intersect: false },
         plugins: {
           legend: {
             labels: {
@@ -484,20 +521,10 @@ function initChart() {
               usePointStyle: true,
             }
           },
-          tooltip: {
-            backgroundColor: 'rgba(10, 0, 20, 0.95)',
-            titleFont: { family: 'Outfit', size: 12 },
-            bodyFont: { family: 'JetBrains Mono', size: 12 },
-            borderColor: 'rgba(255, 107, 181, 0.4)',
-            borderWidth: 1,
-            padding: 8,
-          }
+          tooltip: createTooltipConfig('rgba(255, 107, 181, 0.4)')
         },
         scales: {
-          x: {
-            grid: { color: pal.grid },
-            ticks: { color: pal.text, font: { family: 'JetBrains Mono', size: 10 }, maxTicksLimit: 6 }
-          },
+          x: createXScaleConfig(pal),
           yPower: {
             type: 'linear',
             position: 'left',
@@ -528,7 +555,6 @@ function initChart() {
     chargeChartInstance = new Chart(ctxCharge, {
       type: 'line',
       data: {
-        labels: [],
         datasets: [
           {
             label: 'Ladestrom (A)',
@@ -538,6 +564,7 @@ function initChart() {
             borderWidth: 2.2,
             tension: 0.25,
             fill: true,
+            spanGaps: true,
             yAxisID: 'yCurrent',
             pointRadius: 2,
             pointHoverRadius: 5,
@@ -550,6 +577,7 @@ function initChart() {
             borderDash: [4, 4],
             tension: 0.2,
             fill: false,
+            spanGaps: true,
             yAxisID: 'yCurrent',
             pointRadius: 1,
             pointHoverRadius: 4,
@@ -560,7 +588,7 @@ function initChart() {
         responsive: true,
         maintainAspectRatio: false,
         animation: { duration: 250 },
-        interaction: { mode: 'index', intersect: false },
+        interaction: { mode: 'nearest', axis: 'x', intersect: false },
         plugins: {
           legend: {
             labels: {
@@ -570,20 +598,10 @@ function initChart() {
               usePointStyle: true,
             }
           },
-          tooltip: {
-            backgroundColor: 'rgba(10, 0, 20, 0.95)',
-            titleFont: { family: 'Outfit', size: 12 },
-            bodyFont: { family: 'JetBrains Mono', size: 12 },
-            borderColor: 'rgba(255, 107, 181, 0.4)',
-            borderWidth: 1,
-            padding: 8,
-          }
+          tooltip: createTooltipConfig('rgba(255, 107, 181, 0.4)')
         },
         scales: {
-          x: {
-            grid: { color: pal.grid },
-            ticks: { color: pal.text, font: { family: 'JetBrains Mono', size: 10 }, maxTicksLimit: 6 }
-          },
+          x: createXScaleConfig(pal),
           yCurrent: {
             type: 'linear',
             position: 'left',
@@ -605,7 +623,6 @@ function initChart() {
     netChartInstance = new Chart(ctxNet, {
       type: 'line',
       data: {
-        labels: [],
         datasets: [
           {
             label: 'Download (Mbit/s)',
@@ -615,6 +632,7 @@ function initChart() {
             borderWidth: 2.2,
             tension: 0.25,
             fill: true,
+            spanGaps: true,
             yAxisID: 'ySpeed',
             pointRadius: 2.5,
             pointHoverRadius: 5,
@@ -627,6 +645,7 @@ function initChart() {
             borderWidth: 1.8,
             tension: 0.25,
             fill: false,
+            spanGaps: true,
             yAxisID: 'ySpeed',
             pointRadius: 2,
             pointHoverRadius: 4,
@@ -639,6 +658,7 @@ function initChart() {
             borderDash: [3, 3],
             tension: 0.2,
             fill: false,
+            spanGaps: true,
             yAxisID: 'yPing',
             pointRadius: 1.5,
             pointHoverRadius: 4,
@@ -651,6 +671,7 @@ function initChart() {
             borderDash: [2, 2],
             tension: 0.2,
             fill: false,
+            spanGaps: true,
             yAxisID: 'yPing',
             pointRadius: 1.5,
             pointHoverRadius: 4,
@@ -663,6 +684,7 @@ function initChart() {
             borderWidth: 1.8,
             tension: 0.1,
             fill: true,
+            spanGaps: true,
             yAxisID: 'yRain',
             pointRadius: 2,
             pointHoverRadius: 4,
@@ -675,6 +697,7 @@ function initChart() {
             borderDash: [2, 2],
             tension: 0.2,
             fill: false,
+            spanGaps: true,
             yAxisID: 'yCloud',
             pointRadius: 1,
             pointHoverRadius: 3,
@@ -685,7 +708,7 @@ function initChart() {
         responsive: true,
         maintainAspectRatio: false,
         animation: { duration: 250 },
-        interaction: { mode: 'index', intersect: false },
+        interaction: { mode: 'nearest', axis: 'x', intersect: false },
         plugins: {
           legend: {
             labels: {
@@ -695,20 +718,10 @@ function initChart() {
               usePointStyle: true,
             }
           },
-          tooltip: {
-            backgroundColor: 'rgba(10, 0, 20, 0.95)',
-            titleFont: { family: 'Outfit', size: 12 },
-            bodyFont: { family: 'JetBrains Mono', size: 12 },
-            borderColor: 'rgba(0, 245, 255, 0.4)',
-            borderWidth: 1,
-            padding: 8,
-          }
+          tooltip: createTooltipConfig('rgba(0, 245, 255, 0.4)')
         },
         scales: {
-          x: {
-            grid: { color: pal.grid },
-            ticks: { color: pal.text, font: { family: 'JetBrains Mono', size: 10 }, maxTicksLimit: 6 }
-          },
+          x: createXScaleConfig(pal),
           ySpeed: {
             type: 'linear',
             position: 'left',
@@ -755,7 +768,6 @@ function initChart() {
     weatherChartInstance = new Chart(ctxWx, {
       type: 'line',
       data: {
-        labels: [],
         datasets: [
           {
             label: 'Solar-Strahlung (W/m²)',
@@ -765,6 +777,7 @@ function initChart() {
             borderWidth: 2,
             tension: 0.25,
             fill: true,
+            spanGaps: true,
             yAxisID: 'ySolar',
             pointRadius: 2,
             pointHoverRadius: 5,
@@ -777,6 +790,7 @@ function initChart() {
             borderWidth: 2,
             tension: 0.25,
             fill: false,
+            spanGaps: true,
             yAxisID: 'yTemp',
             pointRadius: 2,
             pointHoverRadius: 4,
@@ -790,6 +804,7 @@ function initChart() {
             borderDash: [3, 3],
             tension: 0.2,
             fill: false,
+            spanGaps: true,
             yAxisID: 'yPercent',
             pointRadius: 1.5,
             pointHoverRadius: 4,
@@ -802,6 +817,7 @@ function initChart() {
             borderWidth: 1.8,
             tension: 0.1,
             fill: true,
+            spanGaps: true,
             yAxisID: 'yRain',
             pointRadius: 2,
             pointHoverRadius: 4,
@@ -812,7 +828,7 @@ function initChart() {
         responsive: true,
         maintainAspectRatio: false,
         animation: { duration: 250 },
-        interaction: { mode: 'index', intersect: false },
+        interaction: { mode: 'nearest', axis: 'x', intersect: false },
         plugins: {
           legend: {
             labels: {
@@ -822,20 +838,10 @@ function initChart() {
               usePointStyle: true,
             }
           },
-          tooltip: {
-            backgroundColor: 'rgba(10, 0, 20, 0.95)',
-            titleFont: { family: 'Outfit', size: 12 },
-            bodyFont: { family: 'JetBrains Mono', size: 12 },
-            borderColor: 'rgba(255, 212, 0, 0.4)',
-            borderWidth: 1,
-            padding: 8,
-          }
+          tooltip: createTooltipConfig('rgba(255, 212, 0, 0.4)')
         },
         scales: {
-          x: {
-            grid: { color: pal.grid },
-            ticks: { color: pal.text, font: { family: 'JetBrains Mono', size: 10 }, maxTicksLimit: 6 }
-          },
+          x: createXScaleConfig(pal),
           ySolar: {
             type: 'linear',
             position: 'left',
@@ -1082,65 +1088,68 @@ function appendChartPoint(item, force = false) {
   }
   lastChartAppendTime = now;
 
-  const timeLabel = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const ptTime = item.created_at ? new Date(item.created_at).getTime() : now;
+  const sinceTime = now - currentHours * 3600 * 1000;
 
   // 1. Solar Power (W) & Battery Voltage (V)
   if (solarChartInstance) {
-    solarChartInstance.data.labels.push(timeLabel);
-    solarChartInstance.data.datasets[0].data.push(item.solar_power || 0);
-    solarChartInstance.data.datasets[1].data.push(item.battery_voltage || 0);
+    solarChartInstance.data.datasets[0].data.push({ x: ptTime, y: item.solar_power || 0 });
+    solarChartInstance.data.datasets[1].data.push({ x: ptTime, y: item.battery_voltage || 0 });
 
-    while (solarChartInstance.data.labels.length > currentLimit) {
-      solarChartInstance.data.labels.shift();
-      solarChartInstance.data.datasets[0].data.shift();
-      solarChartInstance.data.datasets[1].data.shift();
-    }
+    solarChartInstance.options.scales.x.min = sinceTime;
+    solarChartInstance.options.scales.x.max = now;
+
+    solarChartInstance.data.datasets.forEach(ds => {
+      while (ds.data.length > 0 && ds.data[0].x < sinceTime) ds.data.shift();
+    });
     solarChartInstance.update('none');
   }
 
   // 2. Charging Current (A) & External Load (A)
   if (chargeChartInstance) {
-    chargeChartInstance.data.labels.push(timeLabel);
-    chargeChartInstance.data.datasets[0].data.push(item.battery_charging_current || item.battery_current || 0);
-    chargeChartInstance.data.datasets[1].data.push(item.external_load || 0);
+    chargeChartInstance.data.datasets[0].data.push({ x: ptTime, y: item.battery_charging_current || item.battery_current || 0 });
+    chargeChartInstance.data.datasets[1].data.push({ x: ptTime, y: item.external_load || 0 });
 
-    while (chargeChartInstance.data.labels.length > currentLimit) {
-      chargeChartInstance.data.labels.shift();
-      chargeChartInstance.data.datasets[0].data.shift();
-      chargeChartInstance.data.datasets[1].data.shift();
-    }
+    chargeChartInstance.options.scales.x.min = sinceTime;
+    chargeChartInstance.options.scales.x.max = now;
+
+    chargeChartInstance.data.datasets.forEach(ds => {
+      while (ds.data.length > 0 && ds.data[0].x < sinceTime) ds.data.shift();
+    });
     chargeChartInstance.update('none');
   }
 
   // 3. Internet Speed (Mbit/s) & Latency (ms) & Weather Overlay
   if (netChartInstance && (item.net_mbps !== undefined || item.net_ping_ms !== undefined)) {
-    netChartInstance.data.labels.push(timeLabel);
-    netChartInstance.data.datasets[0].data.push(item.net_mbps || 0);
-    netChartInstance.data.datasets[1].data.push(item.net_up_mbps || 0);
-    netChartInstance.data.datasets[2].data.push(item.net_ping_ms || 0);
-    netChartInstance.data.datasets[3].data.push(item.gw_ping_ms || 0);
-    if (netChartInstance.data.datasets[4]) netChartInstance.data.datasets[4].data.push(item.wx_rain_mm !== undefined ? item.wx_rain_mm : null);
-    if (netChartInstance.data.datasets[5]) netChartInstance.data.datasets[5].data.push(item.wx_cloud_pct !== undefined ? item.wx_cloud_pct : null);
+    netChartInstance.data.datasets[0].data.push({ x: ptTime, y: item.net_mbps || 0 });
+    netChartInstance.data.datasets[1].data.push({ x: ptTime, y: item.net_up_mbps || 0 });
+    netChartInstance.data.datasets[2].data.push({ x: ptTime, y: item.net_ping_ms || 0 });
+    netChartInstance.data.datasets[3].data.push({ x: ptTime, y: item.gw_ping_ms || 0 });
+    if (netChartInstance.data.datasets[4]) netChartInstance.data.datasets[4].data.push({ x: ptTime, y: item.wx_rain_mm !== undefined && item.wx_rain_mm !== null ? item.wx_rain_mm : null });
+    if (netChartInstance.data.datasets[5]) netChartInstance.data.datasets[5].data.push({ x: ptTime, y: item.wx_cloud_pct !== undefined && item.wx_cloud_pct !== null ? item.wx_cloud_pct : null });
 
-    while (netChartInstance.data.labels.length > currentLimit) {
-      netChartInstance.data.labels.shift();
-      netChartInstance.data.datasets.forEach(ds => ds.data.shift());
-    }
+    netChartInstance.options.scales.x.min = sinceTime;
+    netChartInstance.options.scales.x.max = now;
+
+    netChartInstance.data.datasets.forEach(ds => {
+      while (ds.data.length > 0 && ds.data[0].x < sinceTime) ds.data.shift();
+    });
     netChartInstance.update('none');
   }
 
   // 4. Local Weather & Microclimate History
   if (weatherChartInstance && (item.wx_temp !== undefined || item.wx_solar_wm2 !== undefined || item.wx_cloud_pct !== undefined)) {
-    weatherChartInstance.data.labels.push(timeLabel);
-    weatherChartInstance.data.datasets[0].data.push(item.wx_solar_wm2 !== undefined ? item.wx_solar_wm2 : null);
-    weatherChartInstance.data.datasets[1].data.push(item.wx_temp !== undefined ? item.wx_temp : null);
-    weatherChartInstance.data.datasets[2].data.push(item.wx_cloud_pct !== undefined ? item.wx_cloud_pct : null);
-    weatherChartInstance.data.datasets[3].data.push(item.wx_rain_mm !== undefined ? item.wx_rain_mm : null);
+    weatherChartInstance.data.datasets[0].data.push({ x: ptTime, y: item.wx_solar_wm2 !== undefined && item.wx_solar_wm2 !== null ? item.wx_solar_wm2 : null });
+    weatherChartInstance.data.datasets[1].data.push({ x: ptTime, y: item.wx_temp !== undefined && item.wx_temp !== null ? item.wx_temp : null });
+    weatherChartInstance.data.datasets[2].data.push({ x: ptTime, y: item.wx_cloud_pct !== undefined && item.wx_cloud_pct !== null ? item.wx_cloud_pct : null });
+    weatherChartInstance.data.datasets[3].data.push({ x: ptTime, y: item.wx_rain_mm !== undefined && item.wx_rain_mm !== null ? item.wx_rain_mm : null });
 
-    while (weatherChartInstance.data.labels.length > currentLimit) {
-      weatherChartInstance.data.labels.shift();
-      weatherChartInstance.data.datasets.forEach(ds => ds.data.shift());
-    }
+    weatherChartInstance.options.scales.x.min = sinceTime;
+    weatherChartInstance.options.scales.x.max = now;
+
+    weatherChartInstance.data.datasets.forEach(ds => {
+      while (ds.data.length > 0 && ds.data[0].x < sinceTime) ds.data.shift();
+    });
     weatherChartInstance.update('none');
   }
 }
@@ -1269,20 +1278,30 @@ async function loadSupabaseHistory(limit = 240, hours = 1) {
       }
     });
 
+    const nowTime = Date.now();
+    const sinceTime = hours && hours > 0 ? (nowTime - hours * 3600 * 1000) : (nowTime - 3600 * 1000);
+
+    const setChartBounds = (chart) => {
+      if (!chart) return;
+      chart.options.scales.x.min = sinceTime;
+      chart.options.scales.x.max = nowTime;
+    };
+    setChartBounds(solarChartInstance);
+    setChartBounds(chargeChartInstance);
+    setChartBounds(netChartInstance);
+    setChartBounds(weatherChartInstance);
+
     if (solarChartInstance) {
-      solarChartInstance.data.labels = [];
       solarChartInstance.data.datasets[0].data = [];
       solarChartInstance.data.datasets[1].data = [];
     }
 
     if (chargeChartInstance) {
-      chargeChartInstance.data.labels = [];
       chargeChartInstance.data.datasets[0].data = [];
       chargeChartInstance.data.datasets[1].data = [];
     }
 
     if (netChartInstance) {
-      netChartInstance.data.labels = [];
       netChartInstance.data.datasets[0].data = [];
       netChartInstance.data.datasets[1].data = [];
       netChartInstance.data.datasets[2].data = [];
@@ -1292,7 +1311,6 @@ async function loadSupabaseHistory(limit = 240, hours = 1) {
     }
 
     if (weatherChartInstance) {
-      weatherChartInstance.data.labels = [];
       weatherChartInstance.data.datasets[0].data = [];
       weatherChartInstance.data.datasets[1].data = [];
       weatherChartInstance.data.datasets[2].data = [];
@@ -1301,55 +1319,38 @@ async function loadSupabaseHistory(limit = 240, hours = 1) {
 
     // Downsample chart data points if dataset is dense (e.g. 1 week), keeps 60fps rendering
     let displayRows = rows;
-    if (rows.length > 500) {
-      const step = Math.ceil(rows.length / 500);
+    if (rows.length > 800) {
+      const step = Math.ceil(rows.length / 800);
       displayRows = rows.filter((_, idx) => idx % step === 0 || idx === rows.length - 1);
     }
 
     displayRows.forEach(item => {
-      const d = new Date(item.created_at);
-      let timeLabel;
-      if (currentHours >= 48) {
-        // Multi-day format (e.g. "Fr 09:15" or "16.10 09:15")
-        const dayStr = d.toLocaleDateString([], { weekday: 'short' });
-        const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        timeLabel = `${dayStr} ${timeStr}`;
-      } else if (currentHours >= 2) {
-        // 6h, 24h: show "HH:MM"
-        timeLabel = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      } else {
-        // 10 min, 1h: show "HH:MM:SS" with seconds
-        timeLabel = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      }
+      const ptTime = new Date(item.created_at).getTime();
 
       if (solarChartInstance) {
-        solarChartInstance.data.labels.push(timeLabel);
-        solarChartInstance.data.datasets[0].data.push(item.solar_power || 0);
-        solarChartInstance.data.datasets[1].data.push(item.battery_voltage || 0);
+        solarChartInstance.data.datasets[0].data.push({ x: ptTime, y: item.solar_power || 0 });
+        solarChartInstance.data.datasets[1].data.push({ x: ptTime, y: item.battery_voltage || 0 });
       }
 
       if (chargeChartInstance) {
-        chargeChartInstance.data.labels.push(timeLabel);
-        chargeChartInstance.data.datasets[0].data.push(item.battery_current || 0);
-        chargeChartInstance.data.datasets[1].data.push(item.external_load || 0);
+        chargeChartInstance.data.datasets[0].data.push({ x: ptTime, y: item.battery_current || 0 });
+        chargeChartInstance.data.datasets[1].data.push({ x: ptTime, y: item.external_load || 0 });
       }
 
       if (netChartInstance && (item.net_mbps !== undefined || item.net_ping_ms !== undefined)) {
-        netChartInstance.data.labels.push(timeLabel);
-        netChartInstance.data.datasets[0].data.push(item.net_mbps || 0);
-        netChartInstance.data.datasets[1].data.push(item.net_up_mbps || 0);
-        netChartInstance.data.datasets[2].data.push(item.net_ping_ms || 0);
-        netChartInstance.data.datasets[3].data.push(item.gw_ping_ms || 0);
-        if (netChartInstance.data.datasets[4]) netChartInstance.data.datasets[4].data.push(item.wx_rain_mm !== undefined && item.wx_rain_mm !== null ? item.wx_rain_mm : null);
-        if (netChartInstance.data.datasets[5]) netChartInstance.data.datasets[5].data.push(item.wx_cloud_pct !== undefined && item.wx_cloud_pct !== null ? item.wx_cloud_pct : null);
+        netChartInstance.data.datasets[0].data.push({ x: ptTime, y: item.net_mbps || 0 });
+        netChartInstance.data.datasets[1].data.push({ x: ptTime, y: item.net_up_mbps || 0 });
+        netChartInstance.data.datasets[2].data.push({ x: ptTime, y: item.net_ping_ms || 0 });
+        netChartInstance.data.datasets[3].data.push({ x: ptTime, y: item.gw_ping_ms || 0 });
+        if (netChartInstance.data.datasets[4]) netChartInstance.data.datasets[4].data.push({ x: ptTime, y: item.wx_rain_mm !== undefined && item.wx_rain_mm !== null ? item.wx_rain_mm : null });
+        if (netChartInstance.data.datasets[5]) netChartInstance.data.datasets[5].data.push({ x: ptTime, y: item.wx_cloud_pct !== undefined && item.wx_cloud_pct !== null ? item.wx_cloud_pct : null });
       }
 
       if (weatherChartInstance && (item.wx_temp !== undefined || item.wx_solar_wm2 !== undefined || item.wx_cloud_pct !== undefined)) {
-        weatherChartInstance.data.labels.push(timeLabel);
-        weatherChartInstance.data.datasets[0].data.push(item.wx_solar_wm2 !== undefined && item.wx_solar_wm2 !== null ? item.wx_solar_wm2 : null);
-        weatherChartInstance.data.datasets[1].data.push(item.wx_temp !== undefined && item.wx_temp !== null ? item.wx_temp : null);
-        weatherChartInstance.data.datasets[2].data.push(item.wx_cloud_pct !== undefined && item.wx_cloud_pct !== null ? item.wx_cloud_pct : null);
-        weatherChartInstance.data.datasets[3].data.push(item.wx_rain_mm !== undefined && item.wx_rain_mm !== null ? item.wx_rain_mm : null);
+        weatherChartInstance.data.datasets[0].data.push({ x: ptTime, y: item.wx_solar_wm2 !== undefined && item.wx_solar_wm2 !== null ? item.wx_solar_wm2 : null });
+        weatherChartInstance.data.datasets[1].data.push({ x: ptTime, y: item.wx_temp !== undefined && item.wx_temp !== null ? item.wx_temp : null });
+        weatherChartInstance.data.datasets[2].data.push({ x: ptTime, y: item.wx_cloud_pct !== undefined && item.wx_cloud_pct !== null ? item.wx_cloud_pct : null });
+        weatherChartInstance.data.datasets[3].data.push({ x: ptTime, y: item.wx_rain_mm !== undefined && item.wx_rain_mm !== null ? item.wx_rain_mm : null });
       }
     });
 
