@@ -435,6 +435,19 @@ window.connectToCustomEndpoint = function() {
 function initChart() {
   const pal = studioThemePalettes[currentTheme] || studioThemePalettes.pinkograph;
 
+  const formatTime24h = (dt, withSeconds = false) => {
+    const pad = (n) => String(n).padStart(2, '0');
+    const h = pad(dt.getHours());
+    const m = pad(dt.getMinutes());
+    return withSeconds ? `${h}:${m}:${pad(dt.getSeconds())}` : `${h}:${m}`;
+  };
+
+  const formatDatePrefix = (dt, withDay = false) => {
+    const loc = (typeof currentLang !== 'undefined' && currentLang === 'de') ? 'de-CH' : 'en-GB';
+    const opt = withDay ? { weekday: 'short', day: '2-digit', month: '2-digit' } : { weekday: 'short' };
+    return dt.toLocaleDateString(loc, opt);
+  };
+
   const createXScaleConfig = (p) => ({
     type: 'linear',
     grid: { color: p.grid },
@@ -445,11 +458,11 @@ function initChart() {
       callback: function(val) {
         const dt = new Date(val);
         if (currentHours >= 48) {
-          return dt.toLocaleDateString([], { weekday: 'short' }) + ' ' + dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          return `${formatDatePrefix(dt, false)} ${formatTime24h(dt, false)}`;
         } else if (currentHours >= 2) {
-          return dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          return formatTime24h(dt, false);
         } else {
-          return dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          return formatTime24h(dt, true);
         }
       }
     }
@@ -466,7 +479,7 @@ function initChart() {
       title: function(items) {
         if (!items || !items.length) return '';
         const dt = new Date(items[0].parsed.x);
-        return dt.toLocaleDateString([], { weekday: 'short', day: '2-digit', month: '2-digit' }) + ' ' + dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        return `${formatDatePrefix(dt, true)} ${formatTime24h(dt, true)}`;
       }
     }
   });

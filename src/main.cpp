@@ -2138,7 +2138,7 @@ void checkTelegramUpdates() {
                                 "• /status - Technische Zahlen & Messwerte\n"
                                 "• /weather - Lokales Wetter & Solarstrahlung 🌤️\n"
                                 "• /mood - Wie ich mich heute fühle (Tagebuch) 💬\n"
-                                "• /speed - Live Internet-Speedtest vom ESP32 🚀\n"
+                                "• /speed - 5G Ookla-Speedtest (TRB500 Gateway) 🚀\n"
                                 "• /ping - Verbindungsstatus prüfen 🏓\n\n"
                                 "🌐 Live-Dashboard: https://randelab.github.io/RandeSolar/",
                                 fromChatId.c_str()
