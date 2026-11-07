@@ -304,15 +304,12 @@ void drainOfflineRecordsToCloud() {
     }
 }
 
-// Internet Speed & Network Diagnostics Tracking
+// Internet Latency & Diagnostics Tracking
 static uint32_t g_netPingMs = 0;      // TCP handshake to 1.1.1.1:53
 static uint32_t g_gwPingMs = 0;       // TCP handshake to local router/gateway
-static uint32_t g_dnsMs = 0;          // DNS lookup time for speed.cloudflare.com
+static uint32_t g_dnsMs = 0;          // DNS lookup time for Cloudflare
 static uint32_t g_ttfbMs = 0;         // HTTP Time-To-First-Byte
-static float g_netSpeedMbps = 0.0f;   // Download speed in Mbit/s
-static float g_netUpMbps = 0.0f;      // Upload speed in Mbit/s
-static uint32_t g_lastSpeedTestMs = 0;
-void measureInternetSpeed(bool measureBandwidth = false);
+void measureLatency();
 
 // Teltonika TRB500 5G Gateway Telemetry (192.168.2.1 ubus JSON-RPC)
 static bool     g_cellHasData = false;
@@ -779,14 +776,6 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
           <div style="color:var(--muted); font-size:0.72rem;">🏢 5G BAND & OPERATOR</div>
           <div style="font-size:1.1rem; font-weight:bold; color:var(--green);"><span id="cellOperator">--</span> <small style="font-size:0.75rem; color:var(--muted);">(<span id="cellMode">--</span>)</small></div>
           <div style="font-size:0.72rem; color:var(--muted); margin-top:2px;"><span id="cellBand">--</span> • Cell <span id="cellId">--</span></div>
-        </div>
-        <div style="padding:8px; border:1px solid var(--border); border-radius:4px;">
-          <div style="color:var(--muted); font-size:0.72rem;">⬇️ ESP32 WLAN DURCHSATZ</div>
-          <div style="font-size:1.35rem; font-weight:bold; color:var(--cyan);"><span id="netDown">--</span> <small style="font-size:0.75rem;">Mbit/s</small></div>
-        </div>
-        <div style="padding:8px; border:1px solid var(--border); border-radius:4px;">
-          <div style="color:var(--muted); font-size:0.72rem;">⬆️ ESP32 WLAN UPLOAD</div>
-          <div style="font-size:1.35rem; font-weight:bold; color:var(--pink);"><span id="netUp">--</span> <small style="font-size:0.75rem;">Mbit/s</small></div>
         </div>
         <div style="padding:8px; border:1px solid var(--border); border-radius:4px;">
           <div style="color:var(--muted); font-size:0.72rem;">🏓 PING (INTERNET / ROUTER)</div>
@@ -1258,8 +1247,8 @@ void handleLiveApi() {
         WiFi.channel(),
         chipTemp,
         (unsigned int)(ESP.getFreeHeap() / 1024),
-        g_netSpeedMbps,
-        g_netUpMbps,
+        g_cellDownMbps,
+        g_cellUpMbps,
         (unsigned int)g_netPingMs,
         (unsigned int)g_gwPingMs,
         (unsigned int)g_dnsMs,
@@ -1360,20 +1349,13 @@ void handleBufferCsv() {
 
 void handleSpeedtestApi() {
     triggerRouterSpeedtest();
-    measureInternetSpeed(true);
+    measureLatency();
     fetchTeltonika5GMetrics(true);
     handleLiveApi();
 }
 
-void measureInternetSpeed(bool measureBandwidth) {
+void measureLatency() {
     if (WiFi.status() != WL_CONNECTED) return;
-
-    // Pause BLE scanner during network benchmark so Wi-Fi gets 100% of the shared 2.4 GHz antenna
-    bool bleWasScanning = false;
-    if (NimBLEDevice::isInitialized() && NimBLEDevice::getScan()->isScanning()) {
-        NimBLEDevice::getScan()->stop();
-        bleWasScanning = true;
-    }
 
     // 1. Local Router / Gateway Ping (TCP handshake to gateway port 80 or 53)
     {
@@ -1385,7 +1367,7 @@ void measureInternetSpeed(bool measureBandwidth) {
             gwClient.stop();
         } else {
             uint32_t elapsed = millis() - t0;
-            if (elapsed < 450) g_gwPingMs = elapsed; // Instant TCP RST from gateway still proves RTT!
+            if (elapsed < 450) g_gwPingMs = elapsed;
         }
     }
 
@@ -1400,123 +1382,13 @@ void measureInternetSpeed(bool measureBandwidth) {
         }
     }
 
-    // 3. Full Bandwidth & Protocol Timing Benchmark (Download + Upload + DNS + TTFB)
-    if (measureBandwidth) {
+    // 3. DNS Timing
+    {
         IPAddress cfIp;
         uint32_t dnsStart = millis();
-        if (WiFi.hostByName("speed.cloudflare.com", cfIp)) {
+        if (WiFi.hostByName("one.one.one.one", cfIp)) {
             g_dnsMs = millis() - dnsStart;
         }
-
-        const size_t BUF_SZ = 8192;
-        uint8_t* buf = (uint8_t*)malloc(BUF_SZ);
-        if (buf) {
-            // 3a. 4-Stream Parallel TCP Download Test (bypasses ESP32 single-socket 5.7KB TCP_WND BDP cap)
-            if (cfIp != IPAddress(0, 0, 0, 0)) {
-                const int NUM_STREAMS = 4;
-                const size_t TARGET_TOTAL = 524288; // 512 KB across 4 parallel sockets
-                WiFiClient dl[NUM_STREAMS];
-                int activeStreams = 0;
-
-                uint32_t getStart = millis();
-                for (int s = 0; s < NUM_STREAMS; s++) {
-                    dl[s].setNoDelay(true);
-                    dl[s].setTimeout(4000);
-                    if (dl[s].connect(cfIp, 80)) {
-                        dl[s].print(
-                            "GET /__down?bytes=163840 HTTP/1.1\r\n"
-                            "Host: speed.cloudflare.com\r\n"
-                            "Connection: close\r\n\r\n"
-                        );
-                        activeStreams++;
-                    }
-                }
-
-                if (activeStreams > 0) {
-                    // Wait for first response byte (TTFB)
-                    uint32_t waitStart = millis();
-                    bool anyAvail = false;
-                    while (!anyAvail && (millis() - waitStart < 2500)) {
-                        for (int s = 0; s < NUM_STREAMS; s++) {
-                            if (dl[s].available()) { anyAvail = true; break; }
-                        }
-                        if (!anyAvail) yield();
-                    }
-                    g_ttfbMs = millis() - getStart;
-
-                    uint32_t streamStartUs = micros();
-                    size_t totalRead = 0;
-                    uint32_t loopGuardMs = millis();
-
-                    while (totalRead < TARGET_TOTAL && (millis() - loopGuardMs < 4500)) {
-                        bool anyConnected = false;
-                        for (int s = 0; s < NUM_STREAMS; s++) {
-                            if (dl[s].connected() || dl[s].available()) {
-                                anyConnected = true;
-                                int r = dl[s].read(buf, BUF_SZ);
-                                if (r > 0) {
-                                    totalRead += r;
-                                }
-                            }
-                        }
-                        if (!anyConnected) break;
-                        yield();
-                    }
-
-                    uint32_t streamElapsedUs = micros() - streamStartUs;
-                    if (streamElapsedUs > 1000 && totalRead > 0) {
-                        // (bytes * 8 bits) / microseconds = Mbit/s
-                        g_netSpeedMbps = (totalRead * 8.0f) / (float)streamElapsedUs;
-                    }
-                    for (int s = 0; s < NUM_STREAMS; s++) {
-                        dl[s].stop();
-                    }
-                }
-            }
-
-            // 3b. Upload Throughput Test (64 KB POST to speed.cloudflare.com/__up)
-            if (cfIp != IPAddress(0, 0, 0, 0)) {
-                WiFiClient upClient;
-                upClient.setNoDelay(true);
-                upClient.setTimeout(4000);
-                if (upClient.connect(cfIp, 80)) {
-                    memset(buf, 'R', BUF_SZ);
-                    upClient.print(
-                        "POST /__up HTTP/1.1\r\n"
-                        "Host: speed.cloudflare.com\r\n"
-                        "Content-Length: 65536\r\n"
-                        "Connection: close\r\n\r\n"
-                    );
-                    uint32_t upStartUs = micros();
-                    size_t totalSent = 0;
-                    for (int chunk = 0; chunk < 8; chunk++) {
-                        size_t w = upClient.write(buf, BUF_SZ);
-                        if (w == 0) break;
-                        totalSent += w;
-                    }
-                    uint32_t ackWait = millis();
-                    while (upClient.connected() && !upClient.available() && (millis() - ackWait < 3000)) {
-                        yield();
-                    }
-                    uint32_t totalUpUs = micros() - upStartUs;
-                    uint32_t rttUs = g_netPingMs * 1000;
-                    uint32_t xferUpUs = (totalUpUs > rttUs + 2000) ? (totalUpUs - rttUs) : totalUpUs;
-                    if (xferUpUs > 1000 && totalSent > 0) {
-                        g_netUpMbps = (totalSent * 8.0f) / (float)xferUpUs;
-                    }
-                    upClient.stop();
-                }
-            }
-
-            free(buf);
-            g_lastSpeedTestMs = millis();
-            Serial.printf("[NetSpeed 🚀] Down: %.2f Mbit/s | Up: %.2f Mbit/s | Ping: %u ms (GW: %u ms) | DNS: %u ms | TTFB: %u ms\n",
-                g_netSpeedMbps, g_netUpMbps, (unsigned int)g_netPingMs, (unsigned int)g_gwPingMs, (unsigned int)g_dnsMs, (unsigned int)g_ttfbMs);
-        }
-    }
-
-    if (bleWasScanning) {
-        NimBLEDevice::getScan()->start(0, false);
     }
 }
 
@@ -1876,8 +1748,8 @@ void logToSupabase(const SolarData& d) {
                 d.charger_error,
                 d.rssi,
                 WiFi.RSSI(),
-                g_netSpeedMbps,
-                g_netUpMbps,
+                g_cellDownMbps,
+                g_cellUpMbps,
                 (unsigned int)g_netPingMs,
                 (unsigned int)g_gwPingMs,
                 temperatureRead(),
@@ -1898,15 +1770,15 @@ void logToSupabase(const SolarData& d) {
                 d.solar_power,
                 d.battery_voltage,
                 d.battery_current,
-                (unsigned long)d.yield_today_wh,
+                (unsigned int)d.yield_today_wh,
                 d.external_load,
                 d.charge_state,
                 getChargeStateName(d.charge_state),
                 d.charger_error,
                 d.rssi,
                 WiFi.RSSI(),
-                g_netSpeedMbps,
-                g_netUpMbps,
+                g_cellDownMbps,
+                g_cellUpMbps,
                 (unsigned int)g_netPingMs,
                 (unsigned int)g_gwPingMs,
                 temperatureRead()
@@ -2134,10 +2006,11 @@ void checkTelegramUpdates() {
                                 "📊 *Tagesertrag:* %.2f kWh\n"
                                 "🏷️ *Zustand:* %s (%s)\n"
                                 "━━━━━━━━━━━━━━━━━━━━\n"
-                                "🚀 *Internet:* ⬇️ %.2f Mbit/s | ⬆️ %.2f Mbit/s\n"
-                                "🏓 *Latenz:* %u ms (Router: %u ms | DNS: %u ms)\n"
-                                "📶 *Funk:* WiFi %d dBm (%d%%, Ch %d) | BLE %d dBm\n"
-                                "🌡️ *ESP32-S3:* %.1f °C (%u KB RAM frei)\n"
+                                "🌐 *5G-Speed:* ⬇️ %.2f Mbit/s | ⬆️ %.2f Mbit/s\n"
+                                "📡 *Mobilfunk:* %d dBm (SINR: %d dB • %s)\n"
+                                "🏓 *Latenz:* %u ms (Router: %u ms)\n"
+                                "📶 *WLAN:* %d dBm (%d%%, Ch %d)\n"
+                                "🌡️ *ESP32:* %.1f °C (%u KB frei)\n"
                                 "⏱️ *Letzter Empfang:* vor %lu Sek.\n"
                                 "━━━━━━━━━━━━━━━━━━━━\n"
                                 "📍 _ESP32-S3 Standalone Station_",
@@ -2152,15 +2025,16 @@ void checkTelegramUpdates() {
                                 d.yield_today_wh / 1000.0f,
                                 getChargeStateName(d.charge_state),
                                 getChargeStateGerman(d.charge_state),
-                                g_netSpeedMbps,
-                                g_netUpMbps,
+                                g_cellDownMbps,
+                                g_cellUpMbps,
+                                g_cellRsrp,
+                                g_cellSinr,
+                                g_cellBand.c_str(),
                                 (unsigned int)g_netPingMs,
                                 (unsigned int)g_gwPingMs,
-                                (unsigned int)g_dnsMs,
                                 wifiRssi,
                                 wifiQual,
                                 WiFi.channel(),
-                                d.rssi,
                                 chipTemp,
                                 (unsigned int)(ESP.getFreeHeap() / 1024),
                                 ageSec
@@ -2168,52 +2042,50 @@ void checkTelegramUpdates() {
                             sendTelegramMessage(msg, fromChatId.c_str());
                         } else if (cmd.startsWith("/speed")) {
                             triggerRouterSpeedtest();
-                            measureInternetSpeed(true);
+                            measureLatency();
                             fetchTeltonika5GMetrics(true);
                             int wifiRssi = WiFi.RSSI();
                             int wifiQual = constrain(2 * (wifiRssi + 100), 0, 100);
-                            char spMsg[820];
+                            char spMsg[750];
                             if (g_cellHasData) {
                                 snprintf(spMsg, sizeof(spMsg),
                                     "🚀 *RandeLab 5G Speedtest (TRB500 Ookla)* 🌐\n"
                                     "━━━━━━━━━━━━━━━━━━━━\n"
-                                    "⬇️ *5G Download:* %.2f Mbit/s (Router WAN)\n"
+                                    "⬇️ *5G Download:* %.2f Mbit/s (TRB500 WAN)\n"
                                     "⬆️ *5G Upload:* %.2f Mbit/s\n"
                                     "🎚️ *Signal (RSRP):* %d dBm (SINR: %d dB)\n"
                                     "📶 *Bänder:* %s (%s)\n"
                                     "🏢 *Provider:* %s • Cell %s\n"
                                     "🌡️ *Router-Temp:* %.1f °C\n"
                                     "━━━━━━━━━━━━━━━━━━━━\n"
-                                    "💻 *ESP32-S3 Wi-Fi Hop:*\n"
-                                    "⬇️ *WLAN Stream:* %.2f Mbit/s (SoC Benchmark)\n"
-                                    "⬆️ *WLAN Upload:* %.2f Mbit/s\n"
                                     "🏓 *Latenz:* %u ms (1.1.1.1) / %u ms (Router)\n"
-                                    "📶 *WLAN:* %d dBm (%d%% • Ch %d)",
+                                    "📶 *WLAN:* %d dBm (%d%% • Ch %d)\n"
+                                    "🌡️ *ESP32 Chip:* %.1f °C (%u KB frei)",
                                     g_cellDownMbps,
                                     g_cellUpMbps,
                                     g_cellRsrp, g_cellSinr,
                                     g_cellBand.c_str(), g_cellMode.c_str(),
                                     g_cellOperator.c_str(), g_cellId.c_str(),
                                     g_cellTemp,
-                                    g_netSpeedMbps,
-                                    g_netUpMbps,
                                     (unsigned int)g_netPingMs, (unsigned int)g_gwPingMs,
-                                    wifiRssi, wifiQual, WiFi.channel()
+                                    wifiRssi, wifiQual, WiFi.channel(),
+                                    temperatureRead(),
+                                    (unsigned int)(ESP.getFreeHeap() / 1024)
                                 );
                             } else {
                                 snprintf(spMsg, sizeof(spMsg),
-                                    "🚀 *RandeLab Internet & Netzwerk-Diagnose* 🌐\n"
+                                    "🚀 *RandeLab 5G Speed & Netzwerk-Diagnose* 🌐\n"
                                     "━━━━━━━━━━━━━━━━━━━━\n"
-                                    "⬇️ *Download:* %.2f Mbit/s (256 KB Stream)\n"
-                                    "⬆️ *Upload:* %.2f Mbit/s (64 KB POST)\n"
+                                    "⬇️ *5G Download:* %.2f Mbit/s (TRB500 WAN)\n"
+                                    "⬆️ *5G Upload:* %.2f Mbit/s\n"
                                     "🏓 *Internet-Ping (1.1.1.1):* %u ms\n"
                                     "🏠 *Router-Ping (%s):* %u ms\n"
                                     "🔍 *DNS Lookup:* %u ms\n"
                                     "⚡ *HTTP TTFB:* %u ms\n"
                                     "📶 *WLAN:* %d dBm (%d%% Qualität • Kanal %d)\n"
                                     "🌡️ *ESP32-S3 Chip:* %.1f °C (%u KB RAM frei)",
-                                    g_netSpeedMbps,
-                                    g_netUpMbps,
+                                    g_cellDownMbps,
+                                    g_cellUpMbps,
                                     (unsigned int)g_netPingMs,
                                     WiFi.gatewayIP().toString().c_str(),
                                     (unsigned int)g_gwPingMs,
@@ -2345,8 +2217,8 @@ void setup() {
         // Initial Teltonika 5G Gateway fetch
         fetchTeltonika5GMetrics(true);
 
-        // Initial Internet Speed & Ping measurement (before BLE starts)
-        measureInternetSpeed(true);
+        // Initial Ping & Latency measurement
+        measureLatency();
 
         // Initial Microclimate fetch from Open-Meteo
         fetchMeteoSwissWeather(true);
@@ -2370,23 +2242,26 @@ void setup() {
 
     // Send Telegram startup message ONLY after BLE + Wi-Fi + WebServer are all running cleanly
     if (WiFi.status() == WL_CONNECTED) {
-        char bootMsg[360];
+        char bootMsg[420];
         snprintf(bootMsg, sizeof(bootMsg),
             "🚀 *RandeSolar ESP32-S3 online (OTA)!* 🔌\n"
             "Verbunden mit Wi-Fi *%s* (IP: `%s`).\n"
             "🌡️ Chip: *%.1f °C* (%u KB RAM frei)\n"
-            "🌐 Speed: ⬇️ *%.2f Mbit/s* | ⬆️ *%.2f Mbit/s*\n"
-            "🏓 Ping: *%u ms* (Router: %u ms | DNS: %u ms)\n"
+            "🌐 5G Speed: ⬇️ *%.2f Mbit/s* | ⬆️ *%.2f Mbit/s*\n"
+            "📡 5G Signal: *%d dBm* (SINR: *%d dB* • %s)\n"
+            "🏓 Latenz: *%u ms* (Router: *%u ms*)\n"
             "Sende /status oder /speed für Live-Telemetrie.",
             WIFI_SSID,
             WiFi.localIP().toString().c_str(),
             temperatureRead(),
             (unsigned int)(ESP.getFreeHeap() / 1024),
-            g_netSpeedMbps,
-            g_netUpMbps,
+            g_cellDownMbps,
+            g_cellUpMbps,
+            g_cellRsrp,
+            g_cellSinr,
+            g_cellBand.c_str(),
             (unsigned int)g_netPingMs,
-            (unsigned int)g_gwPingMs,
-            (unsigned int)g_dnsMs
+            (unsigned int)g_gwPingMs
         );
         sendTelegramMessage(bootMsg);
     }
@@ -2447,8 +2322,8 @@ void loop() {
                 WiFi.channel(),
                 temperatureRead(),
                 (unsigned int)(ESP.getFreeHeap() / 1024),
-                g_netSpeedMbps,
-                g_netUpMbps,
+                g_cellDownMbps,
+                g_cellUpMbps,
                 (unsigned int)g_netPingMs,
                 (unsigned int)g_gwPingMs,
                 (unsigned int)g_dnsMs,
@@ -2472,18 +2347,11 @@ void loop() {
         fetchTeltonika5GMetrics(false);
     }
 
-    // Refresh Internet Speed (Mbps) every 5 minutes, and Ping (ms) every 20s
-    static uint32_t lastSpeedTest = 0;
-    bool runFullSpeedTest = (now - lastSpeedTest >= 300000);
-    if (runFullSpeedTest) {
-        lastSpeedTest = now;
-    }
-
     // Log to Supabase Cloud every 2 minutes (120 seconds) - keeps database calm and clean
     static uint32_t lastSupabaseLog = 0;
     if (now - lastSupabaseLog >= 120000) {
         lastSupabaseLog = now;
-        measureInternetSpeed(runFullSpeedTest);
+        measureLatency();
         fetchTeltonika5GMetrics(false);
         fetchMeteoSwissWeather(false);
 
