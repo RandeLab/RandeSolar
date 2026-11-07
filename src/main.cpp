@@ -314,6 +314,22 @@ static float g_netUpMbps = 0.0f;      // Upload speed in Mbit/s
 static uint32_t g_lastSpeedTestMs = 0;
 void measureInternetSpeed(bool measureBandwidth = false);
 
+// Teltonika TRB500 5G Gateway Telemetry (192.168.2.1 ubus JSON-RPC)
+static bool     g_cellHasData = false;
+static int      g_cellRsrp = 0;         // Reference Signal Received Power in dBm (e.g. -94 dBm)
+static int      g_cellSinr = 0;         // Signal-to-Interference-plus-Noise Ratio in dB (e.g. -2 dB)
+static int      g_cellRsrq = 0;         // Reference Signal Received Quality in dB (e.g. -14 dB)
+static int      g_cellQual = 0;         // Signal Quality in % (e.g. 37%)
+static float    g_cellTemp = 0.0f;      // Modem temperature in °C (e.g. 25.0 °C)
+static String   g_cellMode = "";        // e.g. "5G-NSA"
+static String   g_cellBand = "";        // e.g. "LTE B3 + 5G N1"
+static String   g_cellOperator = "";    // e.g. "GoMo"
+static String   g_cellId = "";          // Cell ID e.g. "29858817"
+static uint32_t g_lastCellFetchMs = 0;
+static String   g_ubusToken = "";
+static uint32_t g_ubusTokenExpires = 0;
+void fetchTeltonika5GMetrics(bool force = false);
+
 // Local Microclimate Tracking (Open-Meteo / MeteoSwiss ICON-CH Underes Ätzisloo 189)
 static float g_wxTemp = 0.0f;
 static float g_wxSolarWm2 = 0.0f;
@@ -736,16 +752,26 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
 
     <div class="panel" style="border-top-color: var(--cyan)">
       <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--border); padding-bottom:6px; margin-bottom:10px;">
-        <h2 id="lblPanelNet" style="border:none; margin:0; padding:0;">🚀 Internet-Speed & ESP32-S3 Netzwerk-Diagnose</h2>
-        <button id="btnSpeedtest" onclick="runSpeedtest()" style="padding:4px 10px; background:var(--pink); color:var(--bg); border:none; border-radius:4px; font-weight:bold; cursor:pointer; font-size:0.78rem;">🔄 Live Speedtest</button>
+        <h2 id="lblPanelNet" style="border:none; margin:0; padding:0;">🚀 5G-Mobilfunk & ESP32-S3 Netzwerk-Diagnose</h2>
+        <button id="btnSpeedtest" onclick="runSpeedtest()" style="padding:4px 10px; background:var(--pink); color:var(--bg); border:none; border-radius:4px; font-weight:bold; cursor:pointer; font-size:0.78rem;">🔄 Live Sync</button>
       </div>
       <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap:10px; font-size:0.82rem;">
+        <div style="padding:8px; border:1px solid var(--border); border-radius:4px; background:rgba(0,0,0,0.15);">
+          <div style="color:var(--muted); font-size:0.72rem;">📡 5G GATEWAY (TRB500)</div>
+          <div style="font-size:1.25rem; font-weight:bold; color:var(--cyan);"><span id="cellRsrp">--</span> <small style="font-size:0.75rem;">dBm</small></div>
+          <div style="font-size:0.72rem; color:var(--muted); margin-top:2px;">SINR <span id="cellSinr">--</span> dB • Güte <span id="cellQual">--</span>%</div>
+        </div>
+        <div style="padding:8px; border:1px solid var(--border); border-radius:4px; background:rgba(0,0,0,0.15);">
+          <div style="color:var(--muted); font-size:0.72rem;">🏢 5G BAND & OPERATOR</div>
+          <div style="font-size:1.1rem; font-weight:bold; color:var(--green);"><span id="cellOperator">--</span> <small style="font-size:0.75rem; color:var(--muted);">(<span id="cellMode">--</span>)</small></div>
+          <div style="font-size:0.72rem; color:var(--muted); margin-top:2px;"><span id="cellBand">--</span> • Cell <span id="cellId">--</span></div>
+        </div>
         <div style="padding:8px; border:1px solid var(--border); border-radius:4px;">
-          <div style="color:var(--muted); font-size:0.72rem;">⬇️ DOWNLOAD</div>
+          <div style="color:var(--muted); font-size:0.72rem;">⬇️ ESP32 WLAN DURCHSATZ</div>
           <div style="font-size:1.35rem; font-weight:bold; color:var(--cyan);"><span id="netDown">--</span> <small style="font-size:0.75rem;">Mbit/s</small></div>
         </div>
         <div style="padding:8px; border:1px solid var(--border); border-radius:4px;">
-          <div style="color:var(--muted); font-size:0.72rem;">⬆️ UPLOAD</div>
+          <div style="color:var(--muted); font-size:0.72rem;">⬆️ ESP32 WLAN UPLOAD</div>
           <div style="font-size:1.35rem; font-weight:bold; color:var(--pink);"><span id="netUp">--</span> <small style="font-size:0.75rem;">Mbit/s</small></div>
         </div>
         <div style="padding:8px; border:1px solid var(--border); border-radius:4px;">
@@ -761,8 +787,8 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
           <div style="font-size:1.15rem; font-weight:bold;"><span id="wifiRssi">--</span> dBm <small style="color:var(--muted); font-size:0.75rem;">(<span id="wifiQual">--</span>% • Ch <span id="wifiCh">--</span>)</small></div>
         </div>
         <div style="padding:8px; border:1px solid var(--border); border-radius:4px;">
-          <div style="color:var(--muted); font-size:0.72rem;">🌡️ ESP32-S3 CHIP & RAM</div>
-          <div style="font-size:1.15rem; font-weight:bold;"><span id="chipTemp">--</span> °C <small style="color:var(--muted); font-size:0.75rem;">(<span id="freeHeap">--</span> KB frei)</small></div>
+          <div style="color:var(--muted); font-size:0.72rem;">🌡️ ROUTER & ESP32 CHIP</div>
+          <div style="font-size:1.15rem; font-weight:bold;"><span id="chipTemp">--</span> °C <small style="color:var(--muted); font-size:0.75rem;">(Modem: <span id="cellTemp">--</span>°C)</small></div>
         </div>
       </div>
       <div class="sub" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:14px;">
@@ -895,6 +921,24 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
         if (d.gw_ping_ms !== undefined) document.getElementById('gwPing').textContent = d.gw_ping_ms;
         if (d.dns_ms !== undefined) document.getElementById('dnsMs').textContent = d.dns_ms;
         if (d.ttfb_ms !== undefined) document.getElementById('ttfbMs').textContent = d.ttfb_ms;
+        if (d.cell_has_data) {
+          const elRsrp = document.getElementById('cellRsrp');
+          if (elRsrp) elRsrp.textContent = d.cell_rsrp;
+          const elSinr = document.getElementById('cellSinr');
+          if (elSinr) elSinr.textContent = d.cell_sinr;
+          const elBand = document.getElementById('cellBand');
+          if (elBand) elBand.textContent = d.cell_band;
+          const elQual = document.getElementById('cellQual');
+          if (elQual) elQual.textContent = d.cell_qual;
+          const elOp = document.getElementById('cellOperator');
+          if (elOp) elOp.textContent = d.cell_operator;
+          const elMode = document.getElementById('cellMode');
+          if (elMode) elMode.textContent = d.cell_mode;
+          const elId = document.getElementById('cellId');
+          if (elId) elId.textContent = d.cell_id;
+          const elTemp = document.getElementById('cellTemp');
+          if (elTemp) elTemp.textContent = d.cell_temp.toFixed(1);
+        }
         document.getElementById('beaconAge').textContent = d.age_sec + (curLang === 'de' ? ' Sek.' : 's ago');
       } catch (e) {
         console.error(e);
@@ -1166,13 +1210,15 @@ void handleLiveApi() {
     int wifiRssi = WiFi.RSSI();
     int wifiQual = constrain(2 * (wifiRssi + 100), 0, 100);
 
-    char json[960];
+    char json[1200];
     snprintf(json, sizeof(json),
         "{\"has_data\":%s,\"solar_power\":%u,\"battery_voltage\":%.2f,\"battery_current\":%.2f,\"panel_voltage\":%.2f,"
         "\"yield_today_wh\":%lu,\"external_load\":%.2f,\"charge_state\":%u,\"state_str\":\"%s\","
         "\"charger_error\":%u,\"ble_rssi\":%d,\"wifi_rssi\":%d,\"wifi_quality_pct\":%d,\"wifi_channel\":%d,"
         "\"chip_temp\":%.1f,\"free_heap_kb\":%u,\"net_mbps\":%.2f,\"net_up_mbps\":%.2f,"
         "\"net_ping_ms\":%u,\"gw_ping_ms\":%u,\"dns_ms\":%u,\"ttfb_ms\":%u,"
+        "\"cell_has_data\":%s,\"cell_rsrp\":%d,\"cell_sinr\":%d,\"cell_rsrq\":%d,\"cell_qual\":%d,"
+        "\"cell_mode\":\"%s\",\"cell_band\":\"%s\",\"cell_operator\":\"%s\",\"cell_id\":\"%s\",\"cell_temp\":%.1f,"
         "\"wx_temp\":%.1f,\"wx_solar_wm2\":%.1f,\"wx_cloud_pct\":%d,\"wx_rain_mm\":%.2f,\"wx_wind_kmh\":%.1f,\"wx_humidity\":%d,\"wx_pressure\":%.1f,"
         "\"buffered_records\":%u,\"ip\":\"%s\",\"gateway_ip\":\"%s\",\"age_sec\":%lu}",
         d.has_data ? "true" : "false",
@@ -1197,6 +1243,16 @@ void handleLiveApi() {
         (unsigned int)g_gwPingMs,
         (unsigned int)g_dnsMs,
         (unsigned int)g_ttfbMs,
+        g_cellHasData ? "true" : "false",
+        g_cellRsrp,
+        g_cellSinr,
+        g_cellRsrq,
+        g_cellQual,
+        g_cellMode.c_str(),
+        g_cellBand.c_str(),
+        g_cellOperator.c_str(),
+        g_cellId.c_str(),
+        g_cellTemp,
         g_wxTemp,
         g_wxSolarWm2,
         g_wxCloudPct,
@@ -1280,6 +1336,7 @@ void handleBufferCsv() {
 
 void handleSpeedtestApi() {
     measureInternetSpeed(true);
+    fetchTeltonika5GMetrics(true);
     handleLiveApi();
 }
 
@@ -1500,6 +1557,108 @@ void fetchMeteoSwissWeather(bool force) {
             Serial.printf("[Weather ⚠️] Fetch failed (HTTP %d): %s\n", code, wxHttp.errorToString(code).c_str());
         }
         wxHttp.end();
+    }
+}
+
+// ==================== TELTONIKA TRB500 5G GATEWAY CLIENT (ubus JSON-RPC) ====================
+void fetchTeltonika5GMetrics(bool force) {
+    if (WiFi.status() != WL_CONNECTED) return;
+    uint32_t now = millis();
+    if (!force && g_cellHasData && (now - g_lastCellFetchMs < 60000)) {
+        return; // 60s cache
+    }
+
+    WiFiClient client;
+    client.setTimeout(3500);
+    HTTPClient http;
+
+    // 1. Authenticate with ubus session if token is empty or expired (tokens last 300s)
+    if (g_ubusToken.length() == 0 || now > g_ubusTokenExpires) {
+        if (http.begin(client, "http://192.168.2.1/ubus")) {
+            http.addHeader("Content-Type", "application/json");
+            const char* loginJson = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"call\",\"params\":[\"00000000000000000000000000000000\",\"session\",\"login\",{\"username\":\"admin\",\"password\":\"Transist0r!\"}]}";
+            int code = http.POST(loginJson);
+            if (code == HTTP_CODE_OK) {
+                String resp = http.getString();
+                int idx = resp.indexOf("\"ubus_rpc_session\":\"");
+                if (idx > 0) {
+                    idx += 20;
+                    int endIdx = resp.indexOf('\"', idx);
+                    if (endIdx > idx) {
+                        g_ubusToken = resp.substring(idx, endIdx);
+                        g_ubusTokenExpires = now + 240000; // Cache for 4 minutes
+                    }
+                }
+            }
+            http.end();
+        }
+    }
+
+    if (g_ubusToken.length() == 0) return;
+
+    // 2. Query gsm.modem0 -> info
+    if (http.begin(client, "http://192.168.2.1/ubus")) {
+        http.addHeader("Content-Type", "application/json");
+        String req = "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"call\",\"params\":[\"" + g_ubusToken + "\",\"gsm.modem0\",\"info\",{}]}";
+        int code = http.POST(req);
+        if (code == HTTP_CODE_OK) {
+            String payload = http.getString();
+
+            if (payload.indexOf("Access denied") >= 0 || payload.indexOf("Permission denied") >= 0) {
+                g_ubusToken = ""; // Clear expired token to re-login next cycle
+                http.end();
+                return;
+            }
+
+            auto getJsonStr = [](const String& src, const char* key) -> String {
+                int k = src.indexOf(key);
+                if (k < 0) return "";
+                int c = src.indexOf(':', k);
+                if (c < 0) return "";
+                int end = src.indexOf(',', c);
+                int endB = src.indexOf('}', c);
+                if (end < 0 || (endB > 0 && endB < end)) end = endB;
+                if (end < 0) return "";
+                String v = src.substring(c + 1, end);
+                v.trim();
+                v.replace("\"", "");
+                return v;
+            };
+
+            String rsrp = getJsonStr(payload, "\"rsrp_value\"");
+            String sinr = getJsonStr(payload, "\"sinr_value\"");
+            String rsrq = getJsonStr(payload, "\"rsrq_value\"");
+            String qual = getJsonStr(payload, "\"signal_quality_value\"");
+            String mode = getJsonStr(payload, "\"net_mode_str\"");
+            String band = getJsonStr(payload, "\"band_str\"");
+            String prov = getJsonStr(payload, "\"provider_name\"");
+            String ci   = getJsonStr(payload, "\"reg_ci\"");
+            String temp = getJsonStr(payload, "\"temperature\"");
+
+            if (rsrp.length() > 0) g_cellRsrp = rsrp.toInt();
+            if (sinr.length() > 0) g_cellSinr = sinr.toInt();
+            if (rsrq.length() > 0) g_cellRsrq = rsrq.toInt();
+            if (qual.length() > 0) g_cellQual = qual.toInt();
+            if (mode.length() > 0) g_cellMode = mode;
+            if (prov.length() > 0) g_cellOperator = prov;
+            if (ci.length() > 0)   g_cellId = ci;
+            if (temp.length() > 0) g_cellTemp = temp.toFloat() / 10.0f;
+
+            if (payload.indexOf("\"5G N1\"") > 0) {
+                g_cellBand = (band.length() > 0 ? band + " + 5G N1" : "5G N1");
+            } else if (band.length() > 0) {
+                g_cellBand = band;
+            }
+
+            g_cellHasData = true;
+            g_lastCellFetchMs = now;
+            Serial.printf("[TRB500 📡] 5G: %s %s (%s) | RSRP: %d dBm | SINR: %d dB | Qual: %d%% | Cell: %s | Temp: %.1f°C\n",
+                g_cellOperator.c_str(), g_cellMode.c_str(), g_cellBand.c_str(),
+                g_cellRsrp, g_cellSinr, g_cellQual, g_cellId.c_str(), g_cellTemp);
+        } else {
+            Serial.printf("[TRB500 ⚠️] Fetch failed (HTTP %d)\n", code);
+        }
+        http.end();
     }
 }
 
@@ -1922,33 +2081,72 @@ void checkTelegramUpdates() {
                             sendTelegramMessage(msg, fromChatId.c_str());
                         } else if (cmd.startsWith("/speed")) {
                             measureInternetSpeed(true);
+                            fetchTeltonika5GMetrics(true);
                             int wifiRssi = WiFi.RSSI();
                             int wifiQual = constrain(2 * (wifiRssi + 100), 0, 100);
-                            char spMsg[480];
-                            snprintf(spMsg, sizeof(spMsg),
-                                "🚀 *RandeLab Internet & Netzwerk-Diagnose* 🌐\n"
-                                "━━━━━━━━━━━━━━━━━━━━\n"
-                                "⬇️ *Download:* %.2f Mbit/s (256 KB Stream)\n"
-                                "⬆️ *Upload:* %.2f Mbit/s (64 KB POST)\n"
-                                "🏓 *Internet-Ping (1.1.1.1):* %u ms\n"
-                                "🏠 *Router-Ping (%s):* %u ms\n"
-                                "🔍 *DNS Lookup:* %u ms\n"
-                                "⚡ *HTTP TTFB:* %u ms\n"
-                                "📶 *WLAN:* %d dBm (%d%% Qualität • Kanal %d)\n"
-                                "🌡️ *ESP32-S3 Chip:* %.1f °C (%u KB RAM frei)",
-                                g_netSpeedMbps,
-                                g_netUpMbps,
-                                (unsigned int)g_netPingMs,
-                                WiFi.gatewayIP().toString().c_str(),
-                                (unsigned int)g_gwPingMs,
-                                (unsigned int)g_dnsMs,
-                                (unsigned int)g_ttfbMs,
-                                wifiRssi,
-                                wifiQual,
-                                WiFi.channel(),
-                                temperatureRead(),
-                                (unsigned int)(ESP.getFreeHeap() / 1024)
-                            );
+                            char spMsg[750];
+                            if (g_cellHasData) {
+                                snprintf(spMsg, sizeof(spMsg),
+                                    "🚀 *RandeLab 5G Mobilfunk & Netzwerk* 🌐\n"
+                                    "━━━━━━━━━━━━━━━━━━━━\n"
+                                    "📡 *5G Router:* Teltonika TRB500\n"
+                                    "🏢 *Provider:* %s (%s)\n"
+                                    "📶 *Band:* %s\n"
+                                    "🎚️ *Signal (RSRP):* %d dBm\n"
+                                    "⚡ *SINR:* %d dB (Signal/Rauschen)\n"
+                                    "📊 *Güte:* %d%% (RSRQ: %d dB)\n"
+                                    "🏰 *Funkzelle:* ID %s\n"
+                                    "🌡️ *Router-Temp:* %.1f °C\n"
+                                    "━━━━━━━━━━━━━━━━━━━━\n"
+                                    "💻 *ESP32-S3 Wi-Fi Hop:*\n"
+                                    "⬇️ *WLAN Stream:* %.2f Mbit/s\n"
+                                    "⬆️ *WLAN Upload:* %.2f Mbit/s\n"
+                                    "🏓 *Internet-Ping:* %u ms (1.1.1.1)\n"
+                                    "🏠 *Router-Ping:* %u ms (%s)\n"
+                                    "🔍 *DNS Lookup:* %u ms • TTFB: %u ms\n"
+                                    "📶 *WLAN:* %d dBm (%d%%, Ch %d)\n"
+                                    "🌡️ *ESP32 Chip:* %.1f °C",
+                                    g_cellOperator.c_str(), g_cellMode.c_str(),
+                                    g_cellBand.c_str(),
+                                    g_cellRsrp,
+                                    g_cellSinr,
+                                    g_cellQual, g_cellRsrq,
+                                    g_cellId.c_str(),
+                                    g_cellTemp,
+                                    g_netSpeedMbps,
+                                    g_netUpMbps,
+                                    (unsigned int)g_netPingMs,
+                                    (unsigned int)g_gwPingMs, WiFi.gatewayIP().toString().c_str(),
+                                    (unsigned int)g_dnsMs, (unsigned int)g_ttfbMs,
+                                    wifiRssi, wifiQual, WiFi.channel(),
+                                    temperatureRead()
+                                );
+                            } else {
+                                snprintf(spMsg, sizeof(spMsg),
+                                    "🚀 *RandeLab Internet & Netzwerk-Diagnose* 🌐\n"
+                                    "━━━━━━━━━━━━━━━━━━━━\n"
+                                    "⬇️ *Download:* %.2f Mbit/s (256 KB Stream)\n"
+                                    "⬆️ *Upload:* %.2f Mbit/s (64 KB POST)\n"
+                                    "🏓 *Internet-Ping (1.1.1.1):* %u ms\n"
+                                    "🏠 *Router-Ping (%s):* %u ms\n"
+                                    "🔍 *DNS Lookup:* %u ms\n"
+                                    "⚡ *HTTP TTFB:* %u ms\n"
+                                    "📶 *WLAN:* %d dBm (%d%% Qualität • Kanal %d)\n"
+                                    "🌡️ *ESP32-S3 Chip:* %.1f °C (%u KB RAM frei)",
+                                    g_netSpeedMbps,
+                                    g_netUpMbps,
+                                    (unsigned int)g_netPingMs,
+                                    WiFi.gatewayIP().toString().c_str(),
+                                    (unsigned int)g_gwPingMs,
+                                    (unsigned int)g_dnsMs,
+                                    (unsigned int)g_ttfbMs,
+                                    wifiRssi,
+                                    wifiQual,
+                                    WiFi.channel(),
+                                    temperatureRead(),
+                                    (unsigned int)(ESP.getFreeHeap() / 1024)
+                                );
+                            }
                             sendTelegramMessage(spMsg, fromChatId.c_str());
                         } else if (cmd.startsWith("/mood") || cmd.startsWith("/feel") || cmd.startsWith("/wiegehts") || cmd.startsWith("/story") || cmd.startsWith("/tagebuch")) {
                             SolarData d;
@@ -2065,6 +2263,9 @@ void setup() {
         configTime(3600, 3600, "pool.ntp.org", "time.google.com");
         Serial.println("[NTP] Time synchronization requested");
 
+        // Initial Teltonika 5G Gateway fetch
+        fetchTeltonika5GMetrics(true);
+
         // Initial Internet Speed & Ping measurement (before BLE starts)
         measureInternetSpeed(true);
 
@@ -2144,13 +2345,14 @@ void loop() {
         if (d.has_data && mqttClient.connected()) {
             int wifiRssi = WiFi.RSSI();
             int wifiQual = constrain(2 * (wifiRssi + 100), 0, 100);
-            char json[580];
+            char json[680];
             snprintf(json, sizeof(json),
                 "{\"solar_power\":%u,\"panel_voltage\":%.2f,\"battery_voltage\":%.2f,\"battery_current\":%.2f,"
                 "\"yield_today_wh\":%lu,\"external_load\":%.2f,\"charge_state\":%u,\"state_str\":\"%s\","
                 "\"charger_error\":%u,\"ble_rssi\":%d,\"wifi_rssi\":%d,\"wifi_quality_pct\":%d,\"wifi_channel\":%d,"
                 "\"chip_temp\":%.1f,\"free_heap_kb\":%u,\"net_mbps\":%.2f,\"net_up_mbps\":%.2f,"
-                "\"net_ping_ms\":%u,\"gw_ping_ms\":%u,\"dns_ms\":%u,\"ttfb_ms\":%u,\"age_sec\":0}",
+                "\"net_ping_ms\":%u,\"gw_ping_ms\":%u,\"dns_ms\":%u,\"ttfb_ms\":%u,"
+                "\"cell_rsrp\":%d,\"cell_sinr\":%d,\"cell_band\":\"%s\",\"age_sec\":0}",
                 d.solar_power,
                 d.panel_voltage,
                 d.battery_voltage,
@@ -2171,7 +2373,10 @@ void loop() {
                 (unsigned int)g_netPingMs,
                 (unsigned int)g_gwPingMs,
                 (unsigned int)g_dnsMs,
-                (unsigned int)g_ttfbMs
+                (unsigned int)g_ttfbMs,
+                g_cellRsrp,
+                g_cellSinr,
+                g_cellBand.c_str()
             );
             mqttClient.publish(MQTT_TOPIC, json);
             triggerTxFlash();
@@ -2191,6 +2396,7 @@ void loop() {
     if (now - lastSupabaseLog >= 120000) {
         lastSupabaseLog = now;
         measureInternetSpeed(runFullSpeedTest);
+        fetchTeltonika5GMetrics(false);
         fetchMeteoSwissWeather(false);
 
         SolarData d;

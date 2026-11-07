@@ -387,16 +387,34 @@
       </div>
     </section>
 
-    <!-- Internet Speed & ESP32-S3 Network Diagnostics Section -->
+    <!-- 5G Mobilfunk & ESP32-S3 Network Diagnostics Section -->
     <section class="panel" style="border-top-color:var(--accent-blue); margin-top:10px;">
-      <h2 id="lblNetDiagTitle">🚀 Internet-Speed & ESP32-S3 Netzwerk-Diagnose</h2>
+      <h2 id="lblNetDiagTitle">🚀 5G-Mobilfunk & ESP32-S3 Netzwerk-Diagnose</h2>
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:12px; margin-top:10px; font-family:var(--font-mono);">
+        <!-- 5G Router Metrics -->
         <div style="padding:10px 12px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">
-          <div style="font-size:0.72rem; color:var(--text-muted);">⬇️ DOWNLOAD (STREAM)</div>
-          <div style="font-size:1.45rem; font-weight:700; color:var(--accent-blue); margin-top:2px;"><span id="netDownMbps">--</span> <small style="font-size:0.8rem;">Mbit/s</small></div>
+          <div style="font-size:0.72rem; color:var(--text-muted);">📡 5G GATEWAY EMPFANG</div>
+          <div style="font-size:1.45rem; font-weight:700; color:var(--accent-blue); margin-top:2px;"><span id="cellRsrp">--</span> <small style="font-size:0.8rem;">dBm</small></div>
+          <div style="font-size:0.74rem; color:var(--text-muted); margin-top:2px;">SINR <span id="cellSinr">--</span> dB • Güte <span id="cellQual">--</span>%</div>
         </div>
         <div style="padding:10px 12px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">
-          <div style="font-size:0.72rem; color:var(--text-muted);">⬆️ UPLOAD (POST)</div>
+          <div style="font-size:0.72rem; color:var(--text-muted);">🏢 5G BAND & OPERATOR</div>
+          <div style="font-size:1.25rem; font-weight:700; color:var(--accent-green); margin-top:4px;"><span id="cellProvider">--</span> <small style="font-size:0.75rem; color:var(--text-muted);">(<span id="cellMode">--</span>)</small></div>
+          <div style="font-size:0.74rem; color:var(--text-muted); margin-top:2px;"><span id="cellBand">--</span> • Cell <span id="cellId">--</span></div>
+        </div>
+        <div style="padding:10px 12px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">
+          <div style="font-size:0.72rem; color:var(--text-muted);">🌡️ 5G ROUTER TEMPERATUR</div>
+          <div style="font-size:1.35rem; font-weight:700; color:var(--accent-yellow); margin-top:4px;"><span id="cellTemp">--</span> °C</div>
+          <div style="font-size:0.74rem; color:var(--text-muted); margin-top:2px;">Teltonika TRB500 (Snapdragon X55)</div>
+        </div>
+        <!-- ESP32 Wi-Fi & Internet Hop Metrics -->
+        <div style="padding:10px 12px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">
+          <div style="font-size:0.72rem; color:var(--text-muted);">⬇️ ESP32 WLAN DURCHSATZ</div>
+          <div style="font-size:1.45rem; font-weight:700; color:var(--accent-blue); margin-top:2px;"><span id="netDownMbps">--</span> <small style="font-size:0.8rem;">Mbit/s</small></div>
+          <div style="font-size:0.72rem; color:var(--text-muted); margin-top:2px;">ESP32-S3 Wi-Fi SoC Benchmark</div>
+        </div>
+        <div style="padding:10px 12px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">
+          <div style="font-size:0.72rem; color:var(--text-muted);">⬆️ ESP32 WLAN UPLOAD</div>
           <div style="font-size:1.45rem; font-weight:700; color:var(--accent-pink); margin-top:2px;"><span id="netUpMbps">--</span> <small style="font-size:0.8rem;">Mbit/s</small></div>
         </div>
         <div style="padding:10px 12px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">
@@ -438,6 +456,10 @@
         <div>
           <h3 style="color:var(--accent-yellow); margin-bottom:6px;">🎨 openBrushograph Ästhetik</h3>
           <p>Entwickelt im unverwechselbaren Stil der openBrushograph Studio Apps mit 8 umschaltbaren Farbschemata (Pinkograph, Randen, Kongreß Dresden, Deep Jungle, Coconut).</p>
+        </div>
+        <div>
+          <h3 style="color:var(--accent-green); margin-bottom:6px;">☀️ Energetica e.Classic M HC</h3>
+          <p>Österreichische 120-Halbzellen Mono-PERC Module (384.9 Wp Flash-Test). 2 Module parallel (1S2P, ~770 Wp) vor dem Gebäude, 6 weitere im Schuppen (~3.08 kWp Gesamtkapazität).</p>
         </div>
       </div>
     </section>
