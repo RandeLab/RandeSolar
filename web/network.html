@@ -3,430 +3,352 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RandeLab 5G Radio &amp; Network Studio • Merishausen / Randen</title>
+  <title>RandeLab 5G SIGINT // Old School CRT Geek Radio Scanner</title>
   <link rel="icon" href="./arai-icon.svg" type="image/svg+xml">
 
-  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <!-- Google Fonts: JetBrains Mono & Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
   <!-- MQTT.js CDN -->
   <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
+  
   <link rel="stylesheet" href="./style.css?v=2.1">
+  <link rel="stylesheet" href="./crt-scanner.css?v=1.0">
 </head>
-<body class="theme-pinkograph">
-  <div class="studio-wrapper">
+<body class="crt-green">
 
-    <!-- Header Container -->
-    <header class="header-container">
-      <div class="brand-left">
-        <a href="https://github.com/RandeLab/RandeSolar" target="_blank" title="RandeLab/RandeSolar on GitHub">
-          <img src="./arai-icon.svg" alt="Arai Logo" class="logo-img" id="dynamic-logo">
-        </a>
-        <div class="title-group">
-          <h1 id="main-title">RandeLab 5G Studio</h1>
-          <div class="badge-sub-row">
-            <span class="sub-chip">TELTONIKA TRB500</span>
-            <span class="sub-chip" style="color:var(--accent-blue);">Snapdragon X55</span>
-            <span class="sub-chip" id="deviceModel">5G-NSA &amp; RF LAB</span>
+  <!-- Outer CRT Glass Monitor Chassis -->
+  <div class="crt-monitor">
+    <!-- Scanline & Phosphor Overlay -->
+    <div class="crt-scanlines"></div>
+
+    <!-- Inner CRT Screen Tube -->
+    <div class="crt-screen crt-flicker-active">
+
+      <!-- ASCII Art Terminal Banner -->
+      <pre class="crt-ascii-banner crt-glow-text">
+██████╗  █████╗ ███╗   ██╗██████╗ ███████╗██╗      █████╗ ██████╗ 
+██╔══██╗██╔══██╗████╗  ██║██╔══██╗██╔════╝██║     ██╔══██╗██╔══██╗
+██████╔╝███████║██╔██╗ ██║██║  ██║█████╗  ██║     ███████║██████╔╝
+██╔══██╗██╔══██║██║╚██╗██║██║  ██║██╔══╝  ██║     ██╔══██║██╔══██╗
+██║  ██║██║  ██║██║ ╚████║██████╔╝███████╗███████╗██║  ██║██████╔╝
+╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═════╝ ╚══════╝╚══════╝╚═╝  ╚═╝╚═════╝ 
+[ SIGINT OBSERVATORY // 857m MERISHAUSEN // CH-DE BORDER CORRIDOR // QUECTEL X55 ]</pre>
+
+      <!-- Bezel Top Bar & Terminal Controls -->
+      <div class="crt-bezel-bar" style="margin-top:10px;">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <div class="crt-badge-status crt-glow-text">
+            <span class="crt-blink-dot"></span>
+            <span id="statusText">SIGINT SYNC</span>
+          </div>
+          <span class="crt-dim-text" style="font-size:0.75rem;">FREQ: 700MHz - 3.5GHz • 47.7701°N 8.5738°E</span>
+        </div>
+
+        <!-- CRT Control Deck -->
+        <div class="crt-controls-group">
+          <!-- Main Navigation -->
+          <a href="./index.html" class="crt-btn" title="Zum Solar Power Dashboard wechseln">
+            <span>☀️ [ SOLAR STUDIO ]</span>
+          </a>
+          <a href="./network.html" class="crt-btn active" title="Aktive 5G Scanner-Ansicht">
+            <span>🌐 [ 5G SCANNER ]</span>
+          </a>
+
+          <!-- Phosphor Palette Buttons -->
+          <button class="crt-btn btn-phosphor active" data-color="green" onclick="setPhosphorMode('green')" title="P1 Green Phosphor">P1-GRN</button>
+          <button class="crt-btn btn-phosphor" data-color="amber" onclick="setPhosphorMode('amber')" title="P3 Amber Phosphor">P3-AMB</button>
+          <button class="crt-btn btn-phosphor" data-color="cyan" onclick="setPhosphorMode('cyan')" title="C64 / Cyan Phosphor">C64-CYN</button>
+          <button class="crt-btn btn-phosphor" data-color="pink" onclick="setPhosphorMode('pink')" title="Cyberpunk Pink">CYBER-PNK</button>
+
+          <!-- FX Switches -->
+          <button id="btnToggleScanlines" class="crt-btn" onclick="toggleScanlines()">SCANLINES: ON</button>
+          <button class="crt-btn glitch-hover" onclick="triggerGlitch()" title="Glitch burst anomaly test">⚡ GLITCH</button>
+          <button id="btnToggleSound" class="crt-btn" onclick="toggleSound()">🔇 AUDIO: OFF</button>
+        </div>
+      </div>
+
+      <!-- Hero Section: Radar Scope + Live Speeds + TTY Stream -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:16px; margin-bottom:16px;">
+
+        <!-- Panel 1: 360° Tactical Radar Scope -->
+        <div class="crt-panel">
+          <div class="crt-panel-header crt-glow-text">
+            <span>🎯 360° RADAR-PEILUNG // RANDEN (5 KM SCAN)</span>
+            <span class="crt-dim-text">SWEEP: ACTIVE</span>
+          </div>
+
+          <div class="crt-radar-container">
+            <canvas id="crtRadarCanvas" width="280" height="280"></canvas>
+          </div>
+
+          <div style="font-size:0.72rem; color:var(--crt-dim); text-align:center; margin-top:4px;">
+            Target: <b class="crt-glow-text">Merishausen Südhang (150° • 0.78km)</b> • Blips: 8 Masten CH/DE
+          </div>
+        </div>
+
+        <!-- Panel 2: Live Speeds & Signal VU-Meters -->
+        <div class="crt-panel">
+          <div class="crt-panel-header crt-glow-text">
+            <span>⚡ 5G WAN SPEEDS &amp; SIGNAL LEVEL</span>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span id="cellSpeedState" style="font-size:0.7rem; color:var(--crt-main);">FINISHED</span>
+              <button id="btnTriggerSpeedtest" class="crt-btn" onclick="triggerSpeedtest()" style="padding:2px 8px; font-size:0.7rem;">🚀 TEST</button>
+            </div>
+          </div>
+
+          <!-- Speeds Hero -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+            <div style="background:rgba(0,0,0,0.5); border:1px solid var(--crt-border); border-radius:4px; padding:10px;">
+              <div style="font-size:0.68rem; color:var(--crt-dim);">⬇️ WAN DOWNLOAD</div>
+              <div class="crt-glow-text glitch-hover" style="font-size:1.8rem; font-weight:800; margin-top:2px;">
+                <span id="cellDownMbps">11.87</span> <small style="font-size:0.75rem;">Mbit/s</small>
+              </div>
+            </div>
+            <div style="background:rgba(0,0,0,0.5); border:1px solid var(--crt-border); border-radius:4px; padding:10px;">
+              <div style="font-size:0.68rem; color:var(--crt-dim);">⬆️ WAN UPLOAD</div>
+              <div class="crt-glow-text glitch-hover" style="font-size:1.8rem; font-weight:800; margin-top:2px;">
+                <span id="cellUpMbps">58.80</span> <small style="font-size:0.75rem;">Mbit/s</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Signal VU Meter RSRP -->
+          <div style="margin-bottom:10px;">
+            <div style="display:flex; justify-content:space-between; font-size:0.72rem;">
+              <span>RSRP SIGNAL: <b class="crt-glow-text"><span id="cellRsrp">-93</span> dBm</b></span>
+              <span class="crt-dim-text">-115dBm ... -70dBm</span>
+            </div>
+            <div class="crt-vu-meter" id="vuBarRsrp">
+              <span class="crt-vu-segment lit"></span>
+              <span class="crt-vu-segment lit"></span>
+              <span class="crt-vu-segment lit"></span>
+              <span class="crt-vu-segment lit"></span>
+              <span class="crt-vu-segment lit"></span>
+              <span class="crt-vu-segment lit"></span>
+              <span class="crt-vu-segment lit"></span>
+              <span class="crt-vu-segment"></span>
+              <span class="crt-vu-segment"></span>
+              <span class="crt-vu-segment"></span>
+              <span class="crt-vu-segment"></span>
+              <span class="crt-vu-segment"></span>
+            </div>
+          </div>
+
+          <!-- Signal VU Meter SINR -->
+          <div style="margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; font-size:0.72rem;">
+              <span>SINR STÖRABSTAND: <b class="crt-glow-text"><span id="cellSinr">-1</span> dB</b> (Güte: <span id="cellQual">39</span>%)</span>
+              <span class="crt-dim-text">-10dB ... +20dB</span>
+            </div>
+            <div class="crt-vu-meter" id="vuBarSinr">
+              <span class="crt-vu-segment lit"></span>
+              <span class="crt-vu-segment lit"></span>
+              <span class="crt-vu-segment lit"></span>
+              <span class="crt-vu-segment lit"></span>
+              <span class="crt-vu-segment"></span>
+              <span class="crt-vu-segment"></span>
+              <span class="crt-vu-segment"></span>
+              <span class="crt-vu-segment"></span>
+              <span class="crt-vu-segment"></span>
+              <span class="crt-vu-segment"></span>
+              <span class="crt-vu-segment"></span>
+              <span class="crt-vu-segment"></span>
+            </div>
+          </div>
+
+          <!-- Carrier & Cell Details -->
+          <div style="font-size:0.72rem; line-height:1.6; border-top:1px dashed var(--crt-border); padding-top:8px;">
+            <div>CARRIER: <b class="crt-glow-text"><span id="cellProvider">GoMo</span> (<span id="cellMode">5G-NSA</span>)</b></div>
+            <div>BÄNDER: <b class="crt-glow-text" id="cellBand">LTE B3 (20 MHz) + 5G n1 (20 MHz) [40 MHz TOTAL]</b></div>
+            <div>CELL ID: <b class="crt-glow-text"><span id="cellId">29858817</span></b> • LATENZ: <b class="crt-glow-text"><span id="netPingMs">24</span>ms</b> (GW: <span id="gwPingMs">4</span>ms)</div>
+          </div>
+        </div>
+
+        <!-- Panel 3: Live TTY Stream / Raw AT Command Log -->
+        <div class="crt-panel">
+          <div class="crt-panel-header crt-glow-text">
+            <span>📟 RAW SIGINT TTY // AT COMMAND STREAM</span>
+            <span class="crt-dim-text">115200 BAUD</span>
+          </div>
+
+          <div class="crt-tty-box" id="crtTtyLog"></div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:0.7rem;">
+            <span><span class="crt-cursor"></span> TTY ACTIVE</span>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span>LAB IP:</span>
+              <input type="text" id="endpointInput" value="192.168.1.100" style="background:#000; color:var(--crt-main); border:1px solid var(--crt-border); padding:2px 6px; font-family:monospace; font-size:0.7rem; width:100px;" onchange="saveEndpoint()">
+              <button onclick="saveEndpoint()" class="crt-btn" style="padding:1px 6px; font-size:0.65rem;">SET</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Embedded Vector Map Section -->
+      <div class="crt-panel">
+        <div class="crt-panel-header crt-glow-text">
+          <span>🗺️ OPENSTREETMAP VEKTOR-RADARKARTE (857 M Ü. M.)</span>
+          <div style="display:flex; gap:6px;">
+            <a href="./randen_rf_map.svg" target="_blank" class="crt-btn" style="font-size:0.7rem;">VOLLBILD SVG ➔</a>
+            <a href="../docs/maps/README.md" target="_blank" class="crt-btn" style="font-size:0.7rem;">MASTEN DOKU</a>
+          </div>
+        </div>
+
+        <div style="width:100%; overflow:hidden; border:1px solid var(--crt-border); border-radius:4px; background:#000; text-align:center;">
+          <object data="./randen_rf_map.svg" type="image/svg+xml" style="width:100%; max-height:750px; display:block; margin:0 auto;" title="Randen RF Map">
+            <p>SVG-Darstellung nicht unterstützt. <a href="./randen_rf_map.svg">Direkt öffnen</a>.</p>
+          </object>
+        </div>
+        <div style="font-size:0.72rem; color:var(--crt-dim); margin-top:6px; text-align:center;">
+          💡 <i>Fahre mit der Maus über die Masten-Karten für Spezifikationen und Frequenzdetails!</i>
+        </div>
+      </div>
+
+      <!-- Detailed Towers Table Section -->
+      <div class="crt-panel">
+        <div class="crt-panel-header crt-glow-text">
+          <span>📡 GRENZKORRIDOR MASTEN-TOPOLOGIE // 8 STATIONEN ERFASST</span>
+          <span class="crt-dim-text">CH 🇨🇭 &amp; DE 🇩🇪</span>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:0.75rem; line-height:1.6; font-family:'JetBrains Mono', monospace;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--crt-border); color:var(--crt-dim); text-align:left;">
+                <th style="padding:6px 8px;">LAND / STATION</th>
+                <th style="padding:6px 8px;">DISTANZ &amp; PEILUNG</th>
+                <th style="padding:6px 8px;">OPERATOR</th>
+                <th style="padding:6px 8px;">BÄNDER</th>
+                <th style="padding:6px 8px;">STATUS &amp; ROLLE</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid rgba(57,255,20,0.15); background:rgba(57,255,20,0.05);">
+                <td style="padding:6px 8px; font-weight:700;" class="crt-glow-text">🇨🇭 Merishausen Südhang</td>
+                <td style="padding:6px 8px;">0.78 km • 150° (SSE)</td>
+                <td style="padding:6px 8px;">Salt / GoMo</td>
+                <td style="padding:6px 8px;"><b class="crt-glow-text">LTE B3 (20M) + 5G n1 (20M)</b></td>
+                <td style="padding:6px 8px; color:#39ff14;"><b>🟢 AKTIV (High-Speed Anker • 40 MHz)</b></td>
+              </tr>
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+                <td style="padding:6px 8px; font-weight:700; color:var(--crt-amber);">🇨🇭 Zelle Randen (B8)</td>
+                <td style="padding:6px 8px;">0.78 km • 150° (SSE)</td>
+                <td style="padding:6px 8px;">Salt / GoMo</td>
+                <td style="padding:6px 8px;">LTE B8 (900 MHz • 10M)</td>
+                <td style="padding:6px 8px; color:var(--crt-amber);">⚠️ Band 8 Falle (im Modem gesperrt!)</td>
+              </tr>
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+                <td style="padding:6px 8px; font-weight:700;">🇨🇭 Merishausen Dorf / Tal</td>
+                <td style="padding:6px 8px;">1.35 km • 175° (S)</td>
+                <td style="padding:6px 8px;">Salt / Swisscom / Sunrise</td>
+                <td style="padding:6px 8px;">B20, B8, B3, B1</td>
+                <td style="padding:6px 8px;" class="crt-dim-text">Gedeckt im Tal, schwächere Sicht</td>
+              </tr>
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+                <td style="padding:6px 8px; font-weight:700;">🇨🇭 Bargen / Schlauch</td>
+                <td style="padding:6px 8px;">2.65 km • 075° (ENE)</td>
+                <td style="padding:6px 8px;">Salt / Sunrise</td>
+                <td style="padding:6px 8px;">B28 (700), B20, B3, 5G n78</td>
+                <td style="padding:6px 8px;" class="crt-dim-text">Ausweichmast bei Talnebel</td>
+              </tr>
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+                <td style="padding:6px 8px; font-weight:700; color:var(--crt-pink);">🇨🇭 Hagenturm (912m)</td>
+                <td style="padding:6px 8px;">3.80 km • 272° (W)</td>
+                <td style="padding:6px 8px;">Swisscom Macro (912 m)</td>
+                <td style="padding:6px 8px;">LTE B20, B3, B1, 5G SA n78</td>
+                <td style="padding:6px 8px;" class="crt-dim-text">Höchster Punkt Schaffhausens</td>
+              </tr>
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.06); background:rgba(255,50,50,0.04);">
+                <td style="padding:6px 8px; font-weight:700; color:#ff4444;">🇩🇪 Wiechs am Randen</td>
+                <td style="padding:6px 8px;">1.80 km • 035° (NNE)</td>
+                <td style="padding:6px 8px;">Telekom DE / Vodafone</td>
+                <td style="padding:6px 8px;">B20 (800), B8, B3, B1 (2100)</td>
+                <td style="padding:6px 8px; color:#ff4444;">Grenzstation DE • Starkes Roaming</td>
+              </tr>
+              <tr style="border-bottom:1px solid rgba(255,255,255,0.06); background:rgba(255,50,50,0.04);">
+                <td style="padding:6px 8px; font-weight:700; color:#ff4444;">🇩🇪 Bargen Grenzstation</td>
+                <td style="padding:6px 8px;">3.10 km • 060° (ENE)</td>
+                <td style="padding:6px 8px;">Telefónica (o2) / 1+1</td>
+                <td style="padding:6px 8px;">LTE B20, B8, B3</td>
+                <td style="padding:6px 8px;" class="crt-dim-text">Zoll / Grenzübertritt E41</td>
+              </tr>
+              <tr>
+                <td style="padding:6px 8px; font-weight:700; color:#ff4444;">🇩🇪 Komberg / Tengen</td>
+                <td style="padding:6px 8px;">4.20 km • 015° (NNE)</td>
+                <td style="padding:6px 8px;">Telekom DE Macro</td>
+                <td style="padding:6px 8px;">B28 (700 MHz), B3, B1, 5G n78</td>
+                <td style="padding:6px 8px;" class="crt-dim-text">High-Power Macro Hegau</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tactical Intel: The Band 8 Trap Story -->
+      <div class="crt-panel">
+        <div class="crt-panel-header crt-glow-text">
+          <span>💡 TACTICAL FIELD INTEL // DIE „BAND 8 FALLE“ AM RANDEN</span>
+          <span class="crt-dim-text">CASE STUDY NOV 2026</span>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:16px; font-size:0.75rem; line-height:1.5;">
+          <div>
+            <h4 class="crt-glow-text" style="margin:0 0 4px 0;">🌲 Warum 900 MHz eine Falle ist:</h4>
+            <p style="margin:0; color:var(--crt-dim);">
+              900-MHz-Wellen (LTE Band 8) dringen fast ungehindert durch das dichte, nasse Blätterdach des Randen und erreichen das Modem mit starken <b>-81 dBm</b>. Der automatische Algorithmus des Modems wählt blind den höchsten RSRP-Pegel. Doch Band 8 hat nur 10 MHz Bandbreite und schaltet keine 5G-Träger dazu – der Download bricht auf <b>1.5 Mbit/s</b> ein!
+            </p>
+          </div>
+          <div>
+            <h4 class="crt-glow-text" style="margin:0 0 4px 0;">⚡ Die Lösung: Manuelles Band-Locking</h4>
+            <p style="margin:0; color:var(--crt-dim);">
+              Im Teltonika WebUI (<code>http://192.168.2.1</code>) unter <b>Network ➔ Mobile ➔ Connection</b> wird die Option <b>Band selection</b> auf <b>Manual</b> gestellt. Durch das Abwählen von <code>LTE B8</code> wird das Modem auf <code>LTE B3 (1800 MHz)</code> gezwungen. <b>Resultat:</b> Der Download springt sofort auf <b>11.87 Mbit/s</b> (~8×) und der Upload auf <b>58.80 Mbit/s</b> (>10×) mit aktiver 5G-Bündelung (40 MHz)!
+            </p>
           </div>
         </div>
       </div>
 
-      <div class="header-right">
-        <!-- Navigation Buttons -->
-        <a href="./index.html" class="btn" style="gap:6px;" title="Zum Solar Power Dashboard wechseln">
-          <span>☀️ Solar Studio</span>
-        </a>
-
-        <a href="./network.html" class="btn" style="gap:6px; background:var(--accent-blue); color:var(--bg-main, #0b0f19); font-weight:700;" title="Aktive 5G Netzwerk-Ansicht">
-          <span>🌐 5G Studio</span>
-        </a>
-
-        <a href="#docsSection" class="btn" style="gap:6px;" title="Fachberichte & Dokumentation">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-            <path d="M19 2H6c-1.2 0-2 .8-2 2v16c0 1.2.8 2 2 2h13c.6 0 1-.4 1-1V3c0-.6-.4-1-1-1zm-1 18H6c-.6 0-1-.4-1-1V5c0-.6.4-1 1-1h12v16z"/>
-            <path d="M8 7h8v2H8zm0 4h8v2H8zm0 4h5v2H8z"/>
-          </svg>
-          <span>Doku</span>
-        </a>
-
-        <!-- Studio Theme Selector -->
-        <div class="theme-select-wrap">
-          <label for="theme-selector" id="lblTheme">STIL:</label>
-          <select id="theme-selector" autocomplete="off" onchange="setTheme(this.value)">
-            <option value="pinkograph" selected>Pinkograph</option>
-            <option value="randen">Randen</option>
-            <option value="dresden-dark">Kongreß Dresden (Nacht) 🇩🇪</option>
-            <option value="dresden">Kongreß Dresden (Altpapier) 🇩🇪</option>
-            <option value="tropical">Deep Jungle Dark</option>
-            <option value="coconut">Coconut Phosphor</option>
-            <option value="bengaluru">Bengaluru Fair</option>
-            <option value="uwu">UwU Pink</option>
-            <option value="light">Arai-eek Light</option>
-          </select>
+      <!-- Sister Documents Quick Links -->
+      <div class="crt-panel" id="docsSection">
+        <div class="crt-panel-header crt-glow-text">
+          <span>📖 FACHDOKUMENTATION &amp; ARCHITEKTUR-BERICHTE</span>
+          <span class="crt-dim-text">GIT REPO</span>
         </div>
 
-        <!-- Connection Source Pill -->
-        <div class="status-indicator" id="connectionStatus" title="Status">
-          <span class="dot"></span>
-          <span class="status-text" id="statusText">Verbinde...</span>
-        </div>
-
-        <a href="https://t.me/RandeSolarBot" id="telegramBotBtn" target="_blank" class="btn" style="gap:6px;" title="Telegram Bot (/status, /speed)">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-            <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
-          </svg>
-        </a>
-
-        <a href="https://github.com/RandeLab/RandeSolar" target="_blank" class="btn" style="gap:6px;">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
-          </svg>
-        </a>
-      </div>
-    </header>
-
-    <!-- Sub-Header Info Banner -->
-    <div class="panel" style="border-left:4px solid var(--accent-blue); padding:10px 16px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-      <div style="display:flex; align-items:center; gap:10px;">
-        <span style="font-size:1.5rem;">📡</span>
-        <div>
-          <div style="font-size:0.75rem; text-transform:uppercase; letter-spacing:1px; color:var(--accent-blue); font-family:var(--font-mono); font-weight:700;">
-            RandeLab 5G-Mobilfunk &amp; Grenzkorridor Observatorium
-          </div>
-          <div style="font-size:0.85rem; color:var(--text-muted); margin-top:2px;">
-            Underes Ätzisloo 189, Merishausen • <b>857 m ü. M.</b> • 47.7701° N, 8.5738° E • Grenzfunk CH 🇨🇭 / DE 🇩🇪
-          </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:10px;">
+          <a href="https://github.com/RandeLab/RandeSolar/blob/main/NETWORK_5G_INFRASTRUCTURE.md" target="_blank" class="crt-btn" style="padding:10px 12px; display:block; text-align:left;">
+            <div class="crt-glow-text" style="font-size:0.8rem; font-weight:700;">🌐 NETWORK_5G_INFRASTRUCTURE.md</div>
+            <div class="crt-dim-text" style="font-size:0.68rem; margin-top:2px;">5G-NSA, ubus API, Speedtests, Antennen-Guide</div>
+          </a>
+          <a href="../docs/maps/README.md" target="_blank" class="crt-btn" style="padding:10px 12px; display:block; text-align:left;">
+            <div class="crt-glow-text" style="font-size:0.8rem; font-weight:700;">🗺️ docs/maps/README.md</div>
+            <div class="crt-dim-text" style="font-size:0.68rem; margin-top:2px;">Randen Funkfeld-Radar, GPS-Koordinaten, 8 Masten</div>
+          </a>
+          <a href="https://github.com/RandeLab/RandeSolar/blob/main/SOLAR_SYSTEM_ARCHITECTURE.md" target="_blank" class="crt-btn" style="padding:10px 12px; display:block; text-align:left;">
+            <div class="crt-glow-text" style="font-size:0.8rem; font-weight:700;">☀️ SOLAR_SYSTEM_ARCHITECTURE.md</div>
+            <div class="crt-dim-text" style="font-size:0.68rem; margin-top:2px;">PV-Feld, MPPT 75|15 Grenzen, 380 Ah Batteriebank</div>
+          </a>
+          <a href="https://github.com/RandeLab/RandeSolar/blob/main/OFFLINE_RESILIENCE.md" target="_blank" class="crt-btn" style="padding:10px 12px; display:block; text-align:left;">
+            <div class="crt-glow-text" style="font-size:0.8rem; font-weight:700;">💾 OFFLINE_RESILIENCE.md</div>
+            <div class="crt-dim-text" style="font-size:0.68rem; margin-top:2px;">35k LittleFS Flash-Puffer, 48 Tage Offline-Autarkie</div>
+          </a>
         </div>
       </div>
-      <div style="display:flex; align-items:center; gap:8px; font-size:0.75rem; font-family:var(--font-mono);">
-        <label for="endpointInput">Lab-IP:</label>
-        <input type="text" id="endpointInput" value="192.168.1.100" style="background:var(--bg-card); color:var(--text-color); border:1px solid var(--border); padding:3px 6px; border-radius:3px; width:110px; font-size:0.75rem;" onchange="saveEndpoint()">
-        <button onclick="saveEndpoint()" class="btn" style="padding:2px 8px; font-size:0.7rem;">Set</button>
+
+      <!-- Retro Bottom Status Strip -->
+      <div style="display:flex; justify-content:space-between; align-items:center; border-top:2px solid var(--crt-border); padding-top:8px; font-size:0.7rem; color:var(--crt-dim); flex-wrap:wrap; gap:8px;">
+        <span>SYSTEM: Teltonika TRB500 (Snapdragon X55)</span>
+        <span>ANTENNEN: 4×4 MIMO</span>
+        <span>STANDORT: Merishausen 857m</span>
+        <span>C64 ENGINE: ACTIVE 🥋</span>
       </div>
+
     </div>
-
-    <!-- Live 5G Telemetry & Speedtest Grid -->
-    <section class="panel" style="border-top-color:var(--accent-blue); margin-top:6px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--border); padding-bottom:6px; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
-        <h2 style="border:none; margin:0; padding:0;">⚡ Live 5G WAN Telemetrie &amp; Funkparameter</h2>
-        <div style="display:flex; align-items:center; gap:8px;">
-          <span style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono);">Status: <b id="cellSpeedState" style="color:var(--accent-green);">FINISHED</b></span>
-          <button id="btnTriggerSpeedtest" class="btn" onclick="triggerSpeedtest()" style="padding:4px 10px; background:var(--accent-blue); color:var(--bg-main, #0b0f19); font-weight:700; font-size:0.75rem;">🚀 Speedtest starten</button>
-        </div>
-      </div>
-
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-top:10px; font-family:var(--font-mono);">
-        <!-- Download Speed -->
-        <div style="padding:12px 14px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">
-          <div style="font-size:0.72rem; color:var(--text-muted);">⬇️ 5G WAN DOWNLOAD</div>
-          <div style="font-size:1.6rem; font-weight:800; color:var(--accent-blue); margin-top:2px;">
-            <span id="cellDownMbps">--</span> <small style="font-size:0.8rem;">Mbit/s</small>
-          </div>
-          <div style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">Teltonika TRB500 Nativ Ookla</div>
-        </div>
-
-        <!-- Upload Speed -->
-        <div style="padding:12px 14px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">
-          <div style="font-size:0.72rem; color:var(--text-muted);">⬆️ 5G WAN UPLOAD</div>
-          <div style="font-size:1.6rem; font-weight:800; color:var(--accent-pink); margin-top:2px;">
-            <span id="cellUpMbps">--</span> <small style="font-size:0.8rem;">Mbit/s</small>
-          </div>
-          <div style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">Qualcomm X55 Trägerbündelung</div>
-        </div>
-
-        <!-- Signal & RSRP -->
-        <div style="padding:12px 14px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">
-          <div style="font-size:0.72rem; color:var(--text-muted);">📡 EMPFANGSSTÄRKE (RSRP)</div>
-          <div style="font-size:1.6rem; font-weight:800; color:var(--accent-yellow); margin-top:2px;">
-            <span id="cellRsrp">--</span> <small style="font-size:0.8rem;">dBm</small>
-          </div>
-          <div style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">
-            SINR: <b id="cellSinr">--</b> dB • Güte: <b id="cellQual">--</b>%
-          </div>
-        </div>
-
-        <!-- Band & Carrier Aggregation -->
-        <div style="padding:12px 14px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">
-          <div style="font-size:0.72rem; color:var(--text-muted);">🏢 TRÄGER &amp; NETZBETREIBER</div>
-          <div style="font-size:1.2rem; font-weight:700; color:var(--accent-green); margin-top:4px;">
-            <span id="cellProvider">--</span> <small style="font-size:0.75rem; color:var(--text-muted);">(<span id="cellMode">--</span>)</small>
-          </div>
-          <div style="font-size:0.74rem; color:var(--text-color); margin-top:3px;">
-            <b id="cellBand" style="color:var(--accent-yellow);">--</b>
-          </div>
-          <div style="font-size:0.70rem; color:var(--text-muted); margin-top:2px;">
-            Cell ID: <span id="cellId">--</span>
-          </div>
-        </div>
-
-        <!-- Gateway Ping & Latency -->
-        <div style="padding:12px 14px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">
-          <div style="font-size:0.72rem; color:var(--text-muted);">🏓 WAN LATENZ / GATEWAY</div>
-          <div style="font-size:1.35rem; font-weight:700; color:var(--accent-green); margin-top:3px;">
-            <span id="netPingMs">--</span> ms <small style="font-size:0.78rem; color:var(--text-muted);">/ GW <span id="gwPingMs">--</span> ms</small>
-          </div>
-          <div style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">ICMP Ping 1.1.1.1 / 192.168.1.1</div>
-        </div>
-
-        <!-- Hardware & Temp -->
-        <div style="padding:12px 14px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">
-          <div style="font-size:0.72rem; color:var(--text-muted);">🌡️ 5G MODEM TEMPERATUR</div>
-          <div style="font-size:1.35rem; font-weight:700; color:var(--accent-yellow); margin-top:3px;">
-            <span id="cellTemp">--</span> °C
-          </div>
-          <div style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">Quectel RG501Q-EU (TRB500)</div>
-        </div>
-
-        <!-- ESP32 Link to Omada AP -->
-        <div style="padding:12px 14px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">
-          <div style="font-size:0.72rem; color:var(--text-muted);">📶 LABOR WLAN (OMADA AP)</div>
-          <div style="font-size:1.2rem; font-weight:700; margin-top:3px;">
-            <span id="wifiRssiDiag">--</span> dBm <small style="font-size:0.75rem; color:var(--text-muted);">(<span id="wifiQualDiag">--</span>% • Ch <span id="wifiChDiag">--</span>)</small>
-          </div>
-          <div style="font-size:0.72rem; color:var(--text-muted); margin-top:4px;">
-            ESP32: <span id="espChipTemp">--</span>°C • <span id="espFreeHeap">--</span> KB RAM
-          </div>
-        </div>
-
-        <!-- Offline Flash Buffer -->
-        <div style="padding:12px 14px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">
-          <div style="font-size:0.72rem; color:var(--text-muted);">💾 LITTLEFS FLASH PUFFER</div>
-          <div style="font-size:1.2rem; font-weight:700; color:var(--accent-pink); margin-top:3px;">
-            <span id="bufferCountDiag">0</span> <small style="font-size:0.75rem; color:var(--text-muted);">/ 35'000</small>
-          </div>
-          <div style="font-size:0.72rem; margin-top:4px;">
-            <a href="http://randesolar.local/api/buffer/csv" target="_blank" style="color:var(--accent-yellow); text-decoration:underline;">📥 CSV Download</a>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Embedded Interactive OpenStreetMap RF Map -->
-    <section class="panel" style="border-top-color:var(--accent-green); margin-top:10px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--border); padding-bottom:6px; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
-        <div>
-          <h2 style="border:none; margin:0; padding:0;">🗺️ Randen Funkfeld-Radar &amp; Masten-Topographie</h2>
-          <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">
-            Vektorkarte auf OpenStreetMap-Basis mit echten GPS-Koordinaten, Distanzen, Peilungen und Grenzfrequenzen (Schweiz 🇨🇭 &amp; Deutschland 🇩🇪)
-          </div>
-        </div>
-        <div style="display:flex; gap:8px;">
-          <a href="./randen_rf_map.svg" target="_blank" class="btn" style="padding:4px 10px; background:var(--accent-green); color:var(--bg-main, #0b0f19); font-weight:700; font-size:0.75rem;">Vollbild-SVG öffnen ➔</a>
-          <a href="../docs/maps/README.md" target="_blank" class="btn" style="padding:4px 10px; font-size:0.75rem;">Masten-Doku</a>
-        </div>
-      </div>
-
-      <!-- Responsive SVG Container -->
-      <div style="width:100%; overflow:hidden; border:1px solid var(--border); border-radius:var(--border-radius); background:#060a12; text-align:center;">
-        <object data="./randen_rf_map.svg" type="image/svg+xml" style="width:100%; max-height:750px; display:block; margin:0 auto;" title="Randen RF Map">
-          <p>SVG-Darstellung nicht unterstützt. <a href="./randen_rf_map.svg">Direkt öffnen</a>.</p>
-        </object>
-      </div>
-      <div style="font-size:0.72rem; color:var(--text-muted); margin-top:8px; text-align:center;">
-        💡 <i>Tipp: Fahre mit der Maus über die Masten-Karten in der Vektorgrafik für Live-Spezifikationen und HF-Details!</i>
-      </div>
-    </section>
-
-    <!-- Masts Table Section -->
-    <section class="panel" style="border-top-color:var(--accent-yellow); margin-top:10px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--border); padding-bottom:6px; margin-bottom:10px;">
-        <h2 style="border:none; margin:0; padding:0;">📡 Sendemasten im Randen-Korridor</h2>
-        <span style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono);">8 Stationen erfasst</span>
-      </div>
-
-      <div style="overflow-x:auto;">
-        <table style="width:100%; border-collapse:collapse; font-size:0.8rem; font-family:var(--font-mono); line-height:1.5;">
-          <thead>
-            <tr style="border-bottom:1px solid var(--border); color:var(--text-muted); text-align:left;">
-              <th style="padding:8px 10px;">Land / Station</th>
-              <th style="padding:8px 10px;">Distanz &amp; Peilung</th>
-              <th style="padding:8px 10px;">Betreiber</th>
-              <th style="padding:8px 10px;">Aktive Frequenzbänder</th>
-              <th style="padding:8px 10px;">Funktion / Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.06); background:rgba(0,180,255,0.06);">
-              <td style="padding:8px 10px; font-weight:700; color:var(--accent-blue);">🇨🇭 Merishausen Südhang</td>
-              <td style="padding:8px 10px;">0.78 km • 150° (SSE)</td>
-              <td style="padding:8px 10px;">Salt / GoMo</td>
-              <td style="padding:8px 10px;"><b style="color:var(--accent-blue);">LTE B3 (20 MHz) + 5G n1 (20 MHz)</b></td>
-              <td style="padding:8px 10px; color:var(--accent-green);"><b>🟢 AKTIV (High-Speed Anker • 40 MHz)</b></td>
-            </tr>
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
-              <td style="padding:8px 10px; font-weight:700; color:#10b981;">🇨🇭 Zelle Randen</td>
-              <td style="padding:8px 10px;">0.78 km • 150° (SSE)</td>
-              <td style="padding:8px 10px;">Salt / GoMo</td>
-              <td style="padding:8px 10px;">LTE B8 (900 MHz • 10 MHz)</td>
-              <td style="padding:8px 10px; color:var(--accent-yellow);">⚠️ Band 8 Falle (im Modem manuell gesperrt!)</td>
-            </tr>
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
-              <td style="padding:8px 10px; font-weight:700;">🇨🇭 Merishausen Dorf / Tal</td>
-              <td style="padding:8px 10px;">1.35 km • 175° (S)</td>
-              <td style="padding:8px 10px;">Salt / Swisscom / Sunrise</td>
-              <td style="padding:8px 10px;">B20, B8, B3, B1</td>
-              <td style="padding:8px 10px; color:var(--text-muted);">Gedeckt im Tal, schwächere Sichtverbindung</td>
-            </tr>
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
-              <td style="padding:8px 10px; font-weight:700;">🇨🇭 Bargen / Schlauch</td>
-              <td style="padding:8px 10px;">2.65 km • 075° (ENE)</td>
-              <td style="padding:8px 10px;">Salt / Sunrise</td>
-              <td style="padding:8px 10px;">B28 (700 MHz), B20, B3, 5G n78 (3.5 GHz)</td>
-              <td style="padding:8px 10px; color:var(--accent-yellow);">Guter Ausweichmast bei Talnebel</td>
-            </tr>
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
-              <td style="padding:8px 10px; font-weight:700; color:var(--accent-pink);">🇨🇭 Randenturm / Hagenturm</td>
-              <td style="padding:8px 10px;">3.80 km • 272° (W)</td>
-              <td style="padding:8px 10px;">Swisscom Macro (912 m)</td>
-              <td style="padding:8px 10px;">LTE B20, B3, B1, 5G SA n78</td>
-              <td style="padding:8px 10px; color:var(--text-muted);">Höchster Punkt Schaffhausens (perfekt für Swisscom-SIM)</td>
-            </tr>
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.06); background:rgba(239,68,68,0.04);">
-              <td style="padding:8px 10px; font-weight:700; color:#ef4444;">🇩🇪 Wiechs am Randen</td>
-              <td style="padding:8px 10px;">1.80 km • 035° (NNE)</td>
-              <td style="padding:8px 10px;">Telekom DE / Vodafone</td>
-              <td style="padding:8px 10px;">B20 (800), B8 (900), B3 (1800), B1 (2100)</td>
-              <td style="padding:8px 10px; color:#ef4444;">Grenzstation DE • Sehr starkes Roaming-Signal</td>
-            </tr>
-            <tr style="border-bottom:1px solid rgba(255,255,255,0.06); background:rgba(239,68,68,0.04);">
-              <td style="padding:8px 10px; font-weight:700; color:#ef4444;">🇩🇪 Bargen Grenzstation / Zoll</td>
-              <td style="padding:8px 10px;">3.10 km • 060° (ENE)</td>
-              <td style="padding:8px 10px;">Telefónica (o2) / 1+1</td>
-              <td style="padding:8px 10px;">LTE B20, B8, B3</td>
-              <td style="padding:8px 10px; color:var(--text-muted);">Grenzübertritt E41 / A81</td>
-            </tr>
-            <tr>
-              <td style="padding:8px 10px; font-weight:700; color:#ef4444;">🇩🇪 Komberg / Tengen</td>
-              <td style="padding:8px 10px;">4.20 km • 015° (NNE)</td>
-              <td style="padding:8px 10px;">Telekom DE Macro</td>
-              <td style="padding:8px 10px;">B28 (700 MHz), B3, B1, 5G n78</td>
-              <td style="padding:8px 10px; color:var(--text-muted);">High-Power Sender Hegau / Schwarzwald-Rand</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- Speed-Tuning Guide & The Band 8 Story -->
-    <section class="panel" style="border-top-color:var(--accent-pink); margin-top:10px;">
-      <h2 style="border-bottom:1px dashed var(--border); padding-bottom:6px; margin-bottom:12px;">💡 Speed-Tuning Guide: Die „Band 8 Falle“ am Randen</h2>
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:20px; font-size:0.85rem; line-height:1.6;">
-        <div>
-          <h3 style="color:var(--accent-pink); margin-bottom:6px;">🌲 Warum das Modem in die Falle tappt:</h3>
-          <p>
-            Auf 857 m ü. M. im dichten Randenwald dringen <b>900-MHz-Funkwellen (LTE Band 8)</b> fast ungebremst durch feuchte Blätter und Geäst. Sie erreichen den Router mit bärenstarken <b>`-81 dBm`</b>.
-          </p>
-          <p>
-            Das schnellere <b>1800-MHz-Signal (Band 3)</b> wird vom Wald jedoch gedämpft (`-93 dBm`). Das automatische Suchverfahren des Modems wählt blind die stärkste Signalstärke (RSRP) – und sitzt auf einem <b>schmalen 10-MHz-Kanal ohne 5G</b> fest (nur 1.5 – 2.5 Mbit/s Down!).
-          </p>
-        </div>
-        <div>
-          <h3 style="color:var(--accent-green); margin-bottom:6px;">⚡ Die Lösung: Manuelles Band-Locking</h3>
-          <p>
-            Im Teltonika WebUI (<code>http://192.168.2.1</code>) unter <b>Network ➔ Mobile ➔ Connection</b> wird die Option <b>Band selection</b> von <i>Auto</i> auf <b>Manual</b> umgestellt.
-          </p>
-          <ul style="padding-left:18px; margin:6px 0;">
-            <li>❌ <b>Haken RAUS bei:</b> <code>LTE B8</code> (900 MHz)</li>
-            <li>✅ <b>Haken DRIN bei:</b> <code>LTE B3</code> (1800), <code>LTE B1</code> (2100), <code>5G n1</code>, <code>5G n78</code></li>
-          </ul>
-          <p style="margin-top:6px;">
-            <b>Resultat:</b> Download klettert von 1.5 auf <b>11.87 Mbit/s</b> (~8×), Upload von 5.4 auf <b>58.80 Mbit/s</b> (>10×), und Carrier Aggregation springt auf <b>Active (40 MHz)</b>!
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Architecture & Documentation Section -->
-    <section class="panel" id="docsSection" style="border-top-color:var(--accent-yellow); margin-top:10px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--border); padding-bottom:6px; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
-        <h2 style="border:none; margin:0; padding:0;">📖 Ausführliche Fachdokumentation</h2>
-        <span style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono);">GitHub Repository Docs</span>
-      </div>
-
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px;">
-        <!-- Card 1: 5G Infrastructure -->
-        <a href="https://github.com/RandeLab/RandeSolar/blob/main/NETWORK_5G_INFRASTRUCTURE.md" target="_blank" style="text-decoration:none; color:inherit; display:flex; flex-direction:column; justify-content:space-between; padding:12px 14px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18); transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--accent-blue)'" onmouseout="this.style.borderColor='var(--border)'">
-          <div>
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-              <span style="font-size:1.3rem;">🌐</span>
-              <strong style="color:var(--accent-blue); font-size:0.92rem;">5G-Netzwerk &amp; Telekommunikation</strong>
-            </div>
-            <p style="font-size:0.78rem; line-height:1.45; color:var(--text-muted); margin:0;">
-              Teltonika TRB500 Gateway, Quectel X55 Modem, ubus JSON-RPC Router-API, Praxisbericht „Band 8 Falle“, manuelles Band-Locking (B3+5G), Speedtests &amp; Antennenvergleich.
-            </p>
-          </div>
-          <div style="font-size:0.74rem; font-weight:700; color:var(--accent-blue); margin-top:10px;">
-            Dokument lesen ➔
-          </div>
-        </a>
-
-        <!-- Card 2: RF Map & Radar -->
-        <a href="../docs/maps/README.md" target="_blank" style="text-decoration:none; color:inherit; display:flex; flex-direction:column; justify-content:space-between; padding:12px 14px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18); transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--accent-green)'" onmouseout="this.style.borderColor='var(--border)'">
-          <div>
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-              <span style="font-size:1.3rem;">🗺️</span>
-              <strong style="color:var(--accent-green); font-size:0.92rem;">Randen Funkfeld-Radar &amp; OSM-Karte</strong>
-            </div>
-            <p style="font-size:0.78rem; line-height:1.45; color:var(--text-muted); margin:0;">
-              Interaktive Vektorkarte (SVG) der Randen-Kammlage (857 m), 8 Sendemasten in CH &amp; DE, GPS-Koordinaten, Distanzen, Peilungen und Frequenzbänder mit Hover-Tooltips.
-            </p>
-          </div>
-          <div style="font-size:0.74rem; font-weight:700; color:var(--accent-green); margin-top:10px;">
-            Masten-Analyse &amp; Karte ➔
-          </div>
-        </a>
-
-        <!-- Card 3: Solar Architecture -->
-        <a href="https://github.com/RandeLab/RandeSolar/blob/main/SOLAR_SYSTEM_ARCHITECTURE.md" target="_blank" style="text-decoration:none; color:inherit; display:flex; flex-direction:column; justify-content:space-between; padding:12px 14px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18); transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--accent-yellow)'" onmouseout="this.style.borderColor='var(--border)'">
-          <div>
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-              <span style="font-size:1.3rem;">☀️</span>
-              <strong style="color:var(--accent-yellow); font-size:0.92rem;">Solar &amp; Inselnetz-Architektur</strong>
-            </div>
-            <p style="font-size:0.78rem; line-height:1.45; color:var(--text-muted); margin:0;">
-              380 Wp Energetica PV-Module, Victron MPPT 75|15 Auslegungsgrenzen, 4x VOLTIC 380 Ah Batteriebank, Peukert-Effekt, RDDSPON 6000W Inverter und 230V Notstrom-Umschalter.
-            </p>
-          </div>
-          <div style="font-size:0.74rem; font-weight:700; color:var(--accent-yellow); margin-top:10px;">
-            Dokument lesen ➔
-          </div>
-        </a>
-
-        <!-- Card 4: Offline Resilience -->
-        <a href="https://github.com/RandeLab/RandeSolar/blob/main/OFFLINE_RESILIENCE.md" target="_blank" style="text-decoration:none; color:inherit; display:flex; flex-direction:column; justify-content:space-between; padding:12px 14px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18); transition:border-color 0.2s;" onmouseover="this.style.borderColor='var(--accent-pink)'" onmouseout="this.style.borderColor='var(--border)'">
-          <div>
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-              <span style="font-size:1.3rem;">💾</span>
-              <strong style="color:var(--accent-pink); font-size:0.92rem;">Offline-Resilienz &amp; Flash-Puffer</strong>
-            </div>
-            <p style="font-size:0.78rem; line-height:1.45; color:var(--text-muted); margin:0;">
-              35'000 Messwerte im Onboard-LittleFS Flash (bis zu 48 Tage Offline-Autarkie bei Netzausfall), Ringpuffer-Sicherheit, High-Speed Cloud-Drain und direkter CSV-Export.
-            </p>
-          </div>
-          <div style="font-size:0.74rem; font-weight:700; color:var(--accent-pink); margin-top:10px;">
-            Architektur lesen ➔
-          </div>
-        </a>
-      </div>
-    </section>
-
-    <!-- Diagnostics Footer Strip -->
-    <footer class="panel panel-footer">
-      <div class="footer-strip">
-        <span><b>GATEWAY:</b> Teltonika TRB500</span>
-        <span><b>MODEM:</b> Qualcomm Snapdragon X55</span>
-        <span><b>STATUS:</b> <span id="lastSeenTimer">Live</span></span>
-        <span><b>ANTENNEN:</b> 4×4 MIMO</span>
-        <span><b>STANDORT:</b> Merishausen 857m</span>
-        <span><b>NETZWERK:</b> GoMo (Salt CH)</span>
-      </div>
-    </footer>
-
   </div>
 
-  <script src="./network.js?v=1.0"></script>
+  <script src="./network.js?v=2.0"></script>
 </body>
 </html>
