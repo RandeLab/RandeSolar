@@ -8,6 +8,9 @@ const CHART_THROTTLE_MS = 4000; // Update charts every 4-5 seconds for calm read
 let currentLimit = 240; // Default 1 hour of history
 let currentHours = 1;
 let lastBeaconTime = null;
+let lastRecordedSpeedDown = null;
+let lastRecordedSpeedUp = null;
+let forceRecordNextSpeedtest = false;
 const urlParams = new URLSearchParams(window.location.search);
 let currentTheme = urlParams.get('theme') || 'pinkograph'; // Start default with Pinkograph theme
 let activeEndpoint = localStorage.getItem('randesolar-endpoint') || 'http://randesolar.local';
@@ -662,26 +665,32 @@ function initChart() {
             data: [],
             borderColor: pal.volt || '#00F5FF',
             backgroundColor: pal.voltFill || 'rgba(0, 245, 255, 0.15)',
-            borderWidth: 2.2,
-            tension: 0.25,
-            fill: true,
-            spanGaps: true,
+            borderWidth: 2,
+            tension: 0.15,
+            fill: false,
+            spanGaps: false,
             yAxisID: 'ySpeed',
-            pointRadius: 2.5,
-            pointHoverRadius: 5,
+            pointRadius: 4.5,
+            pointHoverRadius: 7,
+            pointBackgroundColor: pal.volt || '#00F5FF',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1.5,
           },
           {
             label: 'Upload (Mbit/s)',
             data: [],
             borderColor: pal.curr || '#FF6BB5',
             backgroundColor: pal.currFill || 'rgba(255, 107, 181, 0.15)',
-            borderWidth: 1.8,
-            tension: 0.25,
+            borderWidth: 2,
+            tension: 0.15,
             fill: false,
-            spanGaps: true,
+            spanGaps: false,
             yAxisID: 'ySpeed',
-            pointRadius: 2,
-            pointHoverRadius: 4,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            pointBackgroundColor: pal.curr || '#FF6BB5',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 1.5,
           },
           {
             label: 'Internet Ping (ms)',
@@ -1201,8 +1210,28 @@ function appendChartPoint(item, force = false) {
 
   // 3. Internet Speed (Mbit/s) & Latency (ms) & Weather Overlay
   if (netChartInstance && (item.net_mbps !== undefined || item.net_ping_ms !== undefined)) {
-    netChartInstance.data.datasets[0].data.push({ x: ptTime, y: item.net_mbps || 0 });
-    netChartInstance.data.datasets[1].data.push({ x: ptTime, y: item.net_up_mbps || 0 });
+    // Only record speedtest points when a new test value arrives or manual test was triggered
+    const liveDown = (item.cell_down_mbps && item.cell_down_mbps > 0) ? item.cell_down_mbps : item.net_mbps;
+    const liveUp = (item.cell_up_mbps && item.cell_up_mbps > 0) ? item.cell_up_mbps : item.net_up_mbps;
+
+    if (liveDown !== undefined && liveDown !== null && liveDown > 0) {
+      const isNewLiveTest = forceRecordNextSpeedtest ||
+                            (lastRecordedSpeedDown === null) ||
+                            (liveDown !== lastRecordedSpeedDown || liveUp !== lastRecordedSpeedUp);
+
+      if (isNewLiveTest) {
+        lastRecordedSpeedDown = liveDown;
+        lastRecordedSpeedUp = liveUp;
+        forceRecordNextSpeedtest = false;
+        netChartInstance.data.datasets[0].data.push({ x: ptTime, y: liveDown });
+        if (liveUp > 0) {
+          netChartInstance.data.datasets[1].data.push({ x: ptTime, y: liveUp });
+        }
+        console.log(`[Chart 🚀] New speedtest point plotted: ⬇️ ${liveDown} Mbit/s, ⬆️ ${liveUp} Mbit/s`);
+      }
+    }
+
+    // Ping, Gateway, Rain and Cloud are continuous telemetry
     netChartInstance.data.datasets[2].data.push({ x: ptTime, y: item.net_ping_ms || 0 });
     netChartInstance.data.datasets[3].data.push({ x: ptTime, y: item.gw_ping_ms || 0 });
     if (netChartInstance.data.datasets[4]) netChartInstance.data.datasets[4].data.push({ x: ptTime, y: item.wx_rain_mm !== undefined && item.wx_rain_mm !== null ? item.wx_rain_mm : null });
@@ -1405,6 +1434,10 @@ async function loadSupabaseHistory(limit = 240, hours = 1) {
       displayRows = rows.filter((_, idx) => idx % step === 0 || idx === rows.length - 1);
     }
 
+    let lastSeenDown = null;
+    let lastSeenUp = null;
+    let lastSpeedtestTime = 0;
+
     displayRows.forEach(item => {
       const ptTime = new Date(item.created_at).getTime();
 
@@ -1419,8 +1452,27 @@ async function loadSupabaseHistory(limit = 240, hours = 1) {
       }
 
       if (netChartInstance && (item.net_mbps !== undefined || item.net_ping_ms !== undefined)) {
-        netChartInstance.data.datasets[0].data.push({ x: ptTime, y: item.net_mbps || 0 });
-        netChartInstance.data.datasets[1].data.push({ x: ptTime, y: item.net_up_mbps || 0 });
+        const rawDown = (item.cell_down_mbps && item.cell_down_mbps > 0) ? item.cell_down_mbps : item.net_mbps;
+        const rawUp = (item.cell_up_mbps && item.cell_up_mbps > 0) ? item.cell_up_mbps : item.net_up_mbps;
+
+        // Record a speedtest point only when a test was actually executed (value changed or scheduled cycle)
+        if (rawDown !== undefined && rawDown !== null && rawDown > 0) {
+          const isNewTest = (lastSeenDown === null) ||
+                            (rawDown !== lastSeenDown || rawUp !== lastSeenUp) ||
+                            (ptTime - lastSpeedtestTime >= 5.5 * 3600 * 1000);
+
+          if (isNewTest) {
+            lastSeenDown = rawDown;
+            lastSeenUp = rawUp;
+            lastSpeedtestTime = ptTime;
+            netChartInstance.data.datasets[0].data.push({ x: ptTime, y: rawDown });
+            if (rawUp > 0) {
+              netChartInstance.data.datasets[1].data.push({ x: ptTime, y: rawUp });
+            }
+          }
+        }
+
+        // Ping, Gateway, Rain and Cloud are continuous telemetry series
         netChartInstance.data.datasets[2].data.push({ x: ptTime, y: item.net_ping_ms || 0 });
         netChartInstance.data.datasets[3].data.push({ x: ptTime, y: item.gw_ping_ms || 0 });
         if (netChartInstance.data.datasets[4]) netChartInstance.data.datasets[4].data.push({ x: ptTime, y: item.wx_rain_mm !== undefined && item.wx_rain_mm !== null ? item.wx_rain_mm : null });
@@ -1434,6 +1486,9 @@ async function loadSupabaseHistory(limit = 240, hours = 1) {
         weatherChartInstance.data.datasets[3].data.push({ x: ptTime, y: item.wx_rain_mm !== undefined && item.wx_rain_mm !== null ? item.wx_rain_mm : null });
       }
     });
+
+    lastRecordedSpeedDown = lastSeenDown;
+    lastRecordedSpeedUp = lastSeenUp;
 
     if (solarChartInstance) solarChartInstance.update('none');
     if (chargeChartInstance) chargeChartInstance.update('none');
@@ -1521,6 +1576,7 @@ function initMQTT() {
         if (topic === 'randelab/solar/ack') {
           console.log('[MQTT ACK]', payload);
           if (payload.action === 'speedtest_triggered') {
+            forceRecordNextSpeedtest = true;
             const btn = document.getElementById('btnSpeedtestMain');
             if (btn) btn.innerHTML = '⚡ Test läuft auf Router...';
           }
@@ -1546,6 +1602,7 @@ function initMQTT() {
 
 // Live Speedtest On-Demand Trigger (Dual MQTT + REST)
 window.triggerSpeedtestLive = async function () {
+  forceRecordNextSpeedtest = true;
   const btn = document.getElementById('btnSpeedtestMain');
   if (btn) {
     btn.disabled = true;
