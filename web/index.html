@@ -389,7 +389,10 @@
 
     <!-- 5G Mobilfunk & ESP32-S3 Network Diagnostics Section -->
     <section class="panel" style="border-top-color:var(--accent-blue); margin-top:10px;">
-      <h2 id="lblNetDiagTitle">🚀 5G-Mobilfunk & ESP32-S3 Netzwerk-Diagnose</h2>
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--border); padding-bottom:6px; margin-bottom:10px;">
+        <h2 id="lblNetDiagTitle" style="border:none; margin:0; padding:0;">🚀 5G-Mobilfunk &amp; ESP32-S3 Netzwerk-Diagnose</h2>
+        <a href="./randen_rf_map.svg" target="_blank" style="padding:4px 10px; background:var(--accent-blue); color:var(--bg-main, #0b0f19); text-decoration:none; border-radius:4px; font-weight:bold; font-size:0.75rem; display:inline-flex; align-items:center; gap:4px;">🗺️ HF-Karte (OSM)</a>
+      </div>
       <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:12px; margin-top:10px; font-family:var(--font-mono);">
         <!-- 5G Router Native Speedtest Metrics -->
         <div style="padding:10px 12px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">

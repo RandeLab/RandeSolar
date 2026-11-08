@@ -59,6 +59,14 @@ flowchart TD
     SUBA -.->|Historische Zeitreihen| GH
 ```
 
+### 1.1 Geographische HF-Topographie & OpenStreetMap Antennenkarte
+
+Die folgende Vektorkarte kombiniert echte OpenStreetMap-Kartographie der Randen-Kammlage (**857 m ü. M.**) mit den exakt eingemessenen Mobilfunkmasten, Abstrahlvektoren, Entfernungen und Grenzfrequenzen (Schweiz 🇨🇭 &amp; Deutschland 🇩🇪):
+
+[![RandeLab 5G &amp; HF-Radar Topographie](./docs/maps/randen_rf_map.svg)](./docs/maps/randen_rf_map.svg)
+
+*Interaktive Vektorkarte in voller Auflösung öffnen: 👉 [**`docs/maps/randen_rf_map.svg`**](./docs/maps/randen_rf_map.svg) (oder als [PNG-Vorschau](./docs/maps/randen_rf_map.png))*
+
 ---
 
 ## 2. Fotodokumentation der Hardware vor Ort
