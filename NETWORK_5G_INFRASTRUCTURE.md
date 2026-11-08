@@ -14,22 +14,28 @@ Das RandeLab verfügt über eine zweistufige Industrie-Netzwerkarchitektur. Die 
 
 ```mermaid
 flowchart TD
-    subgraph WAN_CELL["📡 Mobilfunknetz (Salt Schweiz / GoMo)"]
-        TOWER["Sendemast (Cell ID: 29858817, TAC: 47007)<br/>Carrier Aggregation: LTE B3 (1800 MHz) + 5G N1 (2100 MHz)"]
+    subgraph POWER_INFRA["⚡ Stromversorgung & Autarkie-Ebenen"]
+        INV_AC["230V AC Inselnetz<br/>(RDDSPON 6000W Inverter • Bedarfsgesteuert)"]
+        BAT_DC["12V DC Batteriebank (4x VOLTIC = 380 Ah)<br/>• 24/7 Dauerversorgung"]
+        USB_STEPDOWN["12V ➔ 5V DC-DC USB-Wandler<br/>(Direkt an Batteriepolen)"]
+    end
+
+    subgraph WAN_CELL["📡 Mobilfunknetz (Salt Schweiz / GoMo & Grenzempfang DE)"]
+        TOWER["Sendemast Merishausen / Bargen (Cell ID: 29858817 / 1C79C01)<br/>Dynamische Carrier Aggregation: LTE B8 (900 MHz) + 5G N78 (3.5 GHz) / N1"]
     end
 
     subgraph OUTDOOR_CPE["🏔️ Outdoor-Telekommunikation (Wetterfest unter Holzvordach)"]
-        TRB500["Teltonika TRB500 Industrial 5G Gateway<br/>IP: 192.168.2.1 • Hostname: Randen5G<br/>RutOS R_00.07.24.7 • Quectel RG501Q-EU (Snapdragon X55)<br/>• Nativer Ookla Speedtest-Daemon<br/>• ubus JSON-RPC Server (/ubus)"]
+        TRB500["Teltonika TRB500 Industrial 5G Gateway<br/>IP: 192.168.2.1 • Hostname: Randen5G<br/>RutOS R_00.07.24.7 • Quectel RG501Q-EU (Snapdragon X55)<br/>• Nativer Ookla Speedtest-Daemon<br/>• ubus JSON-RPC Server (/ubus)<br/>• 230V AC Netzteil an Inverter"]
     end
 
     subgraph INDOOR_LAN["🏠 Indoor RandeLab Netzwerk (857 m ü. M.)"]
-        POE["PoE-Injektor (Power over Ethernet)"]
+        POE["PoE-Injektor (230V AC an Inverter)"]
         AP["TP-Link Omada WLAN Access Point<br/>IP: 192.168.1.1 • SSID: RandeLab<br/>2.4 GHz + 5 GHz Dual-Band"]
     end
 
     subgraph CLIENTS["💻 Lokale Clients & Sensor-Knoten"]
-        ESP32["ESP32-S3 Kraftwerk-Controller<br/>IP: 192.168.1.100 (randesolar.local)<br/>• Hardware-AES BLE Scanner (Victron 0x02E1)<br/>• 35'000 LittleFS Flash-Puffer (48 Tage)<br/>• ubus JSON-RPC Client (/ubus Polling)<br/>• Webserver Port 80 & OTA (/update)"]
-        LAPTOP["Labor-Laptops, Tablets & Smartphones<br/>(Speedtest: ~22 Mbit/s Down / ~80 Mbit/s Up)"]
+        ESP32["ESP32-S3 Kraftwerk-Controller<br/>IP: 192.168.1.100 (randesolar.local)<br/>• Hardware-AES BLE Scanner (Victron 0x02E1)<br/>• 35'000 LittleFS Flash-Puffer (48 Tage)<br/>• ubus JSON-RPC Client (/ubus Polling)<br/>• Webserver Port 80 & OTA (/update)<br/>• 24/7 Autark direkt an 12V Batterie versorgt!"]
+        LAPTOP["Labor-Laptops, Tablets & Smartphones"]
     end
 
     subgraph CLOUD_SERVICES["☁️ Cloud-Dienste & Messaging"]
@@ -39,10 +45,13 @@ flowchart TD
         GH["GitHub Pages Dashboard<br/>(randelab.github.io/RandeSolar)"]
     end
 
-    TOWER <-->|5G-NSA Funkfeld RSRP -93 dBm| TRB500
+    INV_AC ==>|230V AC Netzkabel| TRB500
+    INV_AC ==>|230V AC Netzkabel| POE
+    BAT_DC ==>|12V DC Direktabgriff| USB_STEPDOWN ==>|5V DC USB| ESP32
+    TOWER <-->|5G-NSA Funkfeld RSRP -81 bis -93 dBm| TRB500
     TRB500 -->|Gigabit Ethernet| POE
     POE -->|PoE Link| AP
-    AP -.->|2.4 GHz Wi-Fi Ch 1| ESP32
+    AP -.->|2.4 GHz Wi-Fi Ch 10| ESP32
     AP -.->|Wi-Fi 5 GHz / 2.4 GHz| LAPTOP
     ESP32 -->|HTTPS REST API| SUBA
     ESP32 -->|MQTTS WebSocket| MQTT
@@ -83,7 +92,18 @@ flowchart TD
 * **IP-Adresse:** `192.168.1.1`
 * **WLAN-SSID:** `RandeLab` (WPA2-PSK)
 * **Stromversorgung:** Power over Ethernet (PoE) über Injektor
-* **ESP32-Verbindung:** 2.4 GHz Wi-Fi (Kanal 1), Signalstärke: `-40 dBm bis -45 dBm` (100% Link-Qualität)
+* **ESP32-Verbindung:** 2.4 GHz Wi-Fi (Kanal 10), Signalstärke: `-45 dBm bis -50 dBm` (100% Link-Qualität)
+
+### 3.3 Stromversorgungs-Konzept: 230V AC (Router) vs. 12V DC Direkt (ESP32)
+Die Stromversorgung der Kommunikations- und Telemetrie-Infrastruktur ist architektonisch in zwei getrennte Ebenen unterteilt:
+
+1. **230V AC Sektor (Wechselrichter):**
+   * Das **Teltonika TRB500 5G-Gateway** und der **TP-Link Omada Access Point** (via PoE-Injektor) werden über das **230V AC Stromnetz** des RDDSPON 6000W Reinsinus-Wechselrichters versorgt.
+   * *Bedarfssteuerung:* Da der 6000W-Wechselrichter im Leerlauf ca. 15–25 Watt benötigt, kann das gesamte 230V-Netz (inkl. Router) bei längerer Abwesenheit oder zur Batterieschonung über den Hauptschalter abgeschaltet werden.
+2. **12V DC Dauerspeisung (Autarker ESP32-S3):**
+   * Der **ESP32-S3 Telemetrie-Controller** hängt **nicht** am 230V-Netz, sondern wird über einen **12V-zu-5V DC-DC USB-Wandler direkt an den 12V-Batteriepolen** betrieben.
+   * *Verbrauch:* Mit < 0.5 Watt (ca. 100 mA @ 5V) ist der ESP32 für die 380 Ah Batteriebank vernachlässigbar.
+   * *24/7 Autarkie:* Wird der 230V-Inverter ausgeschaltet, läuft der ESP32 unterbrechungsfrei weiter, lauscht per BLE auf den Victron MPPT 75|15 und zeichnet bis zu **48 Tage lang (35'000 Datensätze)** im Onboard-Flash auf. Sobald 230V und die Router wieder aktiv sind, drainiert der ESP32 alle Daten lückenlos in die Cloud.
 
 ---
 
@@ -117,6 +137,20 @@ In 95% aller Internetanschlüsse ist der Download 5- bis 10-mal schneller als de
    * Sinkt der SINR wie am RandeLab auf **`-3 dB`**, muss das Modem im Downlink auf **16-QAM** oder **QPSK** (nur 2 bis 4 Bit pro Symbol) herunterschalten. Dadurch bricht der theoretische Durchsatz um mehr als 60% ein.
 4. **Feuchtes Blätterdach & Reflexionen:**
    Der Randen ist dicht bewaldet. Die aktuell genutzten Frequenzen (1.8 GHz und 2.1 GHz) haben eine Wellenlänge von ca. 14–16 cm — genau in der Grössenordnung nasser Blätter und Äste. Diese wirken bei Regen und dichtem Hochnebel wie ein absorbierender und streuender Filter (*Multipath Fading*).
+
+### 4.3 Dynamisches 5G-NSA Scheduling: Band 8 (900 MHz) vs. Band 3 (1800 MHz) & Band 78 (3.5 GHz)
+Messungen im Live-Betrieb (November 2026) deckten das dynamische Band-Scheduling des Quectel RG501Q-EU Modems und der Salt-Basisstation auf:
+
+* **Ruhemodus (Idle / Schwachlast):**
+  * Das Modem wählt als Primärträger (`PCC`) bevorzugt **LTE Band 8 (900 MHz)** mit 10 MHz Kanalbandbreite (50 Resource Blocks).
+  * *Grund:* Mit **`-81 dBm`** liefert das 900-MHz-Signal den stärksten RSRP-Signalpegel am Randen (durchdringt Wald und Kuppe mühelos).
+  * *Durchsatz im Idle:* Limitiert auf ca. **`4.5 – 10 Mbit/s Down`** und **`11 – 15 Mbit/s Up`**.
+* **Lastmodus (Ookla-Speedtest & Traffic-Wakeup):**
+  * Sobald für mehrere Sekunden massiv Daten fliessen, schaltet die Basisstation sekundenschnell zusätzliche High-Speed-Träger per Carrier Aggregation (`SCC`) dazu:
+    * **`SCC1`:** **`NR5G BAND 78`** (3.5 GHz C-Band Midband) oder **`NR5G BAND n1`** (2.1 GHz).
+    * **`SCC2`:** **`LTE BAND 3`** (1800 MHz, 20 MHz Bandbreite).
+  * *Spitzendurchsatz bei Carrier Aggregation:* **`44.78 Mbit/s Download`** / **`83.16 Mbit/s Upload`**!
+  * Sobald der Datentransfer endet, baut die Zelle den 5G-Zusatzträger nach 1–2 Sekunden wieder ab, um Ressourcen und Energie zu sparen.
 
 ---
 
@@ -217,6 +251,21 @@ Der ESP32-S3 kommuniziert autonom im LAN mit dem Teltonika TRB500 über das Open
 * **Umrechnung im ESP32:**
   $$\text{Download Mbit/s} = \frac{\text{avgDownloadSpeed (Bytes/s)} \times 8}{1'000'000} \approx \mathbf{20.24\text{ Mbit/s}}$$
   $$\text{Upload Mbit/s} = \frac{\text{avgUploadSpeed (Bytes/s)} \times 8}{1'000'000} \approx \mathbf{80.56\text{ Mbit/s}}$$
+
+### 6.4 Grenznetz- & Auslands-Operator-Scan (`AT+COPS=?`)
+Auf der Kammlage des Randens (**857 m ü. M.**) reicht der optische und funktechnische Horizont bis weit in den deutschen Hegau und das Bundesland Baden-Württemberg. Über das CLI-Diagnosetool `scripts/chabis_scanner.py` kann ein 3GPP-Frequenzscan über alle sichtbaren Mobilfunkanbieter durchgeführt werden:
+
+| Land | Netzbetreiber | MCC / MNC | Funktechnik (RAT) | Status am Randen (857 m ü. M.) |
+| :--- | :--- | :---: | :---: | :--- |
+| 🇨🇭 **Schweiz** | **Sunrise** | `228 02` | **4G LTE & 5G NR** | Sichtbar / Broadcast |
+| 🇨🇭 **Schweiz** | **Swisscom** | `228 01` | **4G LTE & 5G NR** | Sichtbar / Broadcast |
+| 🇨🇭 **Schweiz** | **Salt / GoMo** | `228 03` | **4G LTE & 3G UTRAN** | **Aktiv eingebucht / Home Network** |
+| 🇩🇪 **Deutschland** | **Telekom.de** | `262 01` | **5G NR** | Sichtbar / Grenzüberschreitender Overspill |
+| 🇩🇪 **Deutschland** | **vodafone.de** | `262 02` | **5G NR** | Sichtbar / Grenzüberschreitender Overspill |
+| 🇩🇪 **Deutschland** | **1+1** | `262 23` | **4G LTE & 5G NR** | Sichtbar / Neues 5G-Kernnetz DE |
+
+> [!NOTE]
+> Dieser Scan belegt das enorme Potenzial des Standorts als grenzüberschreitendes Hochfrequenz- und Telekommunikations-Observatorium. Bei Ausfall der Schweizer Infrastruktur könnte das Gateway im Notfall auf deutsches Roaming umschalten.
 
 ---
 

@@ -33,14 +33,19 @@ flowchart TD
         FUSE_INV["150A–200A Mega/ANL Sicherung (Dringend empfohlen!)"]
     end
 
-    subgraph INVERTER_UNIT["⚡ 230V AC Stromnetz"]
+    subgraph INVERTER_UNIT["⚡ 230V AC Stromnetz (Bedarfsgesteuert)"]
         INV["RDDSPON 6000W Pure Sine Wave Inverter<br/>DC 12V zu AC 230V 50Hz Echte Sinuswelle<br/>6000W Peak / ~3000W Dauerlast"]
         AC_SOCKETS["2x EU-Schuko Steckdosen<br/>(Laptops, Werkzeuge, Ladegeräte)"]
+        AC_ROUTER_PSU["230V AC Netzteile & PoE-Injektor"]
+    end
+
+    subgraph DC_DIRECT["🔌 12V DC Kleinspannungs-Versorgung (24/7 Dauerbetrieb)"]
+        USB_CONV["12V ➔ 5V DC-DC USB-Wandler<br/>(Direktabgriff an 12V-Batteriepolen)"]
     end
 
     subgraph MONITORING["📡 Telemetrie & Microclimate Observatory"]
-        ESP32["ESP32-S3 Station (randesolar.local)<br/>• Hardware-AES BLE Scanner<br/>• 35'000 Flash-Puffer (48 Tage)<br/>• 5G Speedtest & Latenz-Benchmarking"]
-        ROUTER["5G Cellular Router (RandeLab WLAN)"]
+        ESP32["ESP32-S3 Station (randesolar.local)<br/>• Hardware-AES BLE Scanner<br/>• 35'000 Flash-Puffer (48 Tage)<br/>• 24/7 autark über 12V Batterie versorgt!"]
+        ROUTER["2x Netzwerk-Geräte (230V AC versorgt):<br/>• Teltonika TRB500 5G Gateway (192.168.2.1)<br/>• TP-Link Omada WLAN AP (192.168.1.1)"]
         CLOUD["Supabase PostgreSQL & HiveMQ MQTT"]
     end
 
@@ -54,6 +59,8 @@ flowchart TD
     BATT_BANK -->|25-35 mm² Batteriekabel| FUSE_INV
     FUSE_INV --> INV
     INV --> AC_SOCKETS
+    AC_SOCKETS ==>|230V AC| AC_ROUTER_PSU ==>|230V Speisung| ROUTER
+    BATT_BANK ==>|12V DC Direktanschluss| USB_CONV ==>|5V DC USB| ESP32
     DONGLE -.->|BLE Instant Beacons| ESP32
     ESP32 <-->|WLAN & MQTT| ROUTER
     ROUTER <-->|5G Uplink| CLOUD
@@ -104,6 +111,20 @@ Die 4 VOLTIC Batterien (DIN 595, je 95 Ah) sind parallel geschaltet und bilden e
 | :---: | :---: |
 | ![4x VOLTIC Batterien und RDDSPON 6000W Wechselrichter](./system_docu/batteries_and_inverter.jpg) | ![230V Hauptschalter und Installation vor Ort](./system_docu/hauptschalter_230V.jpg) |
 | *4x VOLTIC DIN 595 parallel (380 Ah @ 12V) mit RDDSPON 6000W Pure Sine Wave Inverter* | *Robuster 230V AC-Haupttrennschalter zur sicheren Trennung des Labor-Netzes* |
+
+### 2.4 Zweistufige Stromversorgungs-Architektur (230V AC vs. 12V DC Direkt)
+Ein zentraler mechatronischer Designvorteil von RandeSolar ist die bewusste Trennung der Spannungsversorgungen zwischen Netzwerk und Telemetrie:
+
+1. **230V AC Sektor (Wechselrichter):**
+   * Die beiden Netzwerk-Komponenten – das **Teltonika TRB500 5G-Gateway** und der **TP-Link Omada WLAN Access Point** (inkl. PoE-Injektor) – werden über das **230V AC Netz** des RDDSPON-Inverters versorgt.
+   * *Eigenverbrauch:* Ein 6000W-Wechselrichter benötigt im Leerlauf typischerweise ~15–25 Watt. Wird das Labor verlassen oder soll im Winter bei mehrtägigem Nebel Energie gespart werden, kann der 230V-Hauptschalter umgelegt werden, wodurch Inverter und Router stromlos werden.
+2. **12V DC Dauerversorgungs-Sektor (Autarker ESP32-S3):**
+   * Der **ESP32-S3 Telemetrie-Controller** ist **nicht** an 230V angeschlossen, sondern wird über einen kompakten **12V-zu-5V DC-DC USB-Wandler direkt an den 12V-Batteriepolen** betrieben.
+   * *Verbrauch:* Mit < 0.5 Watt (100 mA @ 5V) ist der ESP32 für die 380 Ah Batteriebank vernachlässigbar klein.
+   * *Blackout- und Winter-Resilienz:* Selbst wenn der 230V-Wechselrichter wochenlang ausgeschaltet bleibt, arbeitet der ESP32-S3 unterbrechungsfrei weiter:
+     * Er empfängt 24/7 alle BLE-Instant-Beacons des Victron MPPT-Ladereglers.
+     * Er puffert alle Lade-, Spannungs- und Solarertragsdaten lückenlos in seinem **35'000-Datensatz-Flash-Speicher (LittleFS)**.
+     * Sobald der 230V-Wechselrichter wieder eingeschaltet wird und die beiden Router hochfahren, verbindet sich der ESP32 automatisch wieder mit dem RandeLab-WLAN und leert ("drained") alle aufgelaufenen Datensätze automatisch und chronologisch in die Supabase Cloud-Datenbank!
 
 ---
 

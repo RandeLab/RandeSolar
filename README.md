@@ -19,6 +19,7 @@ The **ESP32-S3** handles the entire pipeline autonomously 24/7 without requiring
 7. **Standalone Telegram Bot (`@RandeSolarBot`)**: Direct replies to commands (`/status`, `/weather`, `/mood`, `/speed`, `/ping`) and automated 20:00 evening summary reports.
 8. **Onboard Web Server & OTA**: Runs openBrushograph Kraftwerk Studio on port 80 at **[http://randesolar.local](http://randesolar.local)** with wireless Over-The-Air firmware updates (`ArduinoOTA` + Web UI at `/update`).
 9. **GitHub Pages Cloud Dashboard**: Accessible worldwide at **[https://randelab.github.io/RandeSolar/](https://randelab.github.io/RandeSolar/)** with 24-hour time formatting across all charts and metrics.
+10. **Dual-Tier Power Architecture (24/7 Autarky)**: The ESP32-S3 is powered directly from the 12V DC battery bank via a 12V-to-5V USB converter (<0.5W), ensuring continuous BLE beacon tracking and flash logging even when the 6000W 230V AC inverter and cellular routers are completely shut down to conserve energy.
 
 ---
 
