@@ -1420,6 +1420,83 @@ void handleWifiScanApi() {
     server.send(200, "application/json", json);
 }
 
+String applyLedCommand(const String& cmd, uint32_t durationSec = 10) {
+    uint32_t durationMs = durationSec * 1000;
+    String lower = cmd;
+    lower.toLowerCase();
+
+    if (lower.indexOf("strobe") >= 0 || lower.indexOf("disco") >= 0 || lower.indexOf("party") >= 0 || lower.indexOf("blink") >= 0) {
+        g_ledOverrideStrobe = true;
+        g_ledOverrideUntilMs = millis() + durationMs;
+        Serial.printf("[LED 💡] DISCO STROBE activated (%us)\n", durationSec);
+        return "{\"status\":\"ok\",\"action\":\"disco_strobe\",\"duration_sec\":" + String(durationSec) + "}";
+    }
+
+    g_ledOverrideStrobe = false;
+    if (lower.indexOf("red") >= 0 || lower.indexOf("rot") >= 0) {
+        g_ledOverrideR = 255; g_ledOverrideG = 0; g_ledOverrideB = 0;
+    } else if (lower.indexOf("green") >= 0 || lower.indexOf("grun") >= 0 || lower.indexOf("grün") >= 0) {
+        g_ledOverrideR = 0; g_ledOverrideG = 255; g_ledOverrideB = 0;
+    } else if (lower.indexOf("blue") >= 0 || lower.indexOf("blau") >= 0) {
+        g_ledOverrideR = 0; g_ledOverrideG = 60; g_ledOverrideB = 255;
+    } else if (lower.indexOf("pink") >= 0 || lower.indexOf("magenta") >= 0 || lower.indexOf("purple") >= 0) {
+        g_ledOverrideR = 255; g_ledOverrideG = 0; g_ledOverrideB = 180;
+    } else if (lower.indexOf("cyan") >= 0 || lower.indexOf("türkis") >= 0) {
+        g_ledOverrideR = 0; g_ledOverrideG = 240; g_ledOverrideB = 255;
+    } else if (lower.indexOf("yellow") >= 0 || lower.indexOf("gelb") >= 0 || lower.indexOf("gold") >= 0) {
+        g_ledOverrideR = 255; g_ledOverrideG = 200; g_ledOverrideB = 0;
+    } else if (lower.indexOf("white") >= 0 || lower.indexOf("weiss") >= 0) {
+        g_ledOverrideR = 255; g_ledOverrideG = 255; g_ledOverrideB = 255;
+    } else if (lower.indexOf("orange") >= 0) {
+        g_ledOverrideR = 255; g_ledOverrideG = 120; g_ledOverrideB = 0;
+    } else if (lower.indexOf("off") >= 0 || lower.indexOf("aus") >= 0) {
+        g_ledOverrideR = 0; g_ledOverrideG = 0; g_ledOverrideB = 0;
+    } else {
+        // Default bright neon magenta flash
+        g_ledOverrideR = 255; g_ledOverrideG = 0; g_ledOverrideB = 255;
+    }
+
+    g_ledOverrideUntilMs = millis() + durationMs;
+    setPixel(g_ledOverrideR, g_ledOverrideG, g_ledOverrideB);
+    char buf[128];
+    snprintf(buf, sizeof(buf), "{\"status\":\"ok\",\"action\":\"led\",\"r\":%u,\"g\":%u,\"b\":%u,\"duration_sec\":%u}",
+        g_ledOverrideR, g_ledOverrideG, g_ledOverrideB, durationSec);
+    Serial.printf("[LED 💡] Set to R=%u G=%u B=%u for %us\n", g_ledOverrideR, g_ledOverrideG, g_ledOverrideB, durationSec);
+    return String(buf);
+}
+
+void handleLedApi() {
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    server.sendHeader("Access-Control-Allow-Headers", "*");
+
+    if (server.method() == HTTP_OPTIONS) {
+        server.send(204);
+        return;
+    }
+
+    String color = "party";
+    if (server.hasArg("color")) {
+        color = server.arg("color");
+    } else if (server.hasArg("cmd")) {
+        color = server.arg("cmd");
+    } else if (server.hasArg("action")) {
+        color = server.arg("action");
+    }
+
+    uint32_t dur = 10;
+    if (server.hasArg("duration")) {
+        dur = server.arg("duration").toInt();
+        if (dur == 0) dur = 10;
+    }
+
+    String res = applyLedCommand(color, dur);
+    if (mqttClient.connected()) {
+        mqttClient.publish(MQTT_TOPIC_ACK, res.c_str());
+    }
+    server.send(200, "application/json", res);
+}
+
 void measureLatency() {
     if (WiFi.status() != WL_CONNECTED) return;
 
@@ -1702,44 +1779,8 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
         }
 
         // Remote LED Command Handler
-        uint32_t durationMs = 8000; // 8 seconds override
-        if (msg.indexOf("strobe") >= 0 || msg.indexOf("disco") >= 0 || msg.indexOf("blink") >= 0) {
-            g_ledOverrideStrobe = true;
-            g_ledOverrideUntilMs = millis() + durationMs;
-            mqttClient.publish(MQTT_TOPIC_ACK, "{\"status\":\"ok\",\"action\":\"disco_strobe\",\"duration_sec\":8}");
-            Serial.println("[MQTT 💡] Remote DISCO STROBE activated (8s)");
-            return;
-        }
-
-        g_ledOverrideStrobe = false;
-        if (msg.indexOf("red") >= 0 || msg.indexOf("rot") >= 0) {
-            g_ledOverrideR = 255; g_ledOverrideG = 0; g_ledOverrideB = 0;
-        } else if (msg.indexOf("green") >= 0 || msg.indexOf("grun") >= 0 || msg.indexOf("grün") >= 0) {
-            g_ledOverrideR = 0; g_ledOverrideG = 255; g_ledOverrideB = 0;
-        } else if (msg.indexOf("blue") >= 0 || msg.indexOf("blau") >= 0) {
-            g_ledOverrideR = 0; g_ledOverrideG = 60; g_ledOverrideB = 255;
-        } else if (msg.indexOf("pink") >= 0 || msg.indexOf("magenta") >= 0 || msg.indexOf("purple") >= 0) {
-            g_ledOverrideR = 255; g_ledOverrideG = 0; g_ledOverrideB = 180;
-        } else if (msg.indexOf("cyan") >= 0 || msg.indexOf("türkis") >= 0) {
-            g_ledOverrideR = 0; g_ledOverrideG = 240; g_ledOverrideB = 255;
-        } else if (msg.indexOf("yellow") >= 0 || msg.indexOf("gelb") >= 0 || msg.indexOf("gold") >= 0) {
-            g_ledOverrideR = 255; g_ledOverrideG = 200; g_ledOverrideB = 0;
-        } else if (msg.indexOf("white") >= 0 || msg.indexOf("weiss") >= 0) {
-            g_ledOverrideR = 255; g_ledOverrideG = 255; g_ledOverrideB = 255;
-        } else if (msg.indexOf("off") >= 0 || msg.indexOf("aus") >= 0) {
-            g_ledOverrideR = 0; g_ledOverrideG = 0; g_ledOverrideB = 0;
-        } else {
-            // Default bright neon flash
-            g_ledOverrideR = 255; g_ledOverrideG = 0; g_ledOverrideB = 255;
-        }
-
-        g_ledOverrideUntilMs = millis() + durationMs;
-        setPixel(g_ledOverrideR, g_ledOverrideG, g_ledOverrideB);
-        char ack[120];
-        snprintf(ack, sizeof(ack), "{\"status\":\"ok\",\"action\":\"led\",\"r\":%u,\"g\":%u,\"b\":%u,\"duration_sec\":8}",
-            g_ledOverrideR, g_ledOverrideG, g_ledOverrideB);
-        mqttClient.publish(MQTT_TOPIC_ACK, ack);
-        Serial.printf("[MQTT 💡] Remote LED override active: R=%u G=%u B=%u (8s)\n", g_ledOverrideR, g_ledOverrideG, g_ledOverrideB);
+        String ack = applyLedCommand(msg, 8);
+        mqttClient.publish(MQTT_TOPIC_ACK, ack.c_str());
     }
 }
 
@@ -2341,6 +2382,7 @@ void setup() {
     server.on("/api/buffer/csv", handleBufferCsv);
     server.on("/api/speedtest", handleSpeedtestApi);
     server.on("/api/wifi/scan", handleWifiScanApi);
+    server.on("/api/led", handleLedApi);
     server.on("/update", HTTP_GET, handleOtaPage);
     server.on("/update", HTTP_POST, handleOtaUploadDone, handleOtaUploadChunk);
     server.begin();
