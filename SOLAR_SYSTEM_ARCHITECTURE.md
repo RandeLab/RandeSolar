@@ -12,62 +12,62 @@
 
 ```mermaid
 flowchart TD
-    subgraph PV_ARRAY["☀️ Energetica e.Classic M HC Modulfeld (120 Halbzellen)"]
-        P1["Modul 1 (aktiv vor Gebäude)<br/>380 Wp • Voc 41.9V • Vmp 35.0V"]
-        P2["Modul 2 (aktiv vor Gebäude)<br/>380 Wp • Voc 41.9V • Vmp 35.0V"]
-        P_RESERVE["6x Reservemodule im Schuppen<br/>6x ~380 Wp = ~2.280 Wp Potenzial"]
+    subgraph PV_FIELD["☀️ Photovoltaik-Feld (Südwand)"]
+        P1["Modul 1: Energetica e.Classic 380 Wp<br/>(Voc 41.9V • Vmp 35.0V)"]
+        P2["Modul 2: Energetica e.Classic 380 Wp<br/>(Voc 41.9V • Vmp 35.0V)"]
+        P_RES["6x Reservemodule im Schuppen<br/>(~2.28 kWp Ausbaupotenzial)"]
     end
 
-    subgraph MPPT_UNIT["⚡ Victron BlueSolar MPPT 75 | 15"]
-        MPPT["MPPT Laderegler<br/>Max. 75V Voc | Max. 15A Ladestrom (~216W @ 12V)"]
-        DONGLE["VE.Direct Bluetooth Smart Dongle<br/>AES-128-CTR Instant Beacon 0x02E1"]
+    subgraph MPPT_CTRL["⚡ MPPT Laderegelung & Sensorik"]
+        MPPT["Victron BlueSolar MPPT 75 | 15<br/>Max. 75V Voc | Max. 15A Ladestrom (~216W @ 12V)"]
+        DONGLE["VE.Direct Bluetooth Smart Dongle<br/>AES-128-CTR Instant Beacon (0x02E1)"]
         MPPT --- DONGLE
     end
 
-    subgraph DC_BUS["🔋 12V DC Batteriespeicher (4x VOLTIC Parallel = 380 Ah)"]
+    subgraph BATT_SYSTEM["🔋 12V DC Batteriespeicher (4x VOLTIC Parallel = 380 Ah)"]
         BATT1["VOLTIC DIN 595 (95 Ah)"]
         BATT2["VOLTIC DIN 595 (95 Ah)"]
         BATT3["VOLTIC DIN 595 (95 Ah)"]
         BATT4["VOLTIC DIN 595 (95 Ah)"]
-        BATT_BANK["380 Ah @ 12V (4.56 kWh Brutto / ~2.3 kWh Nutzbar)"]
-        FUSE_INV["150A–200A Mega/ANL Sicherung (Dringend empfohlen!)"]
+        BATT_BANK["380 Ah @ 12V Bank (4.56 kWh Brutto / ~2.3 kWh Nutzbar)<br/><i>Diagonaler Anschluss zur gleichmässigen Lastverteilung</i>"]
+        FUSE["150A–200A Mega/ANL Schmelzsicherung"]
     end
 
-    subgraph INVERTER_UNIT["⚡ 230V AC Stromnetz & Umschalt-Infrastruktur"]
-        INV["RDDSPON 6000W Pure Sine Wave Inverter<br/>DC 12V zu AC 230V 50Hz Echte Sinuswelle<br/>6000W Peak / ~3000W Dauerlast"]
-        GEN["⛽ Notstrom-Generator (im Schuppen)<br/>Benzin/Diesel-Aggregat für Schlechtwetter & Grosslasten"]
-        CHANGEOVER["🔀 230V Netz-Umschalter (1 - 0 - 2)<br/>(Batterie / Inverter ⟷ AUS ⟷ Generator)"]
-        AC_SOCKETS["230V AC Labor-Hausnetz<br/>Schweizer T13-Steckdosen (SEV 1011)"]
-        AC_ROUTER_PSU["230V AC Netzteile für Router & AP"]
+    subgraph DC_LOW["🔌 12V DC Kleinspannungs-Sektor (24/7 Dauerbetrieb autark)"]
+        USB["12V ➔ 5V DC-DC USB-Wandler<br/>(Direktabgriff an 12V-Batteriepolen)"]
+        ESP["ESP32-S3 Telemetrie-Station (randesolar.local)<br/>• 24/7 autark direkt an 12V versorgt (< 0.5 W)<br/>• Hardware-AES BLE Scanner<br/>• 35'000 LittleFS Flash-Puffer (48 Tage)"]
     end
 
-    subgraph DC_DIRECT["🔌 12V DC Kleinspannungs-Versorgung (24/7 Dauerbetrieb)"]
-        USB_CONV["12V ➔ 5V DC-DC USB-Wandler<br/>(Direktabgriff an 12V-Batteriepolen)"]
+    subgraph AC_GRID["⚡ Duales 230V AC Stromnetz (Schweizer T13 / SEV 1011)"]
+        INV["RDDSPON 6000W Pure Sine Wave Inverter<br/>DC 12V zu AC 230V 50Hz (Leerlauf ~15W)"]
+        GEN["⛽ Notstrom-Generator (im Schuppen)<br/>Benzin/Diesel für Grosslast & Schlechtwetter"]
+        SWITCH["🔀 230V Netz-Umschalter (1 - 0 - 2)<br/>1: Batterie/Inverter ⟷ 0: AUS ⟷ 2: Generator"]
+        T13["Schweizer T13 Steckdosennetz<br/>(Werkstatt-Maschinen & Router-Netzteile)"]
     end
 
-    subgraph MONITORING["📡 Telemetrie & Microclimate Observatory"]
-        ESP32["ESP32-S3 Station (randesolar.local)<br/>• Hardware-AES BLE Scanner<br/>• 35'000 Flash-Puffer (48 Tage)<br/>• 24/7 autark direkt an 12V Batterie versorgt!"]
-        ROUTER["2x Netzwerk-Geräte (am 230V Hausnetz):<br/>• Teltonika TRB500 5G Gateway (192.168.2.1)<br/>• TP-Link Omada WLAN AP (192.168.1.1)"]
-        CLOUD["Supabase PostgreSQL & HiveMQ MQTT"]
+    subgraph NET_MINIMAL["🌐 Netzwerk & Cloud-Uplink (230V-gespeist)"]
+        NET["230V Router-Infrastruktur:<br/>• Teltonika TRB500 (5G Gateway)<br/>• TP-Link Omada WLAN Access Point"]
+        CLOUD["Supabase PostgreSQL & HiveMQ MQTT<br/>(Live Web Dashboard & Telegram Bot)"]
     end
 
     P1 -->|Parallel 1S2P| MPPT
     P2 -->|Parallel 1S2P| MPPT
-    MPPT -->|12V Ladekabel max 15A| BATT_BANK
+    MPPT -->|12V Ladekabel max. 15A| BATT_BANK
     BATT1 --- BATT_BANK
     BATT2 --- BATT_BANK
     BATT3 --- BATT_BANK
     BATT4 --- BATT_BANK
-    BATT_BANK -->|25-35 mm² Batteriekabel| FUSE_INV
-    FUSE_INV --> INV
-    INV ==>|Quelle 1: Batterie/Inverter| CHANGEOVER
-    GEN ==>|Quelle 2: Generator-Netz| CHANGEOVER
-    CHANGEOVER ==>|230V AC Speisung| AC_SOCKETS
-    AC_SOCKETS ==>|230V T13 Speisung| AC_ROUTER_PSU ==>|230V Speisung| ROUTER
-    BATT_BANK ==>|12V DC Direktanschluss| USB_CONV ==>|5V DC USB| ESP32
-    DONGLE -.->|BLE Instant Beacons| ESP32
-    ESP32 <-->|WLAN & MQTT| ROUTER
-    ROUTER <-->|5G Uplink| CLOUD
+    BATT_BANK -->|25-35 mm² Batteriekabel| FUSE
+    FUSE --> INV
+    INV ==>|Quelle 1: Batterie/Inverter| SWITCH
+    GEN ==>|Quelle 2: Generator-Netz| SWITCH
+    SWITCH ==>|230V AC Speisung| T13
+    T13 ==>|230V Netzteile| NET
+    BATT_BANK ==>|12V DC Direktanschluss| USB
+    USB ==>|5V DC USB| ESP
+    DONGLE -.->|BLE Instant Beacons| ESP
+    ESP <-->|WLAN & MQTT| NET
+    NET <-->|5G Mobilfunk Uplink| CLOUD
 ```
 
 ---
@@ -82,31 +82,22 @@ Die beiden aktuell aktiven Module sind an der Naturstein- und Holzwand des Rande
 | ![Aktuelle 2-Panel-Aufstellung am RandeLab](./system_docu/solarpanel_2_panel_setup.jpg) | ![Typenschild e.Classic M HC 380 mit 384.9 Wp Flash-Test](./system_docu/solarpanel_qr_info.jpg) |
 | *Zwei Energetica e.Classic M HC Module an der RandeLab-Wand* | *Laser-Typenschild: 380er Klasse, Flash-Test 384,9 Wp!* |
 
-### 2.2 Internet-Infrastruktur & Mobilfunk-Gateway
-Die Telemetrie-Übertragung ins Internet und das ESP32-WLAN werden über ein zweistufiges professionelles Netzwerk-Setup realisiert:
+### 2.2 Netzwerk- & Gateway-Infrastruktur (am 230V-Hausnetz)
+Die Anbindung an das Internet und das lokale WLAN-Netzwerk des RandeLabs erfolgt über zwei Komponenten:
 
-* **Outdoor 5G Gateway (`192.168.2.1`):** **Teltonika TRB500** (Hostname `Randen5G`, RutOS R_00.07.24.7), industrielles 5G-Gateway im wetterfesten Schutzgehäuse unter dem Holzvordach.
-  * **5G-Modem:** Quectel RG501Q-EU (Qualcomm Snapdragon X55)
-  * **Provider & Netz:** **GoMo (Salt Schweiz)**, 5G-NSA (Non-Standalone) mit Carrier Aggregation
-  * **Funkzelle:** Cell ID `29858817` (TAC: `47007`, PCID: `54`)
-  * **Primärband (4G-Anker):** **LTE Band 3 (1800 MHz)** • 20 MHz Bandbreite • RSRP `-93 dBm` • RSRQ `-13 dB`
-  * **Sekundärband (5G):** **5G Band N1 (2100 MHz)** • 20 MHz Bandbreite • RSRP `-106 dBm` • SINR `-3 dB`
-* **Indoor WLAN Access Point (`192.168.1.1`):** **TP-Link Omada Access Point**, per PoE versorgt, spannt das interne RandeLab-WLAN auf und verbindet den ESP32-S3 (`192.168.1.100`) mit dem Teltonika-Gateway.
-
-#### Physikalische Erklärung: Mikroklima vs. Internet-Geschwindigkeit 🌧️🌲
-Die Live-Abfrage des Teltonika-Gateways bestätigt den direkten Einfluss des Randen-Wetters auf die Mobilfunkleistung:
-1. **Frequenzdämpfung:** Die Verbindung nutzt 1.8 GHz (B3) und 2.1 GHz (N1). Diese Frequenzen reagieren empfindlich auf Wassertröpfchen in der Luft (dichter Hochnebel, Regen) und besonders auf das umgebende **nasse Blätterdach des Waldes**, welches wie ein absorbierender Schirm wirkt.
-2. **Signal-Rauschabstand (SINR):** Bei feuchtem Herbstwetter sinkt der Störabstand auf **`SINR = -3 dB`** ab. Das Rauschen überwiegt, das Modem muss Pakete wiederholen (*Retransmissions*), wodurch der Durchsatz auf 1.5 – 5 Mbit/s sinkt.
-3. Bei trockener, klarer Witterung steigt der SINR in den positiven Bereich (+5 bis +15 dB), und die Datenraten verdoppeln bis vervierfachen sich.
+* **Outdoor 5G Gateway (`192.168.2.1`):** **Teltonika TRB500** Industrie-Gateway, wetterfest unter dem Holzvordach montiert, stellt über das Mobilfunknetz den WAN-Uplink her.
+* **Indoor WLAN Access Point (`192.168.1.1`):** **TP-Link Omada**, per PoE-Injektor versorgt, spannt das lokale RandeLab-WLAN auf.
+* **230V-Speisung:** Beide Netzwerkkomponenten sind über Steckernetzteile an das **230V AC Hausnetz** angeschlossen und laufen somit, wenn der Hauptumschalter auf Inverter (1) oder Generator (2) steht. Bei ausgeschaltetem 230V-Netz bleibt der ESP32-S3 autark über seine direkte 12V-Leitung aktiv und puffert alle Solardaten im internen Flash (siehe Abschnitt 2.4).
 
 | Outdoor 4G/5G Teltonika Gateway | Indoor TP-Link Omada WLAN-Router |
 | :---: | :---: |
 | ![Aussenantenne / 4G-5G Outdoor-CPE](./system_docu/router_outside.jpg) | ![TP-Link Omada WLAN Access Point im Gebäude](./system_docu/router_inside.jpg) |
-| *Wetterfeste Teltonika 4G/5G Station (192.168.2.1) geschützt unter dem Holzvordach* | *TP-Link Access Point (192.168.1.1) mit PoE-Speisung im RandeLab-Innenraum* |
+| *Wetterfeste Teltonika TRB500 Station (`192.168.2.1`) unter dem Holzvordach* | *TP-Link Access Point (`192.168.1.1`) mit PoE-Speisung im RandeLab-Innenraum* |
 
 > [!NOTE]
-> Ausführliche Details zu den Hochfrequenz-Messwerten, Band-Locking (700 MHz / 3.5 GHz N78), der ubus-API-Architektur und der Asymmetrie-Analyse (80 Mbit/s Up vs. 20 Mbit/s Down) sind im separaten Dokument dokumentiert:  
-> 👉 [**`NETWORK_5G_INFRASTRUCTURE.md`**](./NETWORK_5G_INFRASTRUCTURE.md)
+> **Ausführliche Mobilfunk- & HF-Dokumentation im Schwesterdokument:**  
+> Sämtliche HF-Messwerte, 5G-NSA Trägerbündelung (LTE B3 / 5G N1), Signalanalysen (RSRP/SINR vs. Randen-Waldfeuchte), Ookla WAN-Speedtests (80 Mbit/s Up / 22 Mbit/s Down), die ubus JSON-RPC Router-API, externe Antennenoptionen, SIM-Vergleiche (Schweiz vs. Deutschland) sowie die geographische Funkfeldkarte sind im separaten Fachbericht dokumentiert:  
+> 👉 [**`NETWORK_5G_INFRASTRUCTURE.md`**](./NETWORK_5G_INFRASTRUCTURE.md) & [**`docs/maps/README.md`**](./docs/maps/README.md)
 
 ### 2.3 Batteriespeicher (4x VOLTIC) & RDDSPON 6000W Inverter
 Die 4 VOLTIC Batterien (DIN 595, je 95 Ah) sind parallel geschaltet und bilden eine massive 380 Ah Pufferbank (4.56 kWh Bruttospeicher). Darauf montiert sitzt der RDDSPON 6000W Reinsinus-Wechselrichter:
@@ -280,54 +271,40 @@ Das Kraftwerk wird rund um die Uhr durch einen autarken ESP32-S3 Mikrocontroller
 
 ---
 
-## 9. Teltonika TRB500 ubus JSON-RPC Gateway & Speedtest-Analyse
+## 9. Telemetrie-Integration & Datenfluss
 
-### 9.1 Warum der ESP32-Speedtest die 5G-Leitung unterbewertete
-Auf dem ESP32-S3 ergab der softwarebasierte Speedtest typischerweise Werte zwischen **$2.5\text{ Mbit/s}$ und $4.5\text{ Mbit/s}$**. Dies führte zu der Vermutung, das Mobilfunknetz sei schwach. Die elektrotechnische Ursache liegt jedoch in der Mikrocontroller-Architektur des ESP32:
-1. **LwIP TCP-Empfangsfenster (TCP Window):** Das standardmässige TCP-Window des ESP32 Arduino-Cores beträgt $TCP\_WND = 5744\text{ Bytes}$ (~5.7 KB).
-2. **Bandwidth-Delay-Product (BDP):** Bei einer typischen Mobilfunk-Latenz von $RTT \approx 45\text{ ms}$ kann ein einzelner TCP-Socket mathematisch maximal:
-   $$\text{Durchsatz}_{\text{max}} = \frac{TCP\_WND}{RTT} = \frac{5744 \times 8\text{ Bit}}{0.045\text{ s}} \approx \mathbf{1.02\text{ Mbit/s}}$$
-   übertragen. Selbst mit 4 parallelen Streams ist der Mikrocontroller-Durchsatz durch den gemeinsamen 2.4 GHz Wi-Fi/BLE-Transceiver und CPU-Context-Switches limitiert.
-3. **Ergebnis:** Der ESP32-Speedtest mass nicht die reale 5G-Anbindung, sondern die interne SoC-Netzwerkverarbeitung des ESP32!
+Die Telemetrie-Architektur verbindet die mechatronische Solaranlage mit der Überwachung und Cloud-Synchronisation:
 
-### 9.2 Direkte Router-Integration via ubus JSON-RPC
-Um die **echte physikalische Mobilfunkqualität** zu erfassen, verbindet sich der ESP32-S3 nun direkt über das interne LAN mit dem Teltonika TRB500 Gateway (`http://192.168.2.1/ubus`):
-* **Authentifizierung:** POST an `/ubus` mit `session.login` (`admin` / `Transist0r!`), liefert einen 300-Sekunden Session-Token (`ubus_rpc_session`), der 4 Minuten lang im RAM gecached wird.
-* **Telemetrie-Abruf:** POST an `/ubus` mit `gsm.modem0 -> info`.
-* **Ausgelesene HF-Parameter:**
-  * **Empfangsstärke (RSRP):** z.B. **`-93 dBm`** (hervorragende physikalische Signalstärke im Wald)
-  * **Störabstand (SINR):** z.B. **`-3 dB`** (erklärt die wetterbedingten Schwankungen bei Nebel & feuchtem Laub)
-  * **Empfangsqualität (RSRQ):** z.B. **`-15 dB`**
-  * **Signalqualität:** z.B. **`39%`**
-  * **Aktive Trägerbündelung (Carrier Aggregation):** **`LTE B3 (1800 MHz) + 5G N1 (2100 MHz)`** (5G-NSA)
-  * **Provider:** **GoMo (Salt)**
-  * **Basisstations-ID:** Cell ID `29858817` (TAC `47007`)
-  * **Modem-Temperatur:** **`24.0 °C`**
+```
+[Victron MPPT 75|15]
+        │
+        ▼ (BLE Instant Beacons alle 2-4s • AES-128 Hardware-Decrypt)
+[ESP32-S3 Station (12V DC Direktversorgung, < 0.5 W)]
+        │
+        ├─► [LittleFS Flash-Puffer: 35'000 Datensätze / 48 Tage Offline-Autarkie]
+        │
+        ▼ (WLAN 2.4 GHz • wenn 230V Hausnetz aktiv)
+[TP-Link WLAN AP & Teltonika TRB500 5G Gateway (am 230V Netz)]
+        │
+        ├─► ubus JSON-RPC Router-Telemetrie (Signal, Band, Speed)
+        ▼ (5G Mobilfunk WAN-Uplink)
+[Supabase Cloud PostgreSQL & HiveMQ MQTT Broker]
+        │
+        ├─► Web Dashboard (randelab.github.io/RandeSolar)
+        └─► Telegram Bot (@RandeSolarBot)
+```
 
-### 9.3 Nativer Ookla 5G-Speedtest auf dem Teltonika Gateway
-Statt den ESP32 mit künstlichen HTTP-Downloads zu überlasten, triggert das System nun direkt auf dem Router den nativen Ookla-Speedtest des RutOS:
-* **Trigger:** POST an `http://192.168.2.1/ubus` mit `speedtest -> run`.
-* **Ergebnisauswertung:** Der ESP32 liest das strukturierte JSON-Ergebnis aus `/tmp/speedtest.json` über `file -> read`.
-* **Reale Messwerte an der RandeLab-Station (Server: Ookla WWZ / Salt Mobile):**
-  * **Download:** **20.24 – 22.21 Mbit/s** *(entspricht exakt der Laptop-Referenzmessung)*
-  * **Upload:** **78.33 – 80.56 Mbit/s**
-  * **Latenz:** **~27 ms** (ohne TCP-Bufferbloat)
-* **Status:** `FINISHED` (automatische Umschaltung während aktiven Messungen)
-
-### 9.4 End-to-End Transparenz auf allen Kanälen
-Die echten 5G-Modem-Werte, nativer WAN-Speedtest und die lokalen ESP32-WLAN-Werte werden nun nebeneinander dargestellt:
-* **REST-API:** `GET /api/live` liefert `net_mbps`, `net_up_mbps`, `cell_down_mbps`, `cell_up_mbps`, `cell_speed_state`, `cell_rsrp`, `cell_sinr`, `cell_band`, `cell_operator`, `cell_temp`.
-* **MQTT:** Kontinuierliche Veröffentlichung auf `randelab/solar/telemetry`.
-* **Web-Dashboard:** Live-Karten für 5G-Gateway-Empfang, WAN-Durchsatz und Trägerbündelung.
-* **Telegram:** Befehle `/status` und `/speed` liefern sofort die echten Router-Leitungsdaten.
+### 9.1 Intelligente Offline- / Online-Betriebsmodi
+* **Online-Modus (230V-Netz aktiv):** Der ESP32 sendet alle 20 Sekunden Live-Messwerte (Solarleistung, Batteriespannung, Ladestrom, Historie) an die Supabase-Datenbank und via MQTT ins globale Web-Dashboard. Parallel fragt er über das interne LAN die Mobilfunkdaten des Teltonika-Routers ab.
+* **Offline-Modus (230V-Netz aus):** Bleibt das 230V-Netz ausgeschaltet (um den ~15W Inverter-Ruhestrom bei Abwesenheit zu sparen), speichert der 12V-autarke ESP32 alle Solar- und Batteriedaten lückenlos im Onboard-Flash ab. Sobald das 230V-Netz wieder eingeschaltet wird und die Router booten, leert der Controller den Puffer automatisch mit hoher Geschwindigkeit (bis zu 250 Datensätze pro Zyklus) in die Cloud.
 
 ---
 
-## 10. Weiterführende Netzwerk- & Telekommunikations-Dokumentation
+## 10. Weiterführende Dokumentation & Fachberichte
 
-Für das vollständige Netzwerk-Engineering, 5G-HF-Physik, Band-Locking-Anleitungen (700 MHz B28 / 3.5 GHz N78), Funkzellen-Analyse und den 35'000-Datensatz LittleFS Flash-Puffer des ESP32:
-
-👉 [**`NETWORK_5G_INFRASTRUCTURE.md`**](./NETWORK_5G_INFRASTRUCTURE.md)
+* 👉 [**`NETWORK_5G_INFRASTRUCTURE.md`**](./NETWORK_5G_INFRASTRUCTURE.md): Vollständiges Mobilfunk- & Netzwerk-Engineering, Quectel X55 5G-Modem, ubus JSON-RPC Protokolle, WAN-Speedtest-Analyse, Richtantennen-Vergleiche und SIM-Provider-Strategien (Schweiz vs. Deutschland).
+* 👉 [**`docs/maps/README.md`**](./docs/maps/README.md): Randen 5G & HF-Radar Topographie, interaktive OpenStreetMap-Vektorkarte und Masten-Standortanalyse.
+* 👉 [**`OFFLINE_RESILIENCE.md`**](./OFFLINE_RESILIENCE.md): Technische Spezifikation des LittleFS Flash-Ringpuffers und Ausfallsicherheits-Mechanismen.
 
 
 
