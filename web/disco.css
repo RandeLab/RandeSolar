@@ -249,44 +249,54 @@ body::before {
   100% { background-position: 0% 50%; }
 }
 
-/* Alien Color Beam Buttons Matrix */
-.alien-beam-grid {
+/* Coloured Coconut Cocktail Drinks Matrix */
+.cocktail-beam-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
   gap: 10px;
   width: 100%;
 }
 
-.alien-btn {
+.cocktail-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 6px;
   padding: 12px 6px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  background: rgba(14, 6, 24, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   color: #fff;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
-.alien-btn:hover {
-  transform: translateY(-2px);
+.cocktail-btn:hover {
+  transform: translateY(-3px) scale(1.03);
   border-color: #fff;
-  box-shadow: 0 0 15px currentColor;
+  box-shadow: 0 0 20px currentColor;
 }
 
-.alien-btn:active {
+.cocktail-btn:active {
   transform: translateY(1px);
 }
 
-.btn-icon {
-  font-size: 1.5rem;
+.cocktail-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+.cocktail-bubble {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 10px currentColor;
 }
 
 /* Duration Bar */
