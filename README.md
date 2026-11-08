@@ -35,6 +35,10 @@ Das Gesamtsystem ist in zwei modulare Spezialdokumentationen aufgeteilt:
    👉 [**`NETWORK_5G_INFRASTRUCTURE.md`**](./NETWORK_5G_INFRASTRUCTURE.md)  
    *Teltonika TRB500 Industrial Gateway, TP-Link Omada PoE Access Point, ubus JSON-RPC Schnittstelle, nativer Ookla 5G-Speedtest, 5G-HF-Physik auf 857m (RSRP/SINR), Frequenz-Tuning (700 MHz vs. 3.5 GHz N78) und 35'000-Datensatz LittleFS Flash-Puffer.*
 
+3. 🗺️ **HF-Radar & Grenznetz-Topographie (OSM):**  
+   👉 [**`docs/maps/README.md`**](./docs/maps/README.md)  
+   *Interaktive OpenStreetMap-Vektorkarte (randen_rf_map.svg) mit eingemessenen Schweizer und deutschen Grenzmasten, 384 GPS-Grenzpunkten der Swisstopo-Landesgrenze, Peilungen und interaktiven Hover-Tooltips.*
+
 ---
 
 ### Flash or Monitor Firmware:
