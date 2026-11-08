@@ -70,6 +70,12 @@
           <button class="crt-btn" onclick="testSoundFx('ping')" title="Sonar Ping abspielen">📡 PING</button>
           <button class="crt-btn" onclick="testSoundFx('packet')" title="FSK Telemetrie-Paket abspielen">📻 FSK</button>
           <button class="crt-btn" onclick="testSoundFx('degauss')" title="CRT Degauss Coil abspielen">⚡ DEGAUSS</button>
+
+          <!-- Retro Synth Soundscape Deck -->
+          <button class="crt-btn btn-soundscape active" data-synth="analog" onclick="setSoundscape('analog')" title="Moog-Style Resonanter Analog-Sonar-Ping">🎛️ ANALOG</button>
+          <button class="crt-btn btn-soundscape" data-synth="8bit" onclick="setSoundscape('8bit')" title="Commodore 64 SID 8-Bit Chiptune Arpeggio">🕹️ 8-BIT SID</button>
+          <button class="crt-btn btn-soundscape" data-synth="cyberfm" onclick="setSoundscape('cyberfm')" title="Yamaha DX7 2-Operator FM Metall-Glocke">⚡ CYBER FM</button>
+          <button class="crt-btn btn-soundscape" data-synth="tube" onclick="setSoundscape('tube')" title="Röhrenradio Heterodyn-Pfeifen / BFO Kurzwellen-Beat">📻 TUBE BFO</button>
         </div>
       </div>
 
@@ -91,7 +97,13 @@
             <div class="crt-radar-expand-hint">[ 🔍 KLICKEN FÜR GROSSANSICHT / HUD ⛶ ]</div>
           </div>
 
-          <div style="font-size:0.72rem; color:var(--crt-dim); text-align:center; margin-top:4px;">
+          <!-- Radar Sweep Speed Slider -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; padding:6px 10px; background:rgba(0,0,0,0.5); border:1px solid var(--crt-border); border-radius:4px; font-size:0.72rem;">
+            <span style="color:var(--crt-dim);">SPEED: <b class="crt-glow-text" id="radarSpeedDisplay">1.0x</b></span>
+            <input type="range" class="crt-slider" id="radarSpeedSlider" min="0" max="3" step="0.1" value="1.0" oninput="setRadarSpeed(this.value)" style="width:140px;" title="Sweep-Geschwindigkeit regeln (0 = Pause)">
+          </div>
+
+          <div style="font-size:0.72rem; color:var(--crt-dim); text-align:center; margin-top:6px;">
             Target: <b class="crt-glow-text">Merishausen Südhang (135.1° • 1.82 km)</b> • Hagenturm (313.3° • 0.64 km) • 7 Masten CH/DE
           </div>
         </div>
@@ -373,9 +385,18 @@
             <button class="crt-btn btn-radar-range" data-range="10.0" onclick="setRadarRange(10.0)">10km</button>
           </div>
 
-          <!-- Speed -->
-          <div style="display:flex; gap:4px;">
-            <button id="btnRadarSweepSpeed" class="crt-btn" onclick="toggleRadarSpeed()">SWEEP: 1X</button>
+          <!-- Sweep Speed Slider -->
+          <div style="display:flex; align-items:center; gap:6px; font-size:0.72rem; background:rgba(0,0,0,0.5); padding:3px 8px; border:1px solid var(--crt-border); border-radius:4px;">
+            <span class="crt-dim-text">SPEED: <b class="crt-glow-text" id="modalRadarSpeedDisplay">1.0x</b></span>
+            <input type="range" class="crt-slider" id="modalRadarSpeedSlider" min="0" max="3" step="0.1" value="1.0" oninput="setRadarSpeed(this.value)" style="width:105px;" title="Sweep-Geschwindigkeit regeln">
+          </div>
+
+          <!-- Soundscape Synths in Modal -->
+          <div style="display:flex; gap:3px;">
+            <button class="crt-btn btn-soundscape active" data-synth="analog" onclick="setSoundscape('analog')" title="Moog Analog Sonar">ANALOG</button>
+            <button class="crt-btn btn-soundscape" data-synth="8bit" onclick="setSoundscape('8bit')" title="C64 8-Bit SID Chiptune">8-BIT</button>
+            <button class="crt-btn btn-soundscape" data-synth="cyberfm" onclick="setSoundscape('cyberfm')" title="DX7 Cyber FM">FM</button>
+            <button class="crt-btn btn-soundscape" data-synth="tube" onclick="setSoundscape('tube')" title="Tube BFO Radio">BFO</button>
           </div>
 
           <!-- Audio Ping Toggle -->
@@ -446,6 +467,6 @@
     </div>
   </div>
 
-  <script src="./network.js?v=3.0"></script>
+  <script src="./network.js?v=3.5"></script>
 </body>
 </html>

@@ -525,6 +525,56 @@ body.crt-pink {
   margin: 0;
 }
 
+/* CRT Range Sliders (Retro Glowing Knob & Track) */
+.crt-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid var(--crt-border);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.9);
+  transition: all 0.2s ease;
+}
+
+.crt-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--crt-main);
+  cursor: pointer;
+  box-shadow: 0 0 10px var(--crt-glow);
+  border: 1px solid #000;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.crt-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.3);
+  box-shadow: 0 0 16px var(--crt-main);
+}
+
+.crt-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--crt-main);
+  cursor: pointer;
+  box-shadow: 0 0 10px var(--crt-glow);
+  border: 1px solid #000;
+}
+
+/* Soundscape Selector Buttons */
+.btn-soundscape.active {
+  background: var(--crt-main);
+  color: #000;
+  font-weight: 800;
+  box-shadow: 0 0 14px var(--crt-glow);
+}
+
 @media (max-width: 768px) {
   .crt-ascii-banner {
     display: none;

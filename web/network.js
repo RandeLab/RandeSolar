@@ -328,61 +328,274 @@
     } catch (e) {}
   }
 
-  // 3. Sonar Radar Ping (Active 5G Cell Target vs Background Mast)
+  // Active Synthesizer Soundscape: 'analog' | '8bit' | 'cyberfm' | 'tube'
+  let currentSoundscape = localStorage.getItem('randelab-soundscape') || 'analog';
+
+  // 3A. ANALOG P1 SYNTH (Warm Moog Ladder Resonant Sonar Ping)
+  function playAnalogMoogPing(ctx, isTarget) {
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    filter.type = 'bandpass';
+    filter.Q.value = 7.5;
+
+    if (isTarget) {
+      // Warm analog Moog-style resonant dive
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1260, t);
+      osc.frequency.exponentialRampToValueAtTime(940, t + 0.38);
+      filter.frequency.setValueAtTime(1200, t);
+      filter.frequency.exponentialRampToValueAtTime(700, t + 0.38);
+
+      gain.gain.setValueAtTime(0.14, t);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.38);
+
+      // Deep sub-harmonic warmth
+      const sub = ctx.createOscillator();
+      const subGain = ctx.createGain();
+      sub.type = 'triangle';
+      sub.frequency.setValueAtTime(630, t);
+      sub.frequency.exponentialRampToValueAtTime(470, t + 0.35);
+      subGain.gain.setValueAtTime(0.06, t);
+      subGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+
+      sub.connect(subGain);
+      subGain.connect(ctx.destination);
+      sub.start(t);
+      sub.stop(t + 0.35);
+    } else {
+      // Background tower: subtle distant blip
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(640, t);
+      filter.frequency.setValueAtTime(640, t);
+      gain.gain.setValueAtTime(0.035, t);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+    }
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + (isTarget ? 0.38 : 0.08));
+  }
+
+  // 3B. 8-BIT CHIPTUNE SYNTH (Commodore 64 SID Arpeggio & Pulse Chirp)
+  function play8BitChiptunePing(ctx, isTarget) {
+    const t = ctx.currentTime;
+
+    if (isTarget) {
+      // C64 SID-style 3-note rapid arpeggio (B5 -> E6 -> B6) with vibrato
+      const notes = [987.77, 1318.51, 1975.53];
+      const step = 0.024;
+
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'square'; // Authentic 8-bit pulse wave
+
+        const noteStart = t + idx * step;
+        const noteDur = (idx === notes.length - 1) ? 0.18 : step;
+
+        osc.frequency.setValueAtTime(freq, noteStart);
+
+        if (idx === notes.length - 1) {
+          // Fast SID-style vibrato LFO on the sustained note
+          const lfo = ctx.createOscillator();
+          const lfoGain = ctx.createGain();
+          lfo.frequency.setValueAtTime(38, noteStart); // 38Hz fast chip vibrato
+          lfoGain.gain.setValueAtTime(45, noteStart);
+          lfo.connect(osc.frequency);
+          lfo.start(noteStart);
+          lfo.stop(noteStart + noteDur);
+        }
+
+        gain.gain.setValueAtTime(0.08, noteStart);
+        gain.gain.exponentialRampToValueAtTime(0.0001, noteStart + noteDur);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(noteStart);
+        osc.stop(noteStart + noteDur);
+      });
+    } else {
+      // 8-bit blip-bloop for background towers
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(784, t);
+      osc.frequency.setValueAtTime(1046, t + 0.018); // 2-step chip jump
+      gain.gain.setValueAtTime(0.04, t);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.045);
+    }
+  }
+
+  // 3C. CYBER FM SYNTH (Yamaha DX7 / OPL3 2-Operator Metallic Bell)
+  function playCyberFmPing(ctx, isTarget) {
+    const t = ctx.currentTime;
+    const carrier = ctx.createOscillator();
+    const modulator = ctx.createOscillator();
+    const modGain = ctx.createGain();
+    const mainGain = ctx.createGain();
+
+    if (isTarget) {
+      // Crystalline metallic sci-fi sonar chime (1:4 frequency ratio)
+      const carrierFreq = 1320;
+      const modFreq = 330;
+      const modIndex = 1600;
+
+      carrier.type = 'sine';
+      carrier.frequency.setValueAtTime(carrierFreq, t);
+
+      modulator.type = 'sine';
+      modulator.frequency.setValueAtTime(modFreq, t);
+
+      // FM Modulation Envelope: deep metallic clang decaying fast
+      modGain.gain.setValueAtTime(modIndex, t);
+      modGain.gain.exponentialRampToValueAtTime(10, t + 0.32);
+
+      // Main Amplitude Envelope
+      mainGain.gain.setValueAtTime(0.12, t);
+      mainGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.36);
+
+      modulator.connect(modGain);
+      modGain.connect(carrier.frequency); // FM Synthesis!
+      carrier.connect(mainGain);
+      mainGain.connect(ctx.destination);
+
+      carrier.start(t);
+      modulator.start(t);
+      carrier.stop(t + 0.36);
+      modulator.stop(t + 0.36);
+    } else {
+      // Short FM crystalline tick
+      carrier.type = 'sine';
+      carrier.frequency.setValueAtTime(1760, t);
+      modulator.type = 'sine';
+      modulator.frequency.setValueAtTime(440, t);
+      modGain.gain.setValueAtTime(500, t);
+      modGain.gain.exponentialRampToValueAtTime(1, t + 0.07);
+
+      mainGain.gain.setValueAtTime(0.04, t);
+      mainGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.07);
+
+      modulator.connect(modGain);
+      modGain.connect(carrier.frequency);
+      carrier.connect(mainGain);
+      mainGain.connect(ctx.destination);
+
+      carrier.start(t);
+      modulator.start(t);
+      carrier.stop(t + 0.07);
+      modulator.stop(t + 0.07);
+    }
+  }
+
+  // 3D. TUBE BFO SYNTH (Shortwave Radio Heterodyne Beat & Carrier Whistle)
+  function playTubeBfoPing(ctx, isTarget) {
+    const t = ctx.currentTime;
+
+    if (isTarget) {
+      // Dual-oscillator heterodyne beat (1080 Hz vs 1088 Hz = 8Hz BFO beat)
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      const gain2 = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1100, t);
+      filter.Q.value = 4.0;
+
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(1080, t);
+      osc1.frequency.exponentialRampToValueAtTime(920, t + 0.4);
+
+      osc2.type = 'triangle';
+      osc2.frequency.setValueAtTime(1088, t); // 8Hz offset creates the radio beat!
+      osc2.frequency.exponentialRampToValueAtTime(928, t + 0.4);
+
+      gain1.gain.setValueAtTime(0.09, t);
+      gain1.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+      gain2.gain.setValueAtTime(0.07, t);
+      gain2.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+
+      osc1.connect(filter);
+      osc2.connect(filter);
+      filter.connect(gain1);
+      gain1.connect(ctx.destination);
+
+      osc1.start(t);
+      osc2.start(t);
+      osc1.stop(t + 0.4);
+      osc2.stop(t + 0.4);
+
+      // Analog tube noise crackle at onset
+      playGlitchStatic(0.04);
+    } else {
+      // Single heterodyne shortwave tick
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(840, t);
+      gain.gain.setValueAtTime(0.035, t);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.05);
+    }
+  }
+
+  // 3. Master Sonar Ping Dispatcher
   function playSonarPing(isTarget = true) {
     if (!soundEnabled) return;
     try {
       const ctx = getAudioCtx();
       if (!ctx) return;
-      const t = ctx.currentTime;
 
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const filter = ctx.createBiquadFilter();
-
-      filter.type = 'bandpass';
-      filter.Q.value = 6;
-
-      if (isTarget) {
-        // High-tech resonant submarine / radar ping for active 5G cell
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(1250, t);
-        osc.frequency.exponentialRampToValueAtTime(1020, t + 0.35);
-        filter.frequency.setValueAtTime(1200, t);
-
-        gain.gain.setValueAtTime(0.12, t);
-        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
-
-        // Harmonic overtone
-        const overtone = ctx.createOscillator();
-        const overGain = ctx.createGain();
-        overtone.type = 'triangle';
-        overtone.frequency.setValueAtTime(2500, t);
-        overGain.gain.setValueAtTime(0.035, t);
-        overGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
-
-        overtone.connect(overGain);
-        overGain.connect(ctx.destination);
-        overtone.start(t);
-        overtone.stop(t + 0.12);
-      } else {
-        // Subtle distant blip for other border towers
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(640, t);
-        filter.frequency.setValueAtTime(640, t);
-
-        gain.gain.setValueAtTime(0.035, t);
-        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+      switch (currentSoundscape) {
+        case '8bit':
+          play8BitChiptunePing(ctx, isTarget);
+          break;
+        case 'cyberfm':
+          playCyberFmPing(ctx, isTarget);
+          break;
+        case 'tube':
+          playTubeBfoPing(ctx, isTarget);
+          break;
+        case 'analog':
+        default:
+          playAnalogMoogPing(ctx, isTarget);
+          break;
       }
-
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start(t);
-      osc.stop(t + (isTarget ? 0.35 : 0.08));
     } catch (e) {}
   }
+
+  // Switch Soundscape Synth Mode
+  window.setSoundscape = function(mode, playSound = true) {
+    currentSoundscape = mode;
+    localStorage.setItem('randelab-soundscape', mode);
+    document.querySelectorAll('.btn-soundscape').forEach(b => {
+      b.classList.toggle('active', b.dataset.synth === mode);
+    });
+    if (playSound) {
+      playMechanicalClick(1.2);
+      playSonarPing(true);
+      const names = {
+        'analog': 'ANALOG P1 (Warm Moog Ladder Filter Sonar)',
+        '8bit': '8-BIT CHIP (Commodore 64 SID Arpeggio)',
+        'cyberfm': 'CYBER FM (Yamaha DX7 2-Op Metallic Chime)',
+        'tube': 'TUBE BFO (Shortwave Radio Heterodyne Beat)'
+      };
+      logTTY(`[SYNTH] Audio Engine switched: ${names[mode] || mode}`);
+    }
+  };
 
   // 4. RF Static Atmospheric Glitch / Crackle
   function playGlitchStatic(duration = 0.22) {
@@ -692,17 +905,37 @@
     logTTY(`[RADAR] Tactical Range Scale set to: ${rangeKm} km`);
   };
 
-  window.toggleRadarSpeed = function() {
-    if (radarSweepSpeed === 1.0) radarSweepSpeed = 2.0;
-    else if (radarSweepSpeed === 2.0) radarSweepSpeed = 0.0;
-    else radarSweepSpeed = 1.0;
+  window.setRadarSpeed = function(val) {
+    radarSweepSpeed = parseFloat(val);
+    localStorage.setItem('randelab-radar-speed', radarSweepSpeed);
+
+    const text = radarSweepSpeed === 0 ? 'PAUSED' : `${radarSweepSpeed.toFixed(1)}x`;
+    const d1 = document.getElementById('radarSpeedDisplay');
+    const d2 = document.getElementById('modalRadarSpeedDisplay');
+    if (d1) d1.textContent = text;
+    if (d2) d2.textContent = text;
+
+    const s1 = document.getElementById('radarSpeedSlider');
+    const s2 = document.getElementById('modalRadarSpeedSlider');
+    if (s1 && parseFloat(s1.value) !== radarSweepSpeed) s1.value = radarSweepSpeed;
+    if (s2 && parseFloat(s2.value) !== radarSweepSpeed) s2.value = radarSweepSpeed;
 
     const btn = document.getElementById('btnRadarSweepSpeed');
     if (btn) {
-      btn.textContent = radarSweepSpeed === 0 ? 'SWEEP: PAUSE' : `SWEEP: ${radarSweepSpeed}X`;
+      btn.textContent = radarSweepSpeed === 0 ? 'SWEEP: PAUSE' : `SWEEP: ${radarSweepSpeed.toFixed(1)}X`;
     }
+  };
+
+  window.onRadarSpeedSlider = function(val) {
+    window.setRadarSpeed(val);
+  };
+
+  window.toggleRadarSpeed = function() {
+    if (radarSweepSpeed === 1.0) window.setRadarSpeed(2.0);
+    else if (radarSweepSpeed === 2.0) window.setRadarSpeed(0.0);
+    else window.setRadarSpeed(1.0);
     playMechanicalClick(1.0);
-    logTTY(`[RADAR] Sweep Speed: ${radarSweepSpeed === 0 ? 'PAUSED' : radarSweepSpeed + 'X'}`);
+    logTTY(`[RADAR] Sweep Speed toggled: ${radarSweepSpeed === 0 ? 'PAUSED' : radarSweepSpeed + 'X'}`);
   };
 
   window.selectMast = function(id) {
@@ -1283,6 +1516,10 @@
   window.addEventListener('DOMContentLoaded', () => {
     // Apply saved phosphor
     window.setPhosphorMode(currentPhosphor, false);
+
+    // Apply saved soundscape synth & radar sweep speed
+    window.setSoundscape(currentSoundscape, false);
+    window.setRadarSpeed(radarSweepSpeed);
 
     if (el.scanlines) {
       el.scanlines.style.display = scanlinesActive ? 'block' : 'none';
