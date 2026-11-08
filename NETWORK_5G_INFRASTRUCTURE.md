@@ -195,6 +195,49 @@ Auf dem Randen sind je nach Antennenausrichtung mehrere Masten sichtbar:
 
 Wenn der aktuell genutzte Mast (Cell ID `29858817`) überlastet ist, kann über AT-Befehle (`AT+QNWLOCK="common/4g",...`) oder die RutOS-Zellensperre eine feste Bindung an einen weniger frequentierten Nachbarmasten konfiguriert werden.
 
+### 5.5 Antennen-Upgrade-Guide: Welche Außenantenne lohnt sich am Randen? (In einfacher Sprache)
+
+Aktuell nutzt der TRB500 vier kleine schwarze Standard-Stummelantennen direkt am Gehäuse unter dem Holzvordach. Das reicht für eine Grundverbindung, aber bei nassen Bäumen im Herbst streut das Signal. Folgende Antennen-Optionen stehen zur Wahl:
+
+1. **Option A: 4×4 MIMO Richtantenne (Dringend empfohlen! z. B. *Poynting XPOL-2-5G* oder *Panorama WMM4G*):**
+   * **Was ist das?** Ein wetterfestes, weißes Flachpaneel (ca. 35 × 35 cm), das außen an der Dachkante oder an einem kleinen Mast montiert wird. Es enthält vier getrennte Antennenelemente in einem Gehäuse und wird mit 4 SMA-Kabeln an den TRB500 angeschlossen.
+   * **Wie funktioniert es?** Eine Richtantenne fokussiert wie ein Scheinwerfer in eine ganz bestimmte Richtung (z. B. direkt zum Sendemast Merishausen Südhang oder Bargen).
+   * **Vorteile am Randen:**
+     * **Filtert Störungen aus:** Weil sie nur nach vorne "schaut", blendet sie Reflexionen und das Rauschen anderer Masten aus. Der Störabstand (`SINR`) steigt typischerweise von **`-3 dB`** auf **`+10 bis +15 dB`**.
+     * **Signalgewinn (+6 bis +9 dBi):** Macht aus einem schwachen Signal (`-95 dBm`) ein stabiles, kräftiges Signal (`-85 dBm`).
+     * **Ergebnis:** Massiv stabilerer Download (50–120 Mbit/s auch bei strömendem Regen oder dichtem Nebel).
+2. **Option B: 4×4 MIMO Rundstrahlantenne (Omni, z. B. *Poynting OMNI-493* oder *Teltonika PR1KCO28*):**
+   * **Was ist das?** Ein weißer Stab bzw. Zylinder, der Signale aus allen 360°-Richtungen gleichmäßig auffängt.
+   * **Vorteil:** Man muss sie nicht auf einen bestimmten Mast ausrichten.
+   * **Nachteil am Randen:** Da sie aus allen Richtungen empfängt, fängt sie auch mehr Störfeuer und Reflexionen der nassen Bäume ein. Der SINR verbessert sich deutlich weniger als bei einer Richtantenne.
+3. **Praxis-Tipp zur Verkabelung:** Wenn eine externe Antenne montiert wird: Die 4 Koaxialkabel so kurz wie möglich halten (max. 3–5 Meter dämpfungsarmes HDF/LMR-200 Kabel), da lange Kabel bei hohen 5G-Frequenzen (2.1 GHz und 3.5 GHz) Signalstärke vernichten.
+
+---
+
+### 5.6 Provider-Optionen & Grenzfunk: Swisscom vs. Deutsche SIM (Was würde ein Wechsel bedeuten?)
+
+Da das RandeLab auf **857 m ü. M.** oben auf der Hügelkuppe thront, liegt es in einem extrem spannenden HF-Korridor. Der 3GPP-Scan zeigt, dass sowohl das Schweizer Kernnetz als auch deutsche Sender direkt empfangen werden:
+
+#### Option 1: Wechsel zu Swisscom (oder Wingo / Coop Mobile)
+* **Aktuelle Empfangslage:** Im RandeLab empfängt der TRB500 von **Swisscom (`228 01`)** sowohl **4G LTE** als auch **5G NR** mit hervorragendem Pegel.
+* **Was bringt Swisscom in der Praxis?**
+  * **Größere Frequenzpakete & weniger Überlastung:** Swisscom verfügt in ländlichen Regionen oft über mehr aggregierte Frequenzbänder (inkl. dediziertem 5G Standalone SA und Band N78) und betreibt weniger überbuchte Downlink-Kanäle als Discount-Netze.
+  * **Höhere Download-Stabilität:** Oftmals 80 bis 200 Mbit/s Download, wo Discount-Netze bei Spitzenzeiten auf 5–10 Mbit/s einbrechen.
+* **Was müsste man tun?**
+  1. Swisscom- bzw. Wingo-SIM-Karte in den TRB500 einlegen.
+  2. Im RutOS-Webinterface (`192.168.2.1`) unter *Network → Interfaces → Mobile* den APN auf `gprs.swisscom.ch` (bzw. für Wingo `internet`) setzen.
+  3. Der ESP32-S3 liest den neuen Betreibernamen (`Swisscom`) über die `ubus`-Schnittstelle vollautomatisch aus – es ist **kein Code-Update auf dem ESP32 nötig**!
+
+#### Option 2: Nutzung einer deutschen SIM-Karte (Telekom Deutschland, Vodafone, 1+1, O2)
+* **Aktuelle Empfangslage:** Unser Grenzscan beweist: Auf dem Randen empfängt der TRB500 direkt **Telekom.de (5G NR)**, **vodafone.de (5G NR)** und **1+1 (4G/5G)** über die Hügelzüge aus Baden-Württemberg (Hegau / Schwarzwald-Baar-Kreis)!
+* **Was bedeutet das technisch & tariflich?**
+  * **Echte Landes- und Infrastruktur-Redundanz:**
+    Sollte im Schweizer Mobilfunknetz eine Störung auftreten oder der Talmast in Merishausen bei einem Sturm ausfallen, läuft das RandeLab über die deutschen Masten völlig unabhängig weiter.
+  * **Tarif-Besonderheit (Kein Roaming, sondern Heimatnetz!):**
+    Wenn eine deutsche SIM-Karte im TRB500 steckt und der Router im Menü fest auf den Netzcode **`262 01` (Telekom Deutschland)** eingestellt wird (*Network → Mobile → Network Operators → Manual*), bucht sich das Modem direkt als **Inlands-Teilnehmer** in die deutsche Zelle ein. Es fällt **kein Roaming** an, und man nutzt das reguläre deutsche Inlands-Datenvolumen (z. B. unbegrenzte deutsche Telekom- oder O2-Flatrate)!
+  * **Signalstärke & Antennen-Bedarf:**
+    Da die deutschen Masten weiter entfernt liegen (Luftlinie ca. 5–12 km im Hegau / Tengen / Wiechs am Randen), ist das Signal mit den internen Stummelantennen schwächer. Für einen stabilen Dauerbetrieb mit einer deutschen SIM empfiehlt sich dringend eine **4×4 MIMO Richtantenne (Option A)**, die nach Norden / Nordosten Richtung Grenze ausgerichtet wird.
+
 ---
 
 ## 6. Teltonika `ubus` JSON-RPC Schnittstelle des ESP32
