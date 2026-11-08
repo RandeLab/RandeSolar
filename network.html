@@ -66,8 +66,10 @@
           <button class="crt-btn btn-phosphor" data-color="cyan" onclick="setPhosphorMode('cyan')" title="C64 / Cyan Phosphor">C64-CYN</button>
           <button class="crt-btn btn-phosphor" data-color="pink" onclick="setPhosphorMode('pink')" title="Cyberpunk Pink">CYBER-PNK</button>
 
+          <!-- Scanlines Toggle -->
+          <button id="btnToggleScanlines" class="crt-btn active" onclick="toggleScanlines()" title="Horizontale CRT Scanlines ein-/ausschalten">📺 LINES: ON</button>
+
           <!-- FX Switches & Sound Deck -->
-          <button id="btnToggleScanlines" class="crt-btn" onclick="toggleScanlines()">SCANLINES: ON</button>
           <button class="crt-btn glitch-hover" onclick="triggerGlitch()" title="Glitch burst anomaly test">⚡ GLITCH</button>
           <button id="btnToggleSound" class="crt-btn" onclick="toggleSound()" title="Soundeffekte ein-/ausschalten">🔇 AUDIO: OFF</button>
           <button class="crt-btn" onclick="testSoundFx('ping')" title="Sonar Ping abspielen">📡 PING</button>
@@ -470,6 +472,6 @@
     </div>
   </div>
 
-  <script src="./web/network.js?v=3.5"></script>
+  <script src="./web/network.js?v=3.6"></script>
 </body>
 </html>

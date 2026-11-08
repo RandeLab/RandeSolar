@@ -794,10 +794,14 @@
   // Toggle Scanlines
   window.toggleScanlines = function() {
     scanlinesActive = !scanlinesActive;
+    document.body.classList.toggle('no-scanlines', !scanlinesActive);
     if (el.scanlines) el.scanlines.style.display = scanlinesActive ? 'block' : 'none';
     localStorage.setItem('randelab-crt-scanlines', scanlinesActive);
     const btn = document.getElementById('btnToggleScanlines');
-    if (btn) btn.textContent = scanlinesActive ? 'SCANLINES: ON' : 'SCANLINES: OFF';
+    if (btn) {
+      btn.innerHTML = scanlinesActive ? '📺 LINES: ON' : '📺 LINES: OFF';
+      btn.classList.toggle('active', scanlinesActive);
+    }
     playMechanicalClick(0.9);
   };
 
@@ -1521,10 +1525,13 @@
     window.setSoundscape(currentSoundscape, false);
     window.setRadarSpeed(radarSweepSpeed);
 
-    if (el.scanlines) {
-      el.scanlines.style.display = scanlinesActive ? 'block' : 'none';
-      const btn = document.getElementById('btnToggleScanlines');
-      if (btn) btn.textContent = scanlinesActive ? 'SCANLINES: ON' : 'SCANLINES: OFF';
+    // Scanlines State
+    document.body.classList.toggle('no-scanlines', !scanlinesActive);
+    if (el.scanlines) el.scanlines.style.display = scanlinesActive ? 'block' : 'none';
+    const btnScan = document.getElementById('btnToggleScanlines');
+    if (btnScan) {
+      btnScan.innerHTML = scanlinesActive ? '📺 LINES: ON' : '📺 LINES: OFF';
+      btnScan.classList.toggle('active', scanlinesActive);
     }
 
     const btnSnd = document.getElementById('btnToggleSound');

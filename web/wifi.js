@@ -972,6 +972,21 @@
     }
   };
 
+  // --- Scanlines Toggle ---
+  let scanlinesActive = localStorage.getItem('randelab-crt-scanlines') !== 'false';
+
+  window.toggleScanlines = function () {
+    scanlinesActive = !scanlinesActive;
+    document.body.classList.toggle('no-scanlines', !scanlinesActive);
+    localStorage.setItem('randelab-crt-scanlines', scanlinesActive);
+    const btn = document.getElementById('btnToggleScanlines');
+    if (btn) {
+      btn.innerHTML = scanlinesActive ? '📺 LINES: ON' : '📺 LINES: OFF';
+      btn.classList.toggle('active', scanlinesActive);
+    }
+    playClickSound();
+  };
+
   // --- Phosphor Theme Switcher ---
   window.setPhosphorMode = function (palette) {
     playClickSound();
@@ -1041,6 +1056,14 @@
         renderSpectrum();
       }
     });
+
+    // Scanlines State
+    document.body.classList.toggle('no-scanlines', !scanlinesActive);
+    const btnScan = document.getElementById('btnToggleScanlines');
+    if (btnScan) {
+      btnScan.innerHTML = scanlinesActive ? '📺 LINES: ON' : '📺 LINES: OFF';
+      btnScan.classList.toggle('active', scanlinesActive);
+    }
 
     // Start Loops
     renderSpectrum();

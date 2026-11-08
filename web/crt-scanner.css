@@ -95,6 +95,11 @@ body.crt-pink {
   background-size: 100% 3px, 6px 100%;
   z-index: 99;
   opacity: 0.85;
+  transition: opacity 0.2s ease;
+}
+
+body.no-scanlines .crt-scanlines {
+  display: none !important;
 }
 
 /* Animated horizontal CRT sweep line */

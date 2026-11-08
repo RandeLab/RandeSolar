@@ -63,6 +63,11 @@
           <button class="crt-btn btn-phosphor" data-color="cyan" onclick="setPhosphorMode('cyan')" title="C64 / Cyan Phosphor">C64-CYN</button>
           <button class="crt-btn btn-phosphor" data-color="pink" onclick="setPhosphorMode('pink')" title="Cyberpunk Pink">CYBER-PNK</button>
 
+          <!-- Scanlines Toggle -->
+          <button id="btnToggleScanlines" class="crt-btn active" onclick="toggleScanlines()" title="Horizontale CRT Scanlines ein-/ausschalten">
+            📺 LINES: ON
+          </button>
+
           <!-- Audio Engine Selector Buttons -->
           <div style="display:inline-flex; border:1px solid var(--crt-border); border-radius:4px; overflow:hidden; margin-left:4px;">
             <button class="crt-btn btn-soundscape active" data-sound="analog" onclick="setSoundscape('analog')" title="Moog Ladder Analog Synth Sonar Ping" style="border:none; border-right:1px solid var(--crt-border);">ANALOG</button>
@@ -290,6 +295,6 @@
   </div>
 
   <!-- Script with Cache Busting -->
-  <script src="./web/wifi.js?v=1.0"></script>
+  <script src="./web/wifi.js?v=1.1"></script>
 </body>
 </html>
