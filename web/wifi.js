@@ -769,17 +769,23 @@
 
     triggerLogFrame('WIFI_SCAN_REQ // Sende Scan-Befehl an ESP32 /api/wifi/scan...');
 
+    const storedEp = localStorage.getItem('randesolar-lab-endpoint') || 'http://192.168.1.100';
+    const cleanStored = storedEp.replace(/\/+$/, '');
     const endpoints = [
       '/api/wifi/scan',
+      `${cleanStored}/api/wifi/scan`,
       'http://192.168.1.100/api/wifi/scan',
       'http://randesolar.local/api/wifi/scan'
     ];
 
+    // Remove duplicates
+    const uniqueEndpoints = [...new Set(endpoints)];
+
     let foundData = null;
-    for (const ep of endpoints) {
+    for (const ep of uniqueEndpoints) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        const timeoutId = setTimeout(() => controller.abort(), 12000); // Allow full 13-channel scan time
         const res = await fetch(ep, { signal: controller.signal });
         clearTimeout(timeoutId);
         if (res.ok) {
@@ -803,7 +809,7 @@
         const estDist = Math.max(1.0, Math.round(d * 10) / 10);
 
         return {
-          ssid: ap.ssid || '<HIDDEN_SSID>',
+          ssid: (ap.ssid && ap.ssid.trim()) ? ap.ssid : '<Verstecktes Netz>',
           bssid: ap.bssid || `02:00:00:00:00:${i.toString(16).padStart(2, '0')}`,
           rssi: ap.rssi || -70,
           channel: ap.channel || 1,
