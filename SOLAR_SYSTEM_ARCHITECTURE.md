@@ -33,10 +33,12 @@ flowchart TD
         FUSE_INV["150A–200A Mega/ANL Sicherung (Dringend empfohlen!)"]
     end
 
-    subgraph INVERTER_UNIT["⚡ 230V AC Stromnetz (Bedarfsgesteuert)"]
+    subgraph INVERTER_UNIT["⚡ 230V AC Stromnetz & Umschalt-Infrastruktur"]
         INV["RDDSPON 6000W Pure Sine Wave Inverter<br/>DC 12V zu AC 230V 50Hz Echte Sinuswelle<br/>6000W Peak / ~3000W Dauerlast"]
-        AC_SOCKETS["2x EU-Schuko Steckdosen<br/>(Laptops, Werkzeuge, Ladegeräte)"]
-        AC_ROUTER_PSU["230V AC Netzteile & PoE-Injektor"]
+        GEN["⛽ Notstrom-Generator (im Schuppen)<br/>Benzin/Diesel-Aggregat für Schlechtwetter & Grosslasten"]
+        CHANGEOVER["🔀 230V Netz-Umschalter (1 - 0 - 2)<br/>(Batterie / Inverter ⟷ AUS ⟷ Generator)"]
+        AC_SOCKETS["230V AC Labor-Hausnetz<br/>Schweizer T13-Steckdosen (SEV 1011)"]
+        AC_ROUTER_PSU["230V AC Netzteile für Router & AP"]
     end
 
     subgraph DC_DIRECT["🔌 12V DC Kleinspannungs-Versorgung (24/7 Dauerbetrieb)"]
@@ -44,8 +46,8 @@ flowchart TD
     end
 
     subgraph MONITORING["📡 Telemetrie & Microclimate Observatory"]
-        ESP32["ESP32-S3 Station (randesolar.local)<br/>• Hardware-AES BLE Scanner<br/>• 35'000 Flash-Puffer (48 Tage)<br/>• 24/7 autark über 12V Batterie versorgt!"]
-        ROUTER["2x Netzwerk-Geräte (230V AC versorgt):<br/>• Teltonika TRB500 5G Gateway (192.168.2.1)<br/>• TP-Link Omada WLAN AP (192.168.1.1)"]
+        ESP32["ESP32-S3 Station (randesolar.local)<br/>• Hardware-AES BLE Scanner<br/>• 35'000 Flash-Puffer (48 Tage)<br/>• 24/7 autark direkt an 12V Batterie versorgt!"]
+        ROUTER["2x Netzwerk-Geräte (am 230V Hausnetz):<br/>• Teltonika TRB500 5G Gateway (192.168.2.1)<br/>• TP-Link Omada WLAN AP (192.168.1.1)"]
         CLOUD["Supabase PostgreSQL & HiveMQ MQTT"]
     end
 
@@ -58,8 +60,10 @@ flowchart TD
     BATT4 --- BATT_BANK
     BATT_BANK -->|25-35 mm² Batteriekabel| FUSE_INV
     FUSE_INV --> INV
-    INV --> AC_SOCKETS
-    AC_SOCKETS ==>|230V AC| AC_ROUTER_PSU ==>|230V Speisung| ROUTER
+    INV ==>|Quelle 1: Batterie/Inverter| CHANGEOVER
+    GEN ==>|Quelle 2: Generator-Netz| CHANGEOVER
+    CHANGEOVER ==>|230V AC Speisung| AC_SOCKETS
+    AC_SOCKETS ==>|230V T13 Speisung| AC_ROUTER_PSU ==>|230V Speisung| ROUTER
     BATT_BANK ==>|12V DC Direktanschluss| USB_CONV ==>|5V DC USB| ESP32
     DONGLE -.->|BLE Instant Beacons| ESP32
     ESP32 <-->|WLAN & MQTT| ROUTER
@@ -107,24 +111,28 @@ Die Live-Abfrage des Teltonika-Gateways bestätigt den direkten Einfluss des Ran
 ### 2.3 Batteriespeicher (4x VOLTIC) & RDDSPON 6000W Inverter
 Die 4 VOLTIC Batterien (DIN 595, je 95 Ah) sind parallel geschaltet und bilden eine massive 380 Ah Pufferbank (4.56 kWh Bruttospeicher). Darauf montiert sitzt der RDDSPON 6000W Reinsinus-Wechselrichter:
 
-| 4-fach Batteriebank & 6000W Inverter | 230V Hauptschalter & AC-Trennschalter |
+| 4-fach Batteriebank & 6000W Inverter | 230V Netz-Umschalter (Inverter ⟷ 0 ⟷ Generator) |
 | :---: | :---: |
 | ![4x VOLTIC Batterien und RDDSPON 6000W Wechselrichter](./system_docu/batteries_and_inverter.jpg) | ![230V Hauptschalter und Installation vor Ort](./system_docu/hauptschalter_230V.jpg) |
-| *4x VOLTIC DIN 595 parallel (380 Ah @ 12V) mit RDDSPON 6000W Pure Sine Wave Inverter* | *Robuster 230V AC-Haupttrennschalter zur sicheren Trennung des Labor-Netzes* |
+| *4x VOLTIC DIN 595 parallel (380 Ah @ 12V) mit RDDSPON 6000W Pure Sine Wave Inverter* | *Robuster 230V Nockenschalter (1 - 0 - 2) zur Umschaltung des Schweizer T13-Hausnetzes* |
 
-### 2.4 Zweistufige Stromversorgungs-Architektur (230V AC vs. 12V DC Direkt)
-Ein zentraler mechatronischer Designvorteil von RandeSolar ist die bewusste Trennung der Spannungsversorgungen zwischen Netzwerk und Telemetrie:
+### 2.4 Zweistufige Stromversorgungs-Architektur, Generator & 24/7 Autarkie
+Ein zentraler mechatronischer Designvorteil von RandeSolar ist die bewusste Trennung der Spannungsversorgungen sowie die duale 230V-Einspeisung:
 
-1. **230V AC Sektor (Wechselrichter):**
-   * Die beiden Netzwerk-Komponenten – das **Teltonika TRB500 5G-Gateway** und der **TP-Link Omada WLAN Access Point** (inkl. PoE-Injektor) – werden über das **230V AC Netz** des RDDSPON-Inverters versorgt.
-   * *Eigenverbrauch:* Ein 6000W-Wechselrichter benötigt im Leerlauf typischerweise ~15–25 Watt. Wird das Labor verlassen oder soll im Winter bei mehrtägigem Nebel Energie gespart werden, kann der 230V-Hauptschalter umgelegt werden, wodurch Inverter und Router stromlos werden.
+1. **Duales 230V AC Stromnetz (Schweizer T13 / SEV 1011):**
+   * Das RandeLab verfügt über eine vollwertige 230V-Gebäudeinstallation mit Schweizer Typ 13 Steckdosen.
+   * Über den robusten **manuellen Netz-Umschalter (1 - 0 - 2)** an der Wand kann das gesamte 230V-Netz umgeschaltet werden:
+     * **Stellung 1 (Solar & Batterie):** Speisung über den RDDSPON 6000W Reinsinus-Wechselrichter aus der 12V-Batteriebank.
+     * **Stellung 0 (AUS):** Allpolige Netztrennung für Wartung oder totale Ruhestromabschaltung.
+     * **Stellung 2 (Notstrom-Generator):** Speisung über den im **Schuppen stationierten Benzin-/Diesel-Generator**. Ideal für stromhungrige Werkstatt-Maschinen, schwere Elektrowerkzeuge oder bei tagelangen winterlichen Hochnebelfeldern zur Notladung.
+   * **Netzwerk-Versorgung:** Die beiden Router – das **Teltonika TRB500 5G-Gateway** und der **TP-Link Omada WLAN Access Point** (inkl. PoE-Injektor) – werden über dieses 230V-Hausnetz versorgt. Sie laufen somit sowohl im Inverter-Betrieb (Stellung 1) als auch im Generator-Betrieb (Stellung 2).
 2. **12V DC Dauerversorgungs-Sektor (Autarker ESP32-S3):**
    * Der **ESP32-S3 Telemetrie-Controller** ist **nicht** an 230V angeschlossen, sondern wird über einen kompakten **12V-zu-5V DC-DC USB-Wandler direkt an den 12V-Batteriepolen** betrieben.
    * *Verbrauch:* Mit < 0.5 Watt (100 mA @ 5V) ist der ESP32 für die 380 Ah Batteriebank vernachlässigbar klein.
-   * *Blackout- und Winter-Resilienz:* Selbst wenn der 230V-Wechselrichter wochenlang ausgeschaltet bleibt, arbeitet der ESP32-S3 unterbrechungsfrei weiter:
+   * *Blackout- und Winter-Resilienz:* Selbst wenn das 230V-Netz (Stellung 0) wochenlang ausgeschaltet bleibt (um den ~15–25W Inverter-Leerlauf zu vermeiden), arbeitet der ESP32-S3 unterbrechungsfrei weiter:
      * Er empfängt 24/7 alle BLE-Instant-Beacons des Victron MPPT-Ladereglers.
      * Er puffert alle Lade-, Spannungs- und Solarertragsdaten lückenlos in seinem **35'000-Datensatz-Flash-Speicher (LittleFS)**.
-     * Sobald der 230V-Wechselrichter wieder eingeschaltet wird und die beiden Router hochfahren, verbindet sich der ESP32 automatisch wieder mit dem RandeLab-WLAN und leert ("drained") alle aufgelaufenen Datensätze automatisch und chronologisch in die Supabase Cloud-Datenbank!
+     * Sobald der 230V-Schalter wieder auf Inverter oder Generator gestellt wird und die beiden Router hochfahren, verbindet sich der ESP32 automatisch wieder mit dem RandeLab-WLAN und leert ("drained") alle aufgelaufenen Datensätze automatisch und chronologisch in die Supabase Cloud-Datenbank!
 
 ---
 

@@ -94,16 +94,20 @@ flowchart TD
 * **Stromversorgung:** Power over Ethernet (PoE) über Injektor
 * **ESP32-Verbindung:** 2.4 GHz Wi-Fi (Kanal 10), Signalstärke: `-45 dBm bis -50 dBm` (100% Link-Qualität)
 
-### 3.3 Stromversorgungs-Konzept: 230V AC (Router) vs. 12V DC Direkt (ESP32)
+### 3.3 Stromversorgungs-Konzept: Duales 230V AC Netz (Umschalter Inverter ⟷ Generator) vs. 12V DC Direkt (ESP32)
 Die Stromversorgung der Kommunikations- und Telemetrie-Infrastruktur ist architektonisch in zwei getrennte Ebenen unterteilt:
 
-1. **230V AC Sektor (Wechselrichter):**
-   * Das **Teltonika TRB500 5G-Gateway** und der **TP-Link Omada Access Point** (via PoE-Injektor) werden über das **230V AC Stromnetz** des RDDSPON 6000W Reinsinus-Wechselrichters versorgt.
-   * *Bedarfssteuerung:* Da der 6000W-Wechselrichter im Leerlauf ca. 15–25 Watt benötigt, kann das gesamte 230V-Netz (inkl. Router) bei längerer Abwesenheit oder zur Batterieschonung über den Hauptschalter abgeschaltet werden.
+1. **Duales 230V AC Stromnetz (Schweizer Typ 13 / SEV 1011):**
+   * Das **Teltonika TRB500 5G-Gateway** und der **TP-Link Omada Access Point** (via PoE-Injektor) hängen an der festen 230V-Gebäudeinstallation mit Schweizer T13-Steckdosen.
+   * **Netz-Umschalter (1 - 0 - 2):** Über den großen manuellen Nockenschalter an der Wand kann das gesamte 230V-Netz umgeschaltet werden:
+     * **Stellung 1 (Solar & Batterie):** Speisung über den RDDSPON 6000W Reinsinus-Wechselrichter aus der 12V-Batteriebank.
+     * **Stellung 0 (AUS):** Allpolig getrennt (kein Ruhestromverlust von Inverter/Routern bei Abwesenheit).
+     * **Stellung 2 (Notstrom-Generator):** Speisung über das **Benzin/Diesel-Aggregat im Schuppen** (für schwere Maschinen, Elektrowerkzeuge oder Winter-Notbetrieb).
+   * Die beiden Router laufen somit vollautomatisch sowohl unter Solar-/Inverter-Strom (Stellung 1) als auch unter Generator-Strom (Stellung 2).
 2. **12V DC Dauerspeisung (Autarker ESP32-S3):**
    * Der **ESP32-S3 Telemetrie-Controller** hängt **nicht** am 230V-Netz, sondern wird über einen **12V-zu-5V DC-DC USB-Wandler direkt an den 12V-Batteriepolen** betrieben.
-   * *Verbrauch:* Mit < 0.5 Watt (ca. 100 mA @ 5V) ist der ESP32 für die 380 Ah Batteriebank vernachlässigbar.
-   * *24/7 Autarkie:* Wird der 230V-Inverter ausgeschaltet, läuft der ESP32 unterbrechungsfrei weiter, lauscht per BLE auf den Victron MPPT 75|15 und zeichnet bis zu **48 Tage lang (35'000 Datensätze)** im Onboard-Flash auf. Sobald 230V und die Router wieder aktiv sind, drainiert der ESP32 alle Daten lückenlos in die Cloud.
+   * *Verbrauch:* Mit < 0.5 Watt (ca. 100 mA @ 5V) ist der ESP32 für die 380 Ah Batteriebank vernachlässigbar klein.
+   * *24/7 Autarkie:* Wird der 230V-Umschalter auf 0 gestellt, läuft der ESP32 unterbrechungsfrei weiter, lauscht per BLE auf den Victron MPPT 75|15 und zeichnet bis zu **48 Tage lang (35'000 Datensätze)** im Onboard-Flash auf. Sobald 230V (via Inverter oder Generator) wieder eingeschaltet wird und die Router booten, drainiert der ESP32 alle Daten lückenlos in die Cloud.
 
 ---
 
