@@ -82,6 +82,7 @@
     { 
       id: 'meri_south', 
       name: '🇨🇭 Merishausen Südhang', 
+      shortLabel: 'Südhang (1.8k)',
       distKm: 1.82, 
       bearingDeg: 135.1, 
       band: 'LTE B3 (20M) + 5G n1 (20M)', 
@@ -99,6 +100,7 @@
     { 
       id: 'hagenturm', 
       name: '🇨🇭 Hagenturm (912m)', 
+      shortLabel: 'Hagenturm (0.6k)',
       distKm: 0.64, 
       bearingDeg: 313.3, 
       band: 'Swisscom/Sunrise 5G n78', 
@@ -116,6 +118,7 @@
     { 
       id: 'randen_b8', 
       name: '🇨🇭 Lokale Zelle Randen (B8)', 
+      shortLabel: 'Randen B8 (0.8k)',
       distKm: 0.78, 
       bearingDeg: 150.2, 
       band: 'LTE B8 (900 MHz)', 
@@ -133,6 +136,7 @@
     { 
       id: 'meri_dorf', 
       name: '🇨🇭 Merishausen Dorf', 
+      shortLabel: 'Dorf (1.4k)',
       distKm: 1.41, 
       bearingDeg: 201.2, 
       band: 'Multi-OP (B20/B8/B3)', 
@@ -150,6 +154,7 @@
     { 
       id: 'bargen', 
       name: '🇨🇭 Mast Bargen (A4-Korridor)', 
+      shortLabel: 'Bargen A4 (3.1k)',
       distKm: 3.11, 
       bearingDeg: 47.5, 
       band: 'Salt LTE B20 (800 MHz)', 
@@ -167,6 +172,7 @@
     { 
       id: 'wiechs', 
       name: '🇩🇪 Wiechs am Randen (DE)', 
+      shortLabel: 'Wiechs DE (4.0k)',
       distKm: 3.99, 
       bearingDeg: 13.2, 
       band: 'Telekom DE 5G n28/n78 + B8/B20', 
@@ -184,6 +190,7 @@
     { 
       id: 'tengen', 
       name: '🇩🇪 Tengen / Kommingen (DE)', 
+      shortLabel: 'Tengen DE (5.6k)',
       distKm: 5.57, 
       bearingDeg: 343.0, 
       band: '1+1 5G n78 + o2 LTE B20/B1', 
@@ -933,7 +940,7 @@
 
           smallCtx.fillStyle = isHit ? '#ffffff' : 'rgba(200, 255, 200, 0.65)';
           smallCtx.font = '8px monospace';
-          smallCtx.fillText(m.name.slice(0, 11), tx + 6, ty + 3);
+          smallCtx.fillText(m.shortLabel || m.name, tx + 6, ty + 3);
         });
       }
 
