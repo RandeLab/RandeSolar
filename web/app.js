@@ -382,6 +382,13 @@ window.setTheme = function(theme) {
     chargeChartInstance.options.scales.yCurrent.grid.color = pal.grid;
     chargeChartInstance.options.scales.yCurrent.ticks.color = pal.curr;
     chargeChartInstance.options.scales.yCurrent.title.color = pal.curr;
+    chargeChartInstance.options.scales.yCurrent.title.text = currentLang === 'de' ? 'Ladestrom (A)' : 'Charge (A)';
+
+    if (chargeChartInstance.options.scales.yLoad) {
+      chargeChartInstance.options.scales.yLoad.ticks.color = pal.load || '#39FF14';
+      chargeChartInstance.options.scales.yLoad.title.color = pal.load || '#39FF14';
+      chargeChartInstance.options.scales.yLoad.title.text = currentLang === 'de' ? 'Lastanschluss (A)' : 'Load Port (A)';
+    }
     chargeChartInstance.update();
   }
 
@@ -586,13 +593,14 @@ function initChart() {
             label: 'Lastanschluss (A)',
             data: [],
             borderColor: pal.load || '#39FF14',
-            borderWidth: 1.8,
+            backgroundColor: 'rgba(57, 255, 20, 0.1)',
+            borderWidth: 2,
             borderDash: [4, 4],
             tension: 0.2,
             fill: false,
             spanGaps: true,
-            yAxisID: 'yCurrent',
-            pointRadius: 1,
+            yAxisID: 'yLoad',
+            pointRadius: 1.5,
             pointHoverRadius: 4,
           }
         ]
@@ -618,11 +626,23 @@ function initChart() {
           yCurrent: {
             type: 'linear',
             position: 'left',
-            title: { display: true, text: 'Strom (A)', color: pal.curr, font: { family: 'Outfit', size: 11 } },
+            title: { display: true, text: currentLang === 'de' ? 'Ladestrom (A)' : 'Charge (A)', color: pal.curr, font: { family: 'Outfit', size: 11 } },
             grid: { color: pal.grid },
             ticks: { color: pal.curr, font: { family: 'JetBrains Mono', size: 10 } },
             suggestedMin: 0,
-            suggestedMax: 10,
+            suggestedMax: 5,
+          },
+          yLoad: {
+            type: 'linear',
+            position: 'right',
+            title: { display: true, text: currentLang === 'de' ? 'Lastanschluss (A)' : 'Load Port (A)', color: pal.load || '#39FF14', font: { family: 'Outfit', size: 11 } },
+            grid: { drawOnChartArea: false },
+            ticks: {
+              color: pal.load || '#39FF14',
+              font: { family: 'JetBrains Mono', size: 10 }
+            },
+            suggestedMin: 0,
+            suggestedMax: 1.0,
           }
         }
       }
