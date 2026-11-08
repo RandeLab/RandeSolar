@@ -798,6 +798,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
         <span><b>Victron BLE:</b> cb:06:61:60:5a:c2 (<span id="bleRssi">--</span> dBm)</span>
         <span><b>ESP32-IP:</b> <span id="ipAddr">--</span></span>
         <span><b>Gateway:</b> <span id="gwAddr">--</span></span>
+        <span><b>RAM:</b> <span id="freeHeap">--</span> KB frei</span>
         <span><b>MQTT:</b> broker.hivemq.com</span>
         <span><b>Empfang:</b> <span id="beaconAge">--</span></span>
         <span><a id="tgBotLink" href="https://t.me/RandeSolarBot" target="_blank" style="color:var(--cyan);text-decoration:none;font-weight:bold;">✈️ Telegram Bot</a></span>
@@ -808,6 +809,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
   </div>
 
   <script>
+    const setT = (id, val) => { const n = document.getElementById(id); if (n && val !== undefined && val !== null) n.textContent = val; };
     const dict = {
       de: {
         title: "RandeSolar Kraftwerk",
@@ -863,7 +865,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
       document.getElementById("lblFlow").textContent = l.flow;
       document.getElementById("lblPanelState").textContent = l.panelState;
       document.getElementById("lblLoad").textContent = l.load;
-      const elDiag = document.getElementById("lblPanelDiag");
+      const elDiag = document.getElementById("lblPanelDiag") || document.getElementById("lblPanelNet");
       if (elDiag) elDiag.textContent = l.panelDiag;
       document.getElementById("lblFooter").textContent = l.footer;
     }
@@ -884,9 +886,9 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
         const d = await res.json();
         if (!d.has_data) return;
 
-        document.getElementById('solarPower').textContent = d.solar_power;
-        document.getElementById('yieldToday').textContent = (d.yield_today_wh / 1000).toFixed(2) + ' kWh';
-        document.getElementById('batteryVoltage').textContent = d.battery_voltage.toFixed(2);
+        setT('solarPower', d.solar_power);
+        setT('yieldToday', (d.yield_today_wh / 1000).toFixed(2) + ' kWh');
+        setT('batteryVoltage', d.battery_voltage.toFixed(2));
 
         let soc = 50;
         if (d.charge_state === 5) soc = 100;
@@ -898,63 +900,57 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
         } else {
           soc = Math.round(Math.min(100, Math.max(0, ((d.battery_voltage - 11.6) / 1.15) * 100)));
         }
-        document.getElementById('batteryBar').style.width = soc + '%';
+        const bBar = document.getElementById('batteryBar');
+        if (bBar) bBar.style.width = soc + '%';
         const stageLabel = (d.charge_state === 5) ? 'Float' : (d.charge_state === 4) ? 'Absorp.' : (d.charge_state === 3) ? 'Bulk' : 'Ruhe';
-        document.getElementById('estSoc').textContent = soc + '% (' + stageLabel + ')';
+        setT('estSoc', soc + '% (' + stageLabel + ')');
 
-        document.getElementById('batteryCurrent').textContent = d.battery_current.toFixed(1);
-        document.getElementById('flowWatts').textContent = (d.battery_voltage * d.battery_current).toFixed(1) + ' W';
+        setT('batteryCurrent', d.battery_current.toFixed(1));
+        setT('flowWatts', (d.battery_voltage * d.battery_current).toFixed(1) + ' W');
 
         const stateMap = dict[curLang].states;
         const stStr = stateMap[d.charge_state] || d.state_str;
-        document.getElementById('chargeState').textContent = stStr;
+        setT('chargeState', stStr);
 
-        document.getElementById('externalLoad').textContent = d.external_load.toFixed(1) + ' A';
-        document.getElementById('bleRssi').textContent = d.ble_rssi;
-        document.getElementById('wifiRssi').textContent = d.wifi_rssi;
-        if (d.wifi_quality_pct !== undefined) document.getElementById('wifiQual').textContent = d.wifi_quality_pct;
-        if (d.wifi_channel !== undefined) document.getElementById('wifiCh').textContent = d.wifi_channel;
-        document.getElementById('ipAddr').textContent = d.ip;
-        if (d.gateway_ip) document.getElementById('gwAddr').textContent = d.gateway_ip;
-        if (d.chip_temp !== undefined) document.getElementById('chipTemp').textContent = d.chip_temp.toFixed(1);
-        if (d.free_heap_kb !== undefined) document.getElementById('freeHeap').textContent = d.free_heap_kb;
+        setT('externalLoad', d.external_load.toFixed(1) + ' A');
+        setT('bleRssi', d.ble_rssi);
+        setT('wifiRssi', d.wifi_rssi);
+        if (d.wifi_quality_pct !== undefined) setT('wifiQual', d.wifi_quality_pct);
+        if (d.wifi_channel !== undefined) setT('wifiCh', d.wifi_channel);
+        setT('ipAddr', d.ip);
+        if (d.gateway_ip) setT('gwAddr', d.gateway_ip);
+        if (d.chip_temp !== undefined) setT('chipTemp', d.chip_temp.toFixed(1));
+        if (d.free_heap_kb !== undefined) setT('freeHeap', d.free_heap_kb);
+
         const downSpeed = (d.cell_down_mbps !== undefined && d.cell_down_mbps > 0) ? d.cell_down_mbps : d.net_mbps;
         const upSpeed = (d.cell_up_mbps !== undefined && d.cell_up_mbps > 0) ? d.cell_up_mbps : d.net_up_mbps;
-        const elCd = document.getElementById('cellDown') || document.getElementById('netDown');
-        if (elCd && downSpeed !== undefined && downSpeed > 0) elCd.textContent = downSpeed.toFixed(2);
-        const elCu = document.getElementById('cellUp') || document.getElementById('netUp');
-        if (elCu && upSpeed !== undefined && upSpeed > 0) elCu.textContent = upSpeed.toFixed(2);
+        if (downSpeed !== undefined && downSpeed > 0) {
+          setT('cellDown', downSpeed.toFixed(2));
+          setT('netDown', downSpeed.toFixed(2));
+        }
+        if (upSpeed !== undefined && upSpeed > 0) {
+          setT('cellUp', upSpeed.toFixed(2));
+          setT('netUp', upSpeed.toFixed(2));
+        }
 
-        const elNp = document.getElementById('netPing');
-        if (elNp && d.net_ping_ms !== undefined) elNp.textContent = d.net_ping_ms;
-        const elGp = document.getElementById('gwPing');
-        if (elGp && d.gw_ping_ms !== undefined) elGp.textContent = d.gw_ping_ms;
-        const elDns = document.getElementById('dnsMs');
-        if (elDns && d.dns_ms !== undefined) elDns.textContent = d.dns_ms;
-        const elTtfb = document.getElementById('ttfbMs');
-        if (elTtfb && d.ttfb_ms !== undefined) elTtfb.textContent = d.ttfb_ms;
+        if (d.net_ping_ms !== undefined) setT('netPing', d.net_ping_ms);
+        if (d.gw_ping_ms !== undefined) setT('gwPing', d.gw_ping_ms);
+        if (d.dns_ms !== undefined) setT('dnsMs', d.dns_ms);
+        if (d.ttfb_ms !== undefined) setT('ttfbMs', d.ttfb_ms);
 
         if (d.cell_has_data) {
-          const elRsrp = document.getElementById('cellRsrp');
-          if (elRsrp) elRsrp.textContent = d.cell_rsrp;
-          const elSinr = document.getElementById('cellSinr');
-          if (elSinr) elSinr.textContent = d.cell_sinr;
-          const elBand = document.getElementById('cellBand');
-          if (elBand) elBand.textContent = d.cell_band;
-          const elQual = document.getElementById('cellQual');
-          if (elQual) elQual.textContent = d.cell_qual;
-          const elOp = document.getElementById('cellOperator');
-          if (elOp) elOp.textContent = d.cell_operator;
-          const elMode = document.getElementById('cellMode');
-          if (elMode) elMode.textContent = d.cell_mode;
-          const elId = document.getElementById('cellId');
-          if (elId) elId.textContent = d.cell_id;
-          const elTemp = document.getElementById('cellTemp');
-          if (elTemp && d.cell_temp !== undefined) elTemp.textContent = d.cell_temp.toFixed(1);
+          setT('cellRsrp', d.cell_rsrp);
+          setT('cellSinr', d.cell_sinr);
+          setT('cellBand', d.cell_band);
+          setT('cellQual', d.cell_qual);
+          setT('cellOperator', d.cell_operator);
+          setT('cellMode', d.cell_mode);
+          setT('cellId', d.cell_id);
+          if (d.cell_temp !== undefined) setT('cellTemp', d.cell_temp.toFixed(1));
         }
-        document.getElementById('beaconAge').textContent = d.age_sec + (curLang === 'de' ? ' Sek.' : 's ago');
+        setT('beaconAge', d.age_sec + (curLang === 'de' ? ' Sek.' : 's ago'));
       } catch (e) {
-        console.error(e);
+        console.error('Update error:', e);
       }
     }
 
