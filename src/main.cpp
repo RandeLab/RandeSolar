@@ -1354,6 +1354,43 @@ void handleSpeedtestApi() {
     handleLiveApi();
 }
 
+void handleWifiScanApi() {
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    server.sendHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+    server.sendHeader("Access-Control-Allow-Headers", "*");
+
+    int n = WiFi.scanNetworks(false, true);
+    String json = "{\"status\":\"ok\",\"timestamp\":" + String(millis()) + ",\"count\":" + String(n >= 0 ? n : 0) + ",\"networks\":[";
+    if (n > 0) {
+        for (int i = 0; i < n; ++i) {
+            if (i > 0) json += ",";
+            json += "{";
+            String safeSsid = WiFi.SSID(i);
+            safeSsid.replace("\"", "\\\"");
+            json += "\"ssid\":\"" + safeSsid + "\",";
+            json += "\"bssid\":\"" + WiFi.BSSIDstr(i) + "\",";
+            json += "\"rssi\":" + String(WiFi.RSSI(i)) + ",";
+            json += "\"channel\":" + String(WiFi.channel(i)) + ",";
+            json += "\"auth\":\"";
+            switch (WiFi.encryptionType(i)) {
+                case WIFI_AUTH_OPEN: json += "OPEN"; break;
+                case WIFI_AUTH_WEP: json += "WEP"; break;
+                case WIFI_AUTH_WPA_PSK: json += "WPA"; break;
+                case WIFI_AUTH_WPA2_PSK: json += "WPA2"; break;
+                case WIFI_AUTH_WPA_WPA2_PSK: json += "WPA/WPA2"; break;
+                case WIFI_AUTH_WPA2_ENTERPRISE: json += "WPA2-EAP"; break;
+                case WIFI_AUTH_WPA3_PSK: json += "WPA3"; break;
+                case WIFI_AUTH_WPA2_WPA3_PSK: json += "WPA2/WPA3"; break;
+                default: json += "UNKNOWN"; break;
+            }
+            json += "\"}";
+        }
+    }
+    json += "]}";
+    WiFi.scanDelete();
+    server.send(200, "application/json", json);
+}
+
 void measureLatency() {
     if (WiFi.status() != WL_CONNECTED) return;
 
@@ -2196,6 +2233,7 @@ void setup() {
     server.on("/api/buffer", handleBufferApi);
     server.on("/api/buffer/csv", handleBufferCsv);
     server.on("/api/speedtest", handleSpeedtestApi);
+    server.on("/api/wifi/scan", handleWifiScanApi);
     server.on("/update", HTTP_GET, handleOtaPage);
     server.on("/update", HTTP_POST, handleOtaUploadDone, handleOtaUploadChunk);
     server.begin();

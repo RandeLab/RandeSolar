@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RandeLab Wi-Fi 2.4GHz SIGINT // Old School CRT War-Driving Scanner</title>
+  <link rel="icon" href="./web/arai-icon.svg" type="image/svg+xml">
+
+  <!-- Google Fonts: JetBrains Mono & Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="./web/style.css?v=2.1">
+  <link rel="stylesheet" href="./web/crt-scanner.css?v=2.0">
+</head>
+<body class="crt-green">
+
+  <!-- Outer CRT Glass Monitor Chassis -->
+  <div class="crt-monitor">
+    <!-- Scanline & Phosphor Overlay -->
+    <div class="crt-scanlines"></div>
+
+    <!-- Inner CRT Screen Tube -->
+    <div class="crt-screen crt-flicker-active">
+
+      <!-- ASCII Art Terminal Banner -->
+      <pre class="crt-ascii-banner crt-glow-text">
+██╗    ██╗██╗███████╗██╗    ███████╗ ██████╗ █████╗ ███╗   ██╗███╗   ██╗███████╗██████╗ 
+██║    ██║██║██╔════╝██║    ██╔════╝██╔════╝██╔══██╗████╗  ██║████╗  ██║██╔════╝██╔══██╗
+██║ █╗ ██║██║█████╗  ██║    ███████╗██║     ███████║██╔██╗ ██║██╔██╗ ██║█████╗  ██████╔╝
+██║███╗██║██║██╔══╝  ██║    ╚════██║██║     ██╔══██║██║╚██╗██║██║╚██╗██║██╔══╝  ██╔══██╗
+╚███╔███╔╝██║██║     ██║    ███████║╚██████╗██║  ██║██║ ╚████║██║ ╚████║███████╗██║  ██║
+ ╚══╝╚══╝ ╚═╝╚═╝     ╚═╝    ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝
+[ 802.11 B/G/N SPECTRUM ANALYZER // RANDELAB ÄTZISLOO // ESP32-S3 WARDIVING RADAR ]</pre>
+
+      <!-- Bezel Top Bar & Terminal Controls -->
+      <div class="crt-bezel-bar" style="margin-top:10px;">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <div class="crt-badge-status crt-glow-text">
+            <span class="crt-blink-dot"></span>
+            <span id="scanStatus">802.11 SYNC</span>
+          </div>
+          <span class="crt-dim-text" style="font-size:0.75rem;">BAND: 2.400 - 2.495 GHz (CH 1-14) • 47.7701°N 8.5738°E</span>
+        </div>
+
+        <!-- CRT Control Deck -->
+        <div class="crt-controls-group">
+          <!-- Main Navigation -->
+          <a href="./index.html" class="crt-btn" title="Zum Solar Power Dashboard wechseln">
+            <span>☀️ [ SOLAR STUDIO ]</span>
+          </a>
+          <a href="./network.html" class="crt-btn" title="Zum 5G Radio &amp; Tower Scanner wechseln">
+            <span>🌐 [ 5G SCANNER ]</span>
+          </a>
+          <a href="./wifi.html" class="crt-btn active" title="Aktive Wi-Fi Scanner-Ansicht">
+            <span>📶 [ WI-FI SCANNER ]</span>
+          </a>
+
+          <!-- Phosphor Palette Buttons -->
+          <button class="crt-btn btn-phosphor active" data-color="green" onclick="setPhosphorMode('green')" title="P1 Green Phosphor">P1-GRN</button>
+          <button class="crt-btn btn-phosphor" data-color="amber" onclick="setPhosphorMode('amber')" title="P3 Amber Phosphor">P3-AMB</button>
+          <button class="crt-btn btn-phosphor" data-color="cyan" onclick="setPhosphorMode('cyan')" title="C64 / Cyan Phosphor">C64-CYN</button>
+          <button class="crt-btn btn-phosphor" data-color="pink" onclick="setPhosphorMode('pink')" title="Cyberpunk Pink">CYBER-PNK</button>
+
+          <!-- Audio Engine Selector Buttons -->
+          <div style="display:inline-flex; border:1px solid var(--crt-border); border-radius:4px; overflow:hidden; margin-left:4px;">
+            <button class="crt-btn btn-soundscape active" data-sound="analog" onclick="setSoundscape('analog')" title="Moog Ladder Analog Synth Sonar Ping" style="border:none; border-right:1px solid var(--crt-border);">ANALOG</button>
+            <button class="crt-btn btn-soundscape" data-sound="sid" onclick="setSoundscape('sid')" title="Commodore 64 MOS 6581 8-Bit Arpeggio" style="border:none; border-right:1px solid var(--crt-border);">8-BIT SID</button>
+            <button class="crt-btn btn-soundscape" data-sound="fm" onclick="setSoundscape('fm')" title="Yamaha DX7 Cyber Metallic FM Chime" style="border:none; border-right:1px solid var(--crt-border);">CYBER FM</button>
+            <button class="crt-btn btn-soundscape" data-sound="tube" onclick="setSoundscape('tube')" title="Shortwave Heterodyne Tube Beat (BFO)" style="border:none;">TUBE BFO</button>
+          </div>
+
+          <!-- Geiger Counter Sound Toggle -->
+          <button id="btnToggleGeiger" class="crt-btn active" onclick="toggleGeiger()" title="Akustischer Wi-Fi Geigerzähler (Klickrate proportional zu dBm)">
+            ☢️ GEIGER: ON
+          </button>
+
+          <!-- Audio Master Toggle -->
+          <button id="btnAudioToggle" class="crt-btn active" onclick="toggleAudio()" title="Web Audio DSP Synthesizer ein/ausschalten">
+            🔊 AUDIO: ON
+          </button>
+
+          <!-- Glitch Trigger -->
+          <button class="crt-btn" onclick="toggleGlitch()" title="Manuelle CRT Kathoden-Störung erzeugen">
+            ⚡ GLITCH
+          </button>
+        </div>
+      </div>
+
+      <!-- Top Summary Metrics Bar -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px; margin-top:14px; margin-bottom:14px;">
+        <div style="background:rgba(0,0,0,0.6); border:1px solid var(--crt-border); border-radius:4px; padding:8px 12px;">
+          <div style="font-size:0.68rem; color:var(--crt-dim);">📡 DETECTED ACCESS POINTS</div>
+          <div class="crt-glow-text" style="font-size:1.5rem; font-weight:800; margin-top:2px;">
+            <span id="totalApsCount">8</span> <small style="font-size:0.75rem;">SSIDs IN RANGE</small>
+          </div>
+        </div>
+
+        <div style="background:rgba(0,0,0,0.6); border:1px solid var(--crt-border); border-radius:4px; padding:8px 12px;">
+          <div style="font-size:0.68rem; color:var(--crt-dim);">🎯 PEAK SIGNAL LEVEL</div>
+          <div class="crt-glow-text" style="font-size:1.15rem; font-weight:700; margin-top:4px;">
+            <span id="peakSignalDisplay">RandeLab (<b class="crt-glow-text">-41 dBm</b>)</span>
+          </div>
+        </div>
+
+        <div style="background:rgba(0,0,0,0.6); border:1px solid var(--crt-border); border-radius:4px; padding:8px 12px;">
+          <div style="font-size:0.68rem; color:var(--crt-dim);">🔓 OPEN / UNENCRYPTED NETS</div>
+          <div style="font-size:1.15rem; font-weight:700; margin-top:4px;">
+            <span id="openApsCount">0 (SECURE)</span>
+          </div>
+        </div>
+
+        <div style="background:rgba(0,0,0,0.6); border:1px solid var(--crt-border); border-radius:4px; padding:8px 12px; display:flex; align-items:center; justify-content:space-between;">
+          <div>
+            <div style="font-size:0.68rem; color:var(--crt-dim);">🔄 AUTO-SCAN INTERVAL</div>
+            <select class="crt-slider" onchange="setAutoScanInterval(this.value)" style="margin-top:4px; background:#000; color:var(--crt-main); border:1px solid var(--crt-border); font-size:0.75rem; padding:2px 6px;">
+              <option value="3">Alle 3s scannen</option>
+              <option value="5" selected>Alle 5s scannen</option>
+              <option value="10">Alle 10s scannen</option>
+              <option value="0">Manuell (Pause)</option>
+            </select>
+          </div>
+          <button id="btnTriggerScan" class="crt-btn" onclick="triggerWifiScan()" style="padding:6px 12px; font-weight:800;">
+            📡 RESCAN
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Operational Grid -->
+      <div class="crt-grid-main">
+
+        <!-- Column 1: Spectrum Analyzer & AP Table -->
+        <div>
+          <!-- Panel 1: 2.4 GHz Spectrum Analyzer -->
+          <div class="crt-panel" style="margin-bottom:14px;">
+            <div class="crt-panel-header crt-glow-text">
+              <span>📊 2.4 GHz SPECTRUM ANALYZER &amp; CHANNEL OVERLAP (CH 1 - 14)</span>
+              <span class="crt-dim-text" style="font-size:0.7rem;">20 MHz PARABOLIC FILTER // RSSI PEAK HOLD</span>
+            </div>
+
+            <!-- Canvas Container -->
+            <div style="width:100%; overflow:hidden; position:relative; background:#020603; border:1px solid var(--crt-border); border-radius:4px; margin-top:4px;">
+              <canvas id="spectrumCanvas" height="240" style="display:block; width:100%;"></canvas>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.72rem; color:var(--crt-dim); margin-top:8px;">
+              <span>Interferenz-Tipp: <b>Kanal 1, 6 und 11</b> überschneiden sich nicht gegenseitig.</span>
+              <span class="crt-glow-text">Bandbreite: 22 MHz Maske</span>
+            </div>
+          </div>
+
+          <!-- Panel 2: Live Wardriving Access Point Table -->
+          <div class="crt-panel">
+            <div class="crt-panel-header crt-glow-text">
+              <span>📋 ACCESS POINT WARDRIVING TABLE</span>
+              <span class="crt-dim-text" style="font-size:0.7rem;">KLICKEN ZUM TARGET-LOCK / GEIGER-TRACKING</span>
+            </div>
+
+            <div style="overflow-x:auto;">
+              <table class="wifi-table">
+                <thead>
+                  <tr>
+                    <th>SSID</th>
+                    <th>BSSID (MAC)</th>
+                    <th>KANAL</th>
+                    <th>RSSI (PEQEL)</th>
+                    <th>VERSCHL.</th>
+                    <th>HERSTELLER / CHIP</th>
+                    <th>DISTANZ</th>
+                    <th>AKTION</th>
+                  </tr>
+                </thead>
+                <tbody id="wifiTableBody">
+                  <!-- Dynamically rendered by web/wifi.js -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Column 2: Wardriving Radar, Target HUD & TTY Packet Log -->
+        <div>
+          <!-- Panel 3: Tactical 360° Circular Radar -->
+          <div class="crt-panel" style="margin-bottom:14px;">
+            <div class="crt-panel-header crt-glow-text">
+              <span>🎯 360° WARDRIVING RADAR // ÄTZISLOO</span>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span id="geigerLed" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--crt-main); opacity:0.3; transition:opacity 0.05s;" title="Geiger Puls Indikator"></span>
+                <button class="crt-btn" onclick="openBigRadar()" style="padding:2px 8px; font-size:0.7rem;" title="Grossansicht &amp; Tactical HUD öffnen">
+                  ⛶ EXPAND
+                </button>
+              </div>
+            </div>
+
+            <div style="display:flex; justify-content:center; align-items:center; position:relative; padding:6px 0; cursor:pointer;" onclick="openBigRadar()" title="Klicken für taktische Großansicht">
+              <canvas id="radarCanvas" width="280" height="280" style="border-radius:50%; box-shadow:0 0 25px rgba(57, 255, 20, 0.15); border:1px solid var(--crt-border);"></canvas>
+            </div>
+
+            <!-- Radar Sweep Speed Slider -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; padding:6px 10px; background:rgba(0,0,0,0.5); border:1px solid var(--crt-border); border-radius:4px; font-size:0.72rem;">
+              <span style="color:var(--crt-dim);">SWEEP SPEED: <b class="crt-glow-text" id="radarSpeedDisplay">1.0x</b></span>
+              <input type="range" class="crt-slider" id="radarSpeedSlider" min="0" max="3" step="0.1" value="1.0" oninput="setRadarSpeed(this.value)" style="width:130px;" title="Radar Sweep-Geschwindigkeit (0 = Pause)">
+            </div>
+
+            <div style="font-size:0.72rem; color:var(--crt-dim); text-align:center; margin-top:6px;">
+              [ 🔍 KLICKEN FÜR GROSSANSICHT / HUD MODAL ]
+            </div>
+          </div>
+
+          <!-- Panel 4: Target HUD Inspector -->
+          <div class="crt-panel" style="margin-bottom:14px;">
+            <div class="crt-panel-header crt-glow-text">
+              <span>🎯 TARGET HUD INSPECTOR</span>
+              <span class="crt-dim-text" style="font-size:0.7rem;">AUDIO-GEIGER ZIEL</span>
+            </div>
+
+            <div style="background:rgba(0,0,0,0.5); border:1px solid var(--crt-border); border-radius:4px; padding:10px; font-size:0.78rem;">
+              <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span style="color:var(--crt-dim);">SSID:</span>
+                <b class="crt-glow-text" id="hudSsid">RandeLab</b>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span style="color:var(--crt-dim);">BSSID:</span>
+                <span id="hudBssid" style="font-family:'JetBrains Mono';">00:1E:42:A8:12:34</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span style="color:var(--crt-dim);">SIGNAL / RSSI:</span>
+                <b class="crt-glow-text" id="hudRssi">-41 dBm</b>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span style="color:var(--crt-dim);">EST. DISTANZ:</span>
+                <span id="hudDist">~2.5m (AZ 0°)</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                <span style="color:var(--crt-dim);">HERSTELLER / OUI:</span>
+                <span id="hudVendor" style="color:#60a5fa;">Teltonika Networks</span>
+              </div>
+              <div style="margin-top:6px; padding-top:6px; border-top:1px dashed var(--crt-border); font-size:0.72rem; color:var(--crt-dim);" id="hudDesc">
+                Lokales RandeLab Labor-Netzwerk (Teltonika Gateway TRB500 / AP).
+              </div>
+            </div>
+          </div>
+
+          <!-- Panel 5: Raw 802.11 TTY Packet & Frame Stream -->
+          <div class="crt-panel">
+            <div class="crt-panel-header crt-glow-text">
+              <span>📟 RAW 802.11 PACKET &amp; BEACON STREAM</span>
+              <button class="crt-btn" onclick="clearTtyLog()" style="padding:1px 6px; font-size:0.65rem;">CLEAR</button>
+            </div>
+
+            <div id="wifiTtyLog" class="crt-tty-log" style="height:140px; overflow-y:auto; font-size:0.7rem;">
+              <!-- Live raw frames appended here -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Tactical Big Radar Scope Popup Modal -->
+      <div id="bigRadarModal" class="crt-modal-overlay" style="display:none;" onclick="if(event.target === this) closeBigRadar();">
+        <div class="crt-modal-content">
+          <div class="crt-panel-header crt-glow-text" style="font-size:1.05rem; padding-bottom:8px; border-bottom:1px solid var(--crt-border);">
+            <span>📡 TACTICAL WARDRIVING SCOPE // 360° HUD</span>
+            <button class="crt-btn" onclick="closeBigRadar()" style="font-size:0.8rem; padding:3px 10px;">[ ✕ CLOSE ]</button>
+          </div>
+
+          <div style="display:flex; flex-direction:column; align-items:center; margin-top:14px;">
+            <canvas id="bigRadarCanvas" width="440" height="440" style="border-radius:50%; box-shadow:0 0 35px rgba(57, 255, 20, 0.25); border:1px solid var(--crt-border); max-width:100%;"></canvas>
+            <div style="margin-top:12px; font-size:0.78rem; color:var(--crt-dim); text-align:center;">
+              Ringe: <b class="crt-glow-text">10m • 25m • 50m • 100m • 150m</b> // Geiger-Klickrate spiegelt Abstand wider
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer & Branding -->
+      <div style="margin-top:20px; padding-top:10px; border-top:1px solid var(--crt-border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; font-size:0.72rem; color:var(--crt-dim);">
+        <div>
+          RANDESOLAR SIGINT OBSERVATORY • Ätzisloo Merishausen 857m • ESP32-S3 Station
+        </div>
+        <div>
+          <a href="./index.html" style="color:var(--crt-main); text-decoration:none; margin-right:12px;">☀️ Solar Studio</a>
+          <a href="./network.html" style="color:var(--crt-main); text-decoration:none; margin-right:12px;">🌐 5G Radio Scanner</a>
+          <a href="https://github.com/randelab/RandeSolar" target="_blank" style="color:var(--crt-main); text-decoration:none;">GitHub Repo ↗</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Script with Cache Busting -->
+  <script src="./web/wifi.js?v=1.0"></script>
+</body>
+</html>
