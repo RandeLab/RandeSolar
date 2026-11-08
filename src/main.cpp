@@ -2299,14 +2299,16 @@ void loop() {
         if (d.has_data && mqttClient.connected()) {
             int wifiRssi = WiFi.RSSI();
             int wifiQual = constrain(2 * (wifiRssi + 100), 0, 100);
-            char json[680];
+            char json[900];
             snprintf(json, sizeof(json),
                 "{\"solar_power\":%u,\"panel_voltage\":%.2f,\"battery_voltage\":%.2f,\"battery_current\":%.2f,"
                 "\"yield_today_wh\":%lu,\"external_load\":%.2f,\"charge_state\":%u,\"state_str\":\"%s\","
                 "\"charger_error\":%u,\"ble_rssi\":%d,\"wifi_rssi\":%d,\"wifi_quality_pct\":%d,\"wifi_channel\":%d,"
                 "\"chip_temp\":%.1f,\"free_heap_kb\":%u,\"net_mbps\":%.2f,\"net_up_mbps\":%.2f,"
                 "\"net_ping_ms\":%u,\"gw_ping_ms\":%u,\"dns_ms\":%u,\"ttfb_ms\":%u,"
-                "\"cell_rsrp\":%d,\"cell_sinr\":%d,\"cell_band\":\"%s\",\"age_sec\":0}",
+                "\"cell_has_data\":%s,\"cell_rsrp\":%d,\"cell_sinr\":%d,\"cell_rsrq\":%d,\"cell_qual\":%d,"
+                "\"cell_mode\":\"%s\",\"cell_band\":\"%s\",\"cell_operator\":\"%s\",\"cell_id\":\"%s\",\"cell_temp\":%.1f,"
+                "\"cell_down_mbps\":%.2f,\"cell_up_mbps\":%.2f,\"buffered_records\":%u,\"age_sec\":0}",
                 d.solar_power,
                 d.panel_voltage,
                 d.battery_voltage,
@@ -2328,9 +2330,19 @@ void loop() {
                 (unsigned int)g_gwPingMs,
                 (unsigned int)g_dnsMs,
                 (unsigned int)g_ttfbMs,
+                g_cellHasData ? "true" : "false",
                 g_cellRsrp,
                 g_cellSinr,
-                g_cellBand.c_str()
+                g_cellRsrq,
+                g_cellQual,
+                g_cellMode.c_str(),
+                g_cellBand.c_str(),
+                g_cellOperator.c_str(),
+                g_cellId.c_str(),
+                g_cellTemp,
+                g_cellDownMbps,
+                g_cellUpMbps,
+                (unsigned int)g_bufferedRecordCount
             );
             mqttClient.publish(MQTT_TOPIC, json);
             triggerTxFlash();

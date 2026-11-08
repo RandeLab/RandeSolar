@@ -1088,21 +1088,22 @@ function updateDashboard(data) {
     if (elC) elC.textContent = data.wifi_channel;
   }
 
-  if (data.cell_has_data) {
+  const hasCellData = Boolean(data.cell_has_data || data.cell_rsrp || data.cell_band || data.cell_operator);
+  if (hasCellData) {
     const elRsrp = document.getElementById('cellRsrp');
-    if (elRsrp) elRsrp.textContent = data.cell_rsrp;
+    if (elRsrp && data.cell_rsrp !== undefined) elRsrp.textContent = data.cell_rsrp;
     const elSinr = document.getElementById('cellSinr');
-    if (elSinr) elSinr.textContent = data.cell_sinr;
+    if (elSinr && data.cell_sinr !== undefined) elSinr.textContent = data.cell_sinr;
     const elBand = document.getElementById('cellBand');
-    if (elBand) elBand.textContent = data.cell_band;
+    if (elBand && data.cell_band) elBand.textContent = data.cell_band;
     const elQual = document.getElementById('cellQual');
-    if (elQual) elQual.textContent = data.cell_qual;
-    const elOp = document.getElementById('cellProvider');
-    if (elOp) elOp.textContent = data.cell_operator;
+    if (elQual && data.cell_qual !== undefined) elQual.textContent = data.cell_qual;
+    const elOp = document.getElementById('cellProvider') || document.getElementById('cellOperator');
+    if (elOp && data.cell_operator) elOp.textContent = data.cell_operator;
     const elMode = document.getElementById('cellMode');
-    if (elMode) elMode.textContent = data.cell_mode;
+    if (elMode && data.cell_mode) elMode.textContent = data.cell_mode;
     const elId = document.getElementById('cellId');
-    if (elId) elId.textContent = data.cell_id;
+    if (elId && data.cell_id) elId.textContent = data.cell_id;
     const elTemp = document.getElementById('cellTemp');
     if (elTemp && data.cell_temp !== undefined) elTemp.textContent = Number(data.cell_temp).toFixed(1);
 
