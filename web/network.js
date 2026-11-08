@@ -68,27 +68,363 @@
     { id: 'komberg_de', name: '🇩🇪 Komberg / Tengen', distKm: 4.20, bearingDeg: 15, band: 'Telekom Macro', color: '#ff3344', active: false }
   ];
 
-  // Web Audio Synthesizer (Retro Arcade Scanner Sound)
+  // =========================================================================
+  // RETRO GEEK WEB AUDIO SYNTHESIZER (ZERO-DEPENDENCY PROCEDURAL DSP)
+  // =========================================================================
   let audioCtx = null;
-  function playBeep(freq = 880, type = 'sine', duration = 0.06, gain = 0.05) {
+
+  function getAudioCtx() {
+    if (!audioCtx) {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) {
+        audioCtx = new AudioContextClass();
+      }
+    }
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    return audioCtx;
+  }
+
+  // 1. Mechanical Key / Switch Click (Tactile impulse transient)
+  function playMechanicalClick(pitchMod = 1.0) {
     if (!soundEnabled) return;
     try {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gainNode = audioCtx.createGain();
-      osc.type = type;
-      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-      gainNode.gain.setValueAtTime(gain, audioCtx.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-      osc.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + duration);
+      const ctx = getAudioCtx();
+      if (!ctx) return;
+      const t = ctx.currentTime;
+
+      // Ultra-short noise burst (contact bounce)
+      const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * 0.005));
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.3));
+      }
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.setValueAtTime(3200 * pitchMod, t);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.06, t);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.005);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+      noise.start(t);
+
+      // Low resonant chassis body knock
+      const osc = ctx.createOscillator();
+      const oscGain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(380 * pitchMod, t);
+      osc.frequency.exponentialRampToValueAtTime(120, t + 0.012);
+
+      oscGain.gain.setValueAtTime(0.05, t);
+      oscGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.012);
+
+      osc.connect(oscGain);
+      oscGain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.012);
     } catch (e) {}
   }
 
+  // 2. CRT Degauss Coil Magnetic Thump + 15.6 kHz Flyback Ring
+  function playDegaussThump() {
+    if (!soundEnabled) return;
+    try {
+      const ctx = getAudioCtx();
+      if (!ctx) return;
+      const t = ctx.currentTime;
+
+      // Sub-bass electromagnetic coil sweep (140 Hz -> 26 Hz)
+      const subOsc = ctx.createOscillator();
+      const subGain = ctx.createGain();
+      subOsc.type = 'sine';
+      subOsc.frequency.setValueAtTime(140, t);
+      subOsc.frequency.exponentialRampToValueAtTime(26, t + 0.45);
+
+      subGain.gain.setValueAtTime(0.22, t);
+      subGain.gain.linearRampToValueAtTime(0.18, t + 0.08);
+      subGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+
+      // Magnetic AC hum (50 Hz buzz harmonics)
+      const humOsc = ctx.createOscillator();
+      const humGain = ctx.createGain();
+      humOsc.type = 'sawtooth';
+      humOsc.frequency.setValueAtTime(50, t);
+      humGain.gain.setValueAtTime(0.04, t);
+      humGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+
+      subOsc.connect(subGain);
+      subGain.connect(ctx.destination);
+      humOsc.connect(humGain);
+      humGain.connect(ctx.destination);
+
+      subOsc.start(t);
+      humOsc.start(t);
+      subOsc.stop(t + 0.5);
+      humOsc.stop(t + 0.35);
+
+      // CRT 15.6 kHz horizontal flyback transformer whine ring
+      const flyback = ctx.createOscillator();
+      const flyGain = ctx.createGain();
+      flyback.type = 'sine';
+      flyback.frequency.setValueAtTime(12000, t + 0.1);
+      flyback.frequency.exponentialRampToValueAtTime(15625, t + 0.3);
+
+      flyGain.gain.setValueAtTime(0.0001, t);
+      flyGain.gain.setValueAtTime(0.018, t + 0.12);
+      flyGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+
+      flyback.connect(flyGain);
+      flyGain.connect(ctx.destination);
+      flyback.start(t + 0.1);
+      flyback.stop(t + 0.45);
+    } catch (e) {}
+  }
+
+  // 3. Sonar Radar Ping (Active 5G Cell Target vs Background Mast)
+  function playSonarPing(isTarget = true) {
+    if (!soundEnabled) return;
+    try {
+      const ctx = getAudioCtx();
+      if (!ctx) return;
+      const t = ctx.currentTime;
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+
+      filter.type = 'bandpass';
+      filter.Q.value = 6;
+
+      if (isTarget) {
+        // High-tech resonant submarine / radar ping for active 5G cell
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1250, t);
+        osc.frequency.exponentialRampToValueAtTime(1020, t + 0.35);
+        filter.frequency.setValueAtTime(1200, t);
+
+        gain.gain.setValueAtTime(0.12, t);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+
+        // Harmonic overtone
+        const overtone = ctx.createOscillator();
+        const overGain = ctx.createGain();
+        overtone.type = 'triangle';
+        overtone.frequency.setValueAtTime(2500, t);
+        overGain.gain.setValueAtTime(0.035, t);
+        overGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+
+        overtone.connect(overGain);
+        overGain.connect(ctx.destination);
+        overtone.start(t);
+        overtone.stop(t + 0.12);
+      } else {
+        // Subtle distant blip for other border towers
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(640, t);
+        filter.frequency.setValueAtTime(640, t);
+
+        gain.gain.setValueAtTime(0.035, t);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+      }
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(t);
+      osc.stop(t + (isTarget ? 0.35 : 0.08));
+    } catch (e) {}
+  }
+
+  // 4. RF Static Atmospheric Glitch / Crackle
+  function playGlitchStatic(duration = 0.22) {
+    if (!soundEnabled) return;
+    try {
+      const ctx = getAudioCtx();
+      if (!ctx) return;
+      const t = ctx.currentTime;
+
+      const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * duration));
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+
+      // Generate bursty / fluttering static noise with dropouts
+      for (let i = 0; i < bufferSize; i++) {
+        const dropout = Math.random() > 0.85 ? 0 : 1;
+        data[i] = (Math.random() * 2 - 1) * dropout * (1 - (i / bufferSize) * 0.7);
+      }
+
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1400, t);
+      filter.Q.value = 2.5;
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.09, t);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      noise.start(t);
+    } catch (e) {}
+  }
+
+  // 5. Bell 202 / AX.25 FSK Packet Radio Chirp (Telemetry burst)
+  function playPacketBurst() {
+    if (!soundEnabled) return;
+    try {
+      const ctx = getAudioCtx();
+      if (!ctx) return;
+      const t = ctx.currentTime;
+
+      // Sequence of rapid tones (1200 Hz mark / 2200 Hz space)
+      const freqs = [1200, 2200, 1200, 2200, 1200, 2200];
+      const toneDur = 0.016; // 16ms per tone = ~60 baud retro packet burst
+
+      freqs.forEach((freq, idx) => {
+        const toneStart = t + idx * toneDur;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, toneStart);
+
+        gain.gain.setValueAtTime(0.05, toneStart);
+        gain.gain.exponentialRampToValueAtTime(0.001, toneStart + toneDur);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(toneStart);
+        osc.stop(toneStart + toneDur);
+      });
+    } catch (e) {}
+  }
+
+  // 6. Teletype Matrix Printer / Terminal Micro-click
+  let lastTtyClick = 0;
+  function playTeletypeClick() {
+    if (!soundEnabled) return;
+    const now = performance.now();
+    if (now - lastTtyClick < 45) return; // Debounce so it doesn't overwhelm
+    lastTtyClick = now;
+
+    try {
+      const ctx = getAudioCtx();
+      if (!ctx) return;
+      const t = ctx.currentTime;
+
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      // Jitter frequency slightly for authentic acoustic variety
+      osc.frequency.setValueAtTime(2200 + (Math.random() * 800 - 400), t);
+
+      gain.gain.setValueAtTime(0.03, t);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.006);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.006);
+    } catch (e) {}
+  }
+
+  // 7. Speedtest Launch Fanfare
+  function playSpeedtestFanfare() {
+    if (!soundEnabled) return;
+    try {
+      const ctx = getAudioCtx();
+      if (!ctx) return;
+      const t = ctx.currentTime;
+
+      const notes = [440, 554, 659, 880, 1108, 1318];
+      notes.forEach((freq, idx) => {
+        const toneStart = t + idx * 0.05;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq, toneStart);
+
+        gain.gain.setValueAtTime(0.045, toneStart);
+        gain.gain.exponentialRampToValueAtTime(0.0001, toneStart + 0.08);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(toneStart);
+        osc.stop(toneStart + 0.08);
+      });
+    } catch (e) {}
+  }
+
+  // Backward compatible beep helper
+  function playBeep(freq = 880, type = 'sine', duration = 0.06, gain = 0.05) {
+    if (!soundEnabled) return;
+    try {
+      const ctx = getAudioCtx();
+      if (!ctx) return;
+      const osc = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      gainNode.gain.setValueAtTime(gain, ctx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+      osc.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + duration);
+    } catch (e) {}
+  }
+
+  // Sound FX Tester trigger helper
+  window.testSoundFx = function(type) {
+    if (!soundEnabled) {
+      window.toggleSound();
+    }
+    switch (type) {
+      case 'ping':
+        playSonarPing(true);
+        logTTY('[AUDIO_TEST] 📡 Radar Sonar Ping: Target Merishausen Südhang (150°, 1250 Hz)');
+        break;
+      case 'packet':
+        playPacketBurst();
+        logTTY('[AUDIO_TEST] 📻 FSK Packet Burst: Bell 202 1200/2200 Hz Telemetry Frame');
+        break;
+      case 'degauss':
+        playDegaussThump();
+        logTTY('[AUDIO_TEST] ⚡ CRT Degauss Coil Discharge + 15.6 kHz Flyback Ring');
+        break;
+      case 'glitch':
+        playGlitchStatic();
+        logTTY('[AUDIO_TEST] ⚡ RF Multipath Crackle & Noise Burst');
+        break;
+      case 'teletype':
+        playTeletypeClick();
+        logTTY('[AUDIO_TEST] ⌨️ TTY Matrix Printer Micro-Click');
+        break;
+      default:
+        playSonarPing(true);
+    }
+  };
+
   // Phosphor Theme Switcher
-  window.setPhosphorMode = function(color) {
+  window.setPhosphorMode = function(color, isUser = true) {
     document.body.classList.remove('crt-green', 'crt-amber', 'crt-cyan', 'crt-pink');
     if (color !== 'green') {
       document.body.classList.add(`crt-${color}`);
@@ -100,7 +436,7 @@
     document.querySelectorAll('.btn-phosphor').forEach(b => {
       b.classList.toggle('active', b.dataset.color === color);
     });
-    playBeep(1200, 'square', 0.04);
+    if (isUser) playMechanicalClick(1.2);
   };
 
   // Toggle Scanlines
@@ -110,7 +446,7 @@
     localStorage.setItem('randelab-crt-scanlines', scanlinesActive);
     const btn = document.getElementById('btnToggleScanlines');
     if (btn) btn.textContent = scanlinesActive ? 'SCANLINES: ON' : 'SCANLINES: OFF';
-    playBeep(950, 'sawtooth', 0.04);
+    playMechanicalClick(0.9);
   };
 
   // Toggle Audio
@@ -119,14 +455,23 @@
     localStorage.setItem('randelab-crt-sound', soundEnabled);
     const btn = document.getElementById('btnToggleSound');
     if (btn) btn.textContent = soundEnabled ? '🔊 AUDIO: ON' : '🔇 AUDIO: OFF';
-    if (soundEnabled) playBeep(1400, 'triangle', 0.08, 0.1);
+    if (soundEnabled) {
+      getAudioCtx();
+      playDegaussThump();
+      setTimeout(() => {
+        playPacketBurst();
+      }, 450);
+      logTTY('[AUDIO] Web Audio DSP Synthesizer online! (Degauss, Radar Sonar, FSK Packet, TTY Clicks active)');
+    } else {
+      logTTY('[AUDIO] Synthesizer muted.');
+    }
   };
 
   // Trigger Glitch Burst
   window.triggerGlitch = function() {
     if (!el.monitor) return;
     el.monitor.classList.add('glitch-hover');
-    playBeep(440, 'sawtooth', 0.15, 0.08);
+    playGlitchStatic(0.35);
     logTTY('[ANOMALY] Atmospheric RF Multipath Glitch detected! Desync: +14ms');
     setTimeout(() => {
       el.monitor.classList.remove('glitch-hover');
@@ -136,6 +481,7 @@
   // Format TTY Log Line
   function logTTY(msg) {
     if (!el.ttyLog) return;
+    playTeletypeClick();
     const now = new Date();
     const ts = `[${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}]`;
     const div = document.createElement('div');
@@ -245,9 +591,13 @@
         if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
 
         // Blip lights up when sweep passes
-        const isHit = angleDiff < 0.05;
+        const isHit = angleDiff < 0.055;
         if (isHit) {
-          playBeep(m.active ? 1400 : 700, 'sine', 0.04, 0.03);
+          const now = performance.now();
+          if (!m._lastPingTime || (now - m._lastPingTime > 2200)) {
+            m._lastPingTime = now;
+            playSonarPing(m.active);
+          }
         }
 
         ctx.fillStyle = isHit ? '#ffffff' : (m.active ? '#00f3ff' : m.color);
@@ -279,6 +629,9 @@
     if (!data) return;
     lastTelemetry = data;
     lastDataTime = Date.now();
+
+    // Sound FX: FSK telemetry packet chirp
+    playPacketBurst();
 
     // Connection indicator
     if (el.connStatus) el.connStatus.classList.add('connected');
@@ -410,7 +763,7 @@
     if (!el.speedtestBtn) return;
     el.speedtestBtn.disabled = true;
     el.speedtestBtn.textContent = 'TEST LÄUFT...';
-    playBeep(1800, 'square', 0.1, 0.08);
+    playSpeedtestFanfare();
     logTTY('[TRIGGER] Initiating Ookla WAN Speedtest on TRB500 Gateway...');
     try {
       const url = `${labEndpoint}/api/speedtest`;
@@ -453,7 +806,7 @@
   // Initialize on page load
   window.addEventListener('DOMContentLoaded', () => {
     // Apply saved phosphor
-    window.setPhosphorMode(currentPhosphor);
+    window.setPhosphorMode(currentPhosphor, false);
 
     if (el.scanlines) {
       el.scanlines.style.display = scanlinesActive ? 'block' : 'none';
