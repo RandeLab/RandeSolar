@@ -53,19 +53,168 @@
     ttyLog: document.getElementById('crtTtyLog'),
     radarCanvas: document.getElementById('crtRadarCanvas'),
     vuBarRsrp: document.getElementById('vuBarRsrp'),
-    vuBarSinr: document.getElementById('vuBarSinr')
+    vuBarSinr: document.getElementById('vuBarSinr'),
+    // Big Radar Modal
+    radarModal: document.getElementById('crtRadarModal'),
+    bigRadarCanvas: document.getElementById('crtBigRadarCanvas'),
+    radarCrosshairTooltip: document.getElementById('radarCrosshairTooltip'),
+    radarMastsList: document.getElementById('radarMastsList'),
+    targetStatusBadge: document.getElementById('targetStatusBadge'),
+    targetName: document.getElementById('targetName'),
+    targetDist: document.getElementById('targetDist'),
+    targetBearing: document.getElementById('targetBearing'),
+    targetOperator: document.getElementById('targetOperator'),
+    targetBand: document.getElementById('targetBand'),
+    targetRsrp: document.getElementById('targetRsrp'),
+    targetBandwidth: document.getElementById('targetBandwidth'),
+    targetCoords: document.getElementById('targetCoords'),
+    targetDesc: document.getElementById('targetDesc')
   };
+
+  // Big Radar Modal State
+  let radarModalOpen = false;
+  let radarRangeKm = 5.0;
+  let radarSweepSpeed = 1.0;
+  let selectedMastId = 'meri_south';
 
   // 8 Masts in Randen Corridor (Coordinates & Azimuth relative to RandeLab)
   const MASTS = [
-    { id: 'meri_south', name: '🇨🇭 Merishausen Südhang', distKm: 0.78, bearingDeg: 150, band: 'B3 + n1', color: '#00f3ff', active: true },
-    { id: 'randen_b8', name: '🇨🇭 Zelle Randen (B8)', distKm: 0.78, bearingDeg: 150, band: 'LTE B8', color: '#ffb000', active: false },
-    { id: 'meri_dorf', name: '🇨🇭 Merishausen Dorf', distKm: 1.35, bearingDeg: 175, band: 'Multi-OP', color: '#39ff14', active: false },
-    { id: 'bargen_schlauch', name: '🇨🇭 Bargen Schlauch', distKm: 2.65, bearingDeg: 75, band: 'B28+n78', color: '#39ff14', active: false },
-    { id: 'hagenturm', name: '🇨🇭 Hagenturm (912m)', distKm: 3.80, bearingDeg: 272, band: 'Swisscom 5G', color: '#ff007f', active: false },
-    { id: 'wiechs_de', name: '🇩🇪 Wiechs am Randen', distKm: 1.80, bearingDeg: 35, band: 'Telekom DE', color: '#ff3344', active: false },
-    { id: 'bargen_zoll_de', name: '🇩🇪 Bargen Zoll', distKm: 3.10, bearingDeg: 60, band: 'o2 DE', color: '#ff3344', active: false },
-    { id: 'komberg_de', name: '🇩🇪 Komberg / Tengen', distKm: 4.20, bearingDeg: 15, band: 'Telekom Macro', color: '#ff3344', active: false }
+    { 
+      id: 'meri_south', 
+      name: '🇨🇭 Merishausen Südhang', 
+      distKm: 0.78, 
+      bearingDeg: 150, 
+      band: 'B3 + n1 (40 MHz)', 
+      color: '#00f3ff', 
+      active: true,
+      operator: 'GoMo / Salt CH',
+      freq: '1800 MHz + 2100 MHz',
+      rsrp: '-93 dBm (LOCKED)',
+      sinr: '-1 dB ... +8 dB',
+      status: '🟢 ACTIVE 5G SERVING CELL',
+      coords: '47.7645° N, 8.5790° E',
+      bandwidth: '40 MHz (20M + 20M CA)',
+      desc: 'Hauptzelle 23667202. Band 8 erfolgreich gebypasst. 58.8 Mbit/s Upload stabil.'
+    },
+    { 
+      id: 'randen_b8', 
+      name: '🇨🇭 Zelle Randen (B8)', 
+      distKm: 0.78, 
+      bearingDeg: 150, 
+      band: 'LTE B8 (900 MHz)', 
+      color: '#ffb000', 
+      active: false,
+      operator: 'Salt CH (Cell 30556191)',
+      freq: '900 MHz (10 MHz Kanal)',
+      rsrp: '-81 dBm (Dämpfungsumgehung)',
+      sinr: '+14 dB',
+      status: '⚠️ GEBLOCKT / BAND-LOCK AUSSCHLUSS',
+      coords: '47.7645° N, 8.5790° E',
+      bandwidth: '10 MHz (überlastet)',
+      desc: 'Band 8 Falle! Zwar starkes Signal, aber nur 2 Mbit/s Durchsatz wegen Überlastung.'
+    },
+    { 
+      id: 'meri_dorf', 
+      name: '🇨🇭 Merishausen Dorf', 
+      distKm: 1.35, 
+      bearingDeg: 175, 
+      band: 'Multi-OP (B20/B8/B3)', 
+      color: '#39ff14', 
+      active: false,
+      operator: 'Swisscom / Salt',
+      freq: '800 / 900 / 1800 MHz',
+      rsrp: '-104 dBm',
+      sinr: '-4 dB',
+      status: '⚪ STANDBY / DORFTAL',
+      coords: '47.7580° N, 8.5750° E',
+      bandwidth: '15 MHz',
+      desc: 'Antennenstandort im Talboden unterhalb der Randen-Geländekante.'
+    },
+    { 
+      id: 'bargen_schlauch', 
+      name: '🇨🇭 Bargen Schlauch', 
+      distKm: 2.65, 
+      bearingDeg: 75, 
+      band: 'B28 + n78 High-Band', 
+      color: '#39ff14', 
+      active: false,
+      operator: 'Swisscom Macro',
+      freq: '700 MHz + 3500 MHz (n78)',
+      rsrp: '-98 dBm',
+      sinr: '+3 dB',
+      status: '⚪ ALTERNATIVE 5G ROUTE',
+      coords: '47.7760° N, 8.6080° E',
+      bandwidth: '40 MHz',
+      desc: 'Optische Sichtverbindung über Talmulde Bargen Richtung H3.'
+    },
+    { 
+      id: 'hagenturm', 
+      name: '🇨🇭 Hagenturm (912m)', 
+      distKm: 3.80, 
+      bearingDeg: 272, 
+      band: 'Swisscom 5G Macro', 
+      color: '#ff007f', 
+      active: false,
+      operator: 'Swisscom Broadcast',
+      freq: '700 / 1800 / 2100 / 3500 MHz',
+      rsrp: '-96 dBm',
+      sinr: '+5 dB',
+      status: '⚪ RIDGE BROADCAST TOWER',
+      coords: '47.7710° N, 8.5230° E',
+      bandwidth: '60 MHz Multi-Carrier',
+      desc: 'Höchster Punkt im Kanton Schaffhausen (912 m ü. M.). Starkes Signal.'
+    },
+    { 
+      id: 'wiechs_de', 
+      name: '🇩🇪 Wiechs am Randen', 
+      distKm: 1.80, 
+      bearingDeg: 35, 
+      band: 'Telekom DE B8+B20', 
+      color: '#ff3344', 
+      active: false,
+      operator: 'Deutsche Telekom (DE)',
+      freq: '900 / 800 MHz',
+      rsrp: '-91 dBm (CROSS-BORDER)',
+      sinr: '+8 dB',
+      status: '🇩🇪 GRENZGÄNGER / ROAMING OFF',
+      coords: '47.7830° N, 8.5880° E',
+      bandwidth: '20 MHz',
+      desc: 'Deutscher Sender strahlt stark über die Landesgrenze in die Ätzisloo-Lichtung.'
+    },
+    { 
+      id: 'bargen_zoll_de', 
+      name: '🇩🇪 Bargen Zoll / Neuhaus', 
+      distKm: 3.10, 
+      bearingDeg: 60, 
+      band: 'Telefónica o2 DE B20', 
+      color: '#ff3344', 
+      active: false,
+      operator: 'o2 Telefónica DE',
+      freq: '800 MHz',
+      rsrp: '-102 dBm',
+      sinr: '-2 dB',
+      status: '🇩🇪 GRENZGÄNGER',
+      coords: '47.7840° N, 8.6140° E',
+      bandwidth: '10 MHz',
+      desc: 'Zollstation A81 / B4. Grenzüberschreitender LTE-Spillover.'
+    },
+    { 
+      id: 'komberg_de', 
+      name: '🇩🇪 Komberg / Tengen', 
+      distKm: 4.20, 
+      bearingDeg: 15, 
+      band: 'Telekom Macro 5G', 
+      color: '#ff3344', 
+      active: false,
+      operator: 'Telekom DE (Hegau)',
+      freq: '800 / 1800 / 3600 MHz',
+      rsrp: '-106 dBm',
+      sinr: '-3 dB',
+      status: '🇩🇪 DEUTSCHER HIGH-SITE',
+      coords: '47.8070° N, 8.5880° E',
+      bandwidth: '50 MHz',
+      desc: 'Erhabener Mast auf Komberg mit Sichtachse in das nördliche Randenplateau.'
+    }
   ];
 
   // =========================================================================
@@ -518,110 +667,447 @@
     }
   }
 
-  // Radar Animation Loop
+  // =========================================================================
+  // BIG RADAR MODAL CONTROLS & HUD INSPECTOR
+  // =========================================================================
+  window.openRadarModal = function() {
+    radarModalOpen = true;
+    if (el.radarModal) el.radarModal.classList.add('open');
+    playMechanicalClick(1.2);
+    playSonarPing(true);
+    updateRadarInspector(selectedMastId);
+    renderMastsList();
+    logTTY('[RADAR] 360° Tactical Radar Scope expanded to high-res tactical HUD.');
+  };
+
+  window.closeRadarModal = function() {
+    radarModalOpen = false;
+    if (el.radarModal) el.radarModal.classList.remove('open');
+    playMechanicalClick(0.8);
+    logTTY('[RADAR] Radar Modal closed.');
+  };
+
+  window.onRadarModalBackdrop = function(e) {
+    if (e.target === el.radarModal) {
+      window.closeRadarModal();
+    }
+  };
+
+  window.setRadarRange = function(rangeKm) {
+    radarRangeKm = rangeKm;
+    document.querySelectorAll('.btn-radar-range').forEach(b => {
+      b.classList.toggle('active', parseFloat(b.dataset.range) === rangeKm);
+    });
+    playMechanicalClick(1.1);
+    logTTY(`[RADAR] Tactical Range Scale set to: ${rangeKm} km`);
+  };
+
+  window.toggleRadarSpeed = function() {
+    if (radarSweepSpeed === 1.0) radarSweepSpeed = 2.0;
+    else if (radarSweepSpeed === 2.0) radarSweepSpeed = 0.0;
+    else radarSweepSpeed = 1.0;
+
+    const btn = document.getElementById('btnRadarSweepSpeed');
+    if (btn) {
+      btn.textContent = radarSweepSpeed === 0 ? 'SWEEP: PAUSE' : `SWEEP: ${radarSweepSpeed}X`;
+    }
+    playMechanicalClick(1.0);
+    logTTY(`[RADAR] Sweep Speed: ${radarSweepSpeed === 0 ? 'PAUSED' : radarSweepSpeed + 'X'}`);
+  };
+
+  window.selectMast = function(id) {
+    const m = MASTS.find(x => x.id === id);
+    if (!m) return;
+    selectedMastId = id;
+    updateRadarInspector(id);
+    renderMastsList();
+    playMechanicalClick(1.2);
+    playSonarPing(m.active);
+    logTTY(`[RADAR_TARGET] Locked to: ${m.name} (${m.distKm}km @ ${m.bearingDeg}°)`);
+  };
+
+  function updateRadarInspector(id) {
+    const m = MASTS.find(x => x.id === id) || MASTS[0];
+    if (el.targetName) el.targetName.textContent = m.name;
+    if (el.targetStatusBadge) {
+      el.targetStatusBadge.textContent = m.status;
+      el.targetStatusBadge.style.color = m.active ? 'var(--crt-main)' : (m.id.includes('b8') ? 'var(--crt-amber)' : 'var(--crt-dim)');
+    }
+    if (el.targetDist) el.targetDist.textContent = `${m.distKm.toFixed(2)} km`;
+    if (el.targetBearing) el.targetBearing.textContent = `${m.bearingDeg}°`;
+    if (el.targetOperator) el.targetOperator.textContent = m.operator || 'Salt / GoMo';
+    if (el.targetBand) el.targetBand.textContent = m.band;
+    if (el.targetRsrp) el.targetRsrp.textContent = m.rsrp;
+    if (el.targetBandwidth) el.targetBandwidth.textContent = m.bandwidth || '20 MHz';
+    if (el.targetCoords) el.targetCoords.textContent = m.coords || '47.7645° N, 8.5790° E';
+    if (el.targetDesc) el.targetDesc.textContent = m.desc || '';
+  }
+
+  function renderMastsList() {
+    if (!el.radarMastsList) return;
+    el.radarMastsList.innerHTML = '';
+    MASTS.forEach(m => {
+      const pill = document.createElement('div');
+      pill.className = `crt-mast-pill ${m.id === selectedMastId ? 'selected' : ''}`;
+      pill.onclick = () => window.selectMast(m.id);
+      pill.innerHTML = `
+        <span style="font-weight:700;">${m.name}</span>
+        <span style="font-size:0.68rem; color:${m.active ? 'var(--crt-main)' : (m.id.includes('de') ? '#ff4455' : 'var(--crt-dim)')};">
+          ${m.bearingDeg}° • ${m.distKm}km
+        </span>
+      `;
+      el.radarMastsList.appendChild(pill);
+    });
+  }
+
+  // Keyboard shortcut for Modal
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && radarModalOpen) {
+      window.closeRadarModal();
+    }
+  });
+
+  // =========================================================================
+  // DUAL RADAR ANIMATION LOOP (SMALL CRT PANEL + EXPANDED FULL HUD MODAL)
+  // =========================================================================
   let radarAngle = 0;
   function initRadar() {
-    const canvas = el.radarCanvas;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const w = canvas.width;
-    const h = canvas.height;
-    const cx = w / 2;
-    const cy = h / 2;
-    const maxRadius = cx - 18;
-    const maxRangeKm = 5.0; // 5 km radar range
+    const smallCanvas = el.radarCanvas;
+    const bigCanvas = el.bigRadarCanvas;
+    const smallCtx = smallCanvas ? smallCanvas.getContext('2d') : null;
+    const bigCtx = bigCanvas ? bigCanvas.getContext('2d') : null;
 
-    function drawRadar() {
-      // Semi-transparent fade background for phosphor decay
-      ctx.fillStyle = 'rgba(2, 10, 4, 0.12)';
-      ctx.fillRect(0, 0, w, h);
+    // Attach mouse interactions to Big Radar Canvas
+    if (bigCanvas) {
+      bigCanvas.addEventListener('mousemove', (e) => {
+        const rect = bigCanvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const cx = bigCanvas.width / 2;
+        const cy = bigCanvas.height / 2;
+        const dx = mouseX - cx;
+        const dy = mouseY - cy;
+        const distPx = Math.sqrt(dx * dx + dy * dy);
+        const maxRadius = cx - 35;
+        const distKm = (distPx / maxRadius) * radarRangeKm;
 
-      // Range circles (1km, 2km, 3km, 4km, 5km)
-      ctx.strokeStyle = 'rgba(26, 87, 18, 0.45)';
-      ctx.lineWidth = 1;
-      for (let r = 1; r <= 5; r++) {
-        const radius = (r / maxRangeKm) * maxRadius;
-        ctx.beginPath();
-        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.fillStyle = 'rgba(57, 255, 20, 0.4)';
-        ctx.font = '8px monospace';
-        ctx.fillText(`${r}k`, cx + 3, cy - radius + 9);
-      }
+        let angleRad = Math.atan2(dx, -dy);
+        if (angleRad < 0) angleRad += Math.PI * 2;
+        const deg = Math.round((angleRad * 180) / Math.PI);
 
-      // Crosshairs & Degree Cardinal Lines (N, E, S, W)
-      ctx.beginPath();
-      ctx.moveTo(cx, cy - maxRadius); ctx.lineTo(cx, cy + maxRadius);
-      ctx.moveTo(cx - maxRadius, cy); ctx.lineTo(cx + maxRadius, cy);
-      ctx.stroke();
+        // Check hover over mast
+        let hoveredMast = null;
+        MASTS.forEach(m => {
+          const targetRad = (m.bearingDeg * Math.PI) / 180;
+          const targetDist = (m.distKm / radarRangeKm) * maxRadius;
+          const tx = cx + Math.sin(targetRad) * targetDist;
+          const ty = cy - Math.cos(targetRad) * targetDist;
+          const mdx = mouseX - tx;
+          const mdy = mouseY - ty;
+          if (Math.sqrt(mdx * mdx + mdy * mdy) < 22) {
+            hoveredMast = m;
+          }
+        });
 
-      // Cardinal Labels
-      ctx.fillStyle = 'rgba(57, 255, 20, 0.7)';
-      ctx.font = '10px monospace';
-      ctx.fillText('N 000°', cx - 18, 14);
-      ctx.fillText('E 090°', w - 42, cy + 4);
-      ctx.fillText('S 180°', cx - 18, h - 5);
-      ctx.fillText('W 270°', 4, cy + 4);
+        bigCanvas.style.cursor = hoveredMast ? 'pointer' : 'crosshair';
 
-      // Radar Sweep Line
-      radarAngle = (radarAngle + 0.025) % (Math.PI * 2);
-      const sweepX = cx + Math.cos(radarAngle - Math.PI / 2) * maxRadius;
-      const sweepY = cy + Math.sin(radarAngle - Math.PI / 2) * maxRadius;
-
-      // Sweep Beam Gradient
-      const grad = ctx.createLinearGradient(cx, cy, sweepX, sweepY);
-      grad.addColorStop(0, 'rgba(57, 255, 20, 0.8)');
-      grad.addColorStop(1, 'rgba(57, 255, 20, 0.05)');
-      ctx.strokeStyle = grad;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.lineTo(sweepX, sweepY);
-      ctx.stroke();
-
-      // Draw Mast Targets / Blips
-      MASTS.forEach(m => {
-        const targetRad = (m.bearingDeg * Math.PI) / 180;
-        const targetDist = (m.distKm / maxRangeKm) * maxRadius;
-        const tx = cx + Math.sin(targetRad) * targetDist;
-        const ty = cy - Math.cos(targetRad) * targetDist;
-
-        // Angle diff between sweep and target
-        let angleDiff = Math.abs(radarAngle - targetRad);
-        if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
-
-        // Blip lights up when sweep passes
-        const isHit = angleDiff < 0.055;
-        if (isHit) {
-          const now = performance.now();
-          if (!m._lastPingTime || (now - m._lastPingTime > 2200)) {
-            m._lastPingTime = now;
-            playSonarPing(m.active);
+        if (el.radarCrosshairTooltip) {
+          if (distPx <= maxRadius + 15) {
+            el.radarCrosshairTooltip.style.display = 'block';
+            el.radarCrosshairTooltip.style.left = `${mouseX + 14}px`;
+            el.radarCrosshairTooltip.style.top = `${mouseY + 14}px`;
+            if (hoveredMast) {
+              el.radarCrosshairTooltip.innerHTML = `🎯 <b>${hoveredMast.name}</b><br>${hoveredMast.distKm} km • ${hoveredMast.bearingDeg}°<br>${hoveredMast.band}`;
+            } else {
+              el.radarCrosshairTooltip.innerHTML = `PEILUNG: <b>${deg}°</b><br>DISTANZ: <b>${distKm.toFixed(2)} km</b>`;
+            }
+          } else {
+            el.radarCrosshairTooltip.style.display = 'none';
           }
         }
-
-        ctx.fillStyle = isHit ? '#ffffff' : (m.active ? '#00f3ff' : m.color);
-        ctx.beginPath();
-        ctx.arc(tx, ty, isHit ? 5.5 : 3, 0, Math.PI * 2);
-        ctx.fill();
-
-        if (m.active) {
-          ctx.strokeStyle = 'rgba(0, 243, 255, 0.8)';
-          ctx.beginPath();
-          ctx.arc(tx, ty, isHit ? 9 : 6, 0, Math.PI * 2);
-          ctx.stroke();
-        }
-
-        // Label
-        ctx.fillStyle = isHit ? '#ffffff' : 'rgba(200, 255, 200, 0.65)';
-        ctx.font = '8px monospace';
-        ctx.fillText(m.name.slice(0, 11), tx + 6, ty + 3);
       });
 
-      requestAnimationFrame(drawRadar);
+      bigCanvas.addEventListener('mouseleave', () => {
+        if (el.radarCrosshairTooltip) el.radarCrosshairTooltip.style.display = 'none';
+      });
+
+      bigCanvas.addEventListener('click', (e) => {
+        const rect = bigCanvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const cx = bigCanvas.width / 2;
+        const cy = bigCanvas.height / 2;
+        const maxRadius = cx - 35;
+
+        let clickedMast = null;
+        MASTS.forEach(m => {
+          const targetRad = (m.bearingDeg * Math.PI) / 180;
+          const targetDist = (m.distKm / radarRangeKm) * maxRadius;
+          const tx = cx + Math.sin(targetRad) * targetDist;
+          const ty = cy - Math.cos(targetRad) * targetDist;
+          const mdx = mouseX - tx;
+          const mdy = mouseY - ty;
+          if (Math.sqrt(mdx * mdx + mdy * mdy) < 26) {
+            clickedMast = m;
+          }
+        });
+
+        if (clickedMast) {
+          window.selectMast(clickedMast.id);
+        }
+      });
     }
 
-    drawRadar();
+    // Main Draw Function (Called on every animation frame)
+    function drawRadarFrame() {
+      // Sweep angle rotation
+      if (radarSweepSpeed > 0) {
+        radarAngle = (radarAngle + 0.025 * radarSweepSpeed) % (Math.PI * 2);
+      }
+
+      // 1. Draw Small Canvas
+      if (smallCtx) {
+        const w = smallCanvas.width;
+        const h = smallCanvas.height;
+        const cx = w / 2;
+        const cy = h / 2;
+        const maxRadius = cx - 18;
+        const maxRangeKm = 5.0;
+
+        smallCtx.fillStyle = 'rgba(2, 10, 4, 0.12)';
+        smallCtx.fillRect(0, 0, w, h);
+
+        // Range rings (1km ... 5km)
+        smallCtx.strokeStyle = 'rgba(26, 87, 18, 0.45)';
+        smallCtx.lineWidth = 1;
+        for (let r = 1; r <= 5; r++) {
+          const radius = (r / maxRangeKm) * maxRadius;
+          smallCtx.beginPath();
+          smallCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+          smallCtx.stroke();
+          smallCtx.fillStyle = 'rgba(57, 255, 20, 0.4)';
+          smallCtx.font = '8px monospace';
+          smallCtx.fillText(`${r}k`, cx + 3, cy - radius + 9);
+        }
+
+        // Crosshairs
+        smallCtx.beginPath();
+        smallCtx.moveTo(cx, cy - maxRadius); smallCtx.lineTo(cx, cy + maxRadius);
+        smallCtx.moveTo(cx - maxRadius, cy); smallCtx.lineTo(cx + maxRadius, cy);
+        smallCtx.stroke();
+
+        // Cardinal Labels
+        smallCtx.fillStyle = 'rgba(57, 255, 20, 0.7)';
+        smallCtx.font = '10px monospace';
+        smallCtx.fillText('N 000°', cx - 18, 14);
+        smallCtx.fillText('E 090°', w - 42, cy + 4);
+        smallCtx.fillText('S 180°', cx - 18, h - 5);
+        smallCtx.fillText('W 270°', 4, cy + 4);
+
+        // Sweep Line
+        const sweepX = cx + Math.cos(radarAngle - Math.PI / 2) * maxRadius;
+        const sweepY = cy + Math.sin(radarAngle - Math.PI / 2) * maxRadius;
+        const grad = smallCtx.createLinearGradient(cx, cy, sweepX, sweepY);
+        grad.addColorStop(0, 'rgba(57, 255, 20, 0.8)');
+        grad.addColorStop(1, 'rgba(57, 255, 20, 0.05)');
+        smallCtx.strokeStyle = grad;
+        smallCtx.lineWidth = 2;
+        smallCtx.beginPath();
+        smallCtx.moveTo(cx, cy);
+        smallCtx.lineTo(sweepX, sweepY);
+        smallCtx.stroke();
+
+        // Draw Mast Blips
+        MASTS.forEach(m => {
+          const targetRad = (m.bearingDeg * Math.PI) / 180;
+          const targetDist = (m.distKm / maxRangeKm) * maxRadius;
+          const tx = cx + Math.sin(targetRad) * targetDist;
+          const ty = cy - Math.cos(targetRad) * targetDist;
+
+          let angleDiff = Math.abs(radarAngle - targetRad);
+          if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+
+          const isHit = angleDiff < 0.055;
+          if (isHit) {
+            const now = performance.now();
+            if (!m._lastPingTime || (now - m._lastPingTime > 2200)) {
+              m._lastPingTime = now;
+              playSonarPing(m.active);
+            }
+          }
+
+          smallCtx.fillStyle = isHit ? '#ffffff' : (m.active ? '#00f3ff' : m.color);
+          smallCtx.beginPath();
+          smallCtx.arc(tx, ty, isHit ? 5.5 : 3, 0, Math.PI * 2);
+          smallCtx.fill();
+
+          if (m.active) {
+            smallCtx.strokeStyle = 'rgba(0, 243, 255, 0.8)';
+            smallCtx.beginPath();
+            smallCtx.arc(tx, ty, isHit ? 9 : 6, 0, Math.PI * 2);
+            smallCtx.stroke();
+          }
+
+          smallCtx.fillStyle = isHit ? '#ffffff' : 'rgba(200, 255, 200, 0.65)';
+          smallCtx.font = '8px monospace';
+          smallCtx.fillText(m.name.slice(0, 11), tx + 6, ty + 3);
+        });
+      }
+
+      // 2. Draw Big Modal Canvas (Only if Modal is Open)
+      if (radarModalOpen && bigCtx) {
+        const w = bigCanvas.width;
+        const h = bigCanvas.height;
+        const cx = w / 2;
+        const cy = h / 2;
+        const maxRadius = cx - 35;
+
+        bigCtx.fillStyle = 'rgba(1, 14, 6, 0.14)';
+        bigCtx.fillRect(0, 0, w, h);
+
+        // Distance range rings
+        const numRings = radarRangeKm === 2.5 ? 5 : (radarRangeKm === 10 ? 5 : 5);
+        const stepKm = radarRangeKm / numRings;
+
+        bigCtx.strokeStyle = 'rgba(57, 255, 20, 0.22)';
+        bigCtx.lineWidth = 1;
+
+        for (let i = 1; i <= numRings; i++) {
+          const rKm = i * stepKm;
+          const radius = (rKm / radarRangeKm) * maxRadius;
+          bigCtx.beginPath();
+          bigCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+          bigCtx.stroke();
+
+          bigCtx.fillStyle = 'rgba(57, 255, 20, 0.65)';
+          bigCtx.font = '10px "JetBrains Mono", monospace';
+          bigCtx.fillText(`${rKm.toFixed(1)} km`, cx + 4, cy - radius + 11);
+        }
+
+        // 30° Azimuth Radial Spokes & Degree Labels
+        for (let deg = 0; deg < 360; deg += 30) {
+          const rad = (deg * Math.PI) / 180;
+          const outerX = cx + Math.sin(rad) * maxRadius;
+          const outerY = cy - Math.cos(rad) * maxRadius;
+
+          bigCtx.strokeStyle = (deg % 90 === 0) ? 'rgba(57, 255, 20, 0.5)' : 'rgba(57, 255, 20, 0.15)';
+          bigCtx.lineWidth = (deg % 90 === 0) ? 1.5 : 0.8;
+          bigCtx.beginPath();
+          bigCtx.moveTo(cx, cy);
+          bigCtx.lineTo(outerX, outerY);
+          bigCtx.stroke();
+
+          // Label outside radius
+          const labelDist = maxRadius + 18;
+          const lx = cx + Math.sin(rad) * labelDist;
+          const ly = cy - Math.cos(rad) * labelDist + 4;
+          bigCtx.fillStyle = (deg % 90 === 0) ? 'var(--crt-main)' : 'rgba(57, 255, 20, 0.7)';
+          bigCtx.font = (deg % 90 === 0) ? 'bold 11px monospace' : '9px monospace';
+          bigCtx.textAlign = 'center';
+          bigCtx.fillText(`${String(deg).padStart(3, '0')}°`, lx, ly);
+        }
+        bigCtx.textAlign = 'start';
+
+        // Outer Compass Ring
+        bigCtx.strokeStyle = 'rgba(57, 255, 20, 0.4)';
+        bigCtx.lineWidth = 2;
+        bigCtx.beginPath();
+        bigCtx.arc(cx, cy, maxRadius, 0, Math.PI * 2);
+        bigCtx.stroke();
+
+        // Sweep Line + Phosphor Trail Wedge
+        const sweepX = cx + Math.cos(radarAngle - Math.PI / 2) * maxRadius;
+        const sweepY = cy + Math.sin(radarAngle - Math.PI / 2) * maxRadius;
+
+        // Fading sweep sector cone
+        const trailAngle = 0.25;
+        const trailGrad = bigCtx.createRadialGradient(cx, cy, 10, cx, cy, maxRadius);
+        trailGrad.addColorStop(0, 'rgba(57, 255, 20, 0.25)');
+        trailGrad.addColorStop(1, 'rgba(57, 255, 20, 0.02)');
+        bigCtx.fillStyle = trailGrad;
+        bigCtx.beginPath();
+        bigCtx.moveTo(cx, cy);
+        bigCtx.arc(cx, cy, maxRadius, radarAngle - Math.PI / 2 - trailAngle, radarAngle - Math.PI / 2);
+        bigCtx.closePath();
+        bigCtx.fill();
+
+        // Bright Sweep Beam
+        bigCtx.strokeStyle = '#39ff14';
+        bigCtx.shadowColor = '#39ff14';
+        bigCtx.shadowBlur = 10;
+        bigCtx.lineWidth = 2.5;
+        bigCtx.beginPath();
+        bigCtx.moveTo(cx, cy);
+        bigCtx.lineTo(sweepX, sweepY);
+        bigCtx.stroke();
+        bigCtx.shadowBlur = 0; // reset
+
+        // Draw All Mast Blips on Big Scope
+        MASTS.forEach(m => {
+          if (m.distKm > radarRangeKm * 1.05) return; // Outside current zoom
+
+          const targetRad = (m.bearingDeg * Math.PI) / 180;
+          const targetDist = (m.distKm / radarRangeKm) * maxRadius;
+          const tx = cx + Math.sin(targetRad) * targetDist;
+          const ty = cy - Math.cos(targetRad) * targetDist;
+
+          let angleDiff = Math.abs(radarAngle - targetRad);
+          if (angleDiff > Math.PI) angleDiff = Math.PI * 2 - angleDiff;
+          const isHit = angleDiff < 0.055;
+
+          const isSelected = (m.id === selectedMastId);
+
+          // Draw Selected Lock Reticle
+          if (isSelected) {
+            bigCtx.strokeStyle = '#00f3ff';
+            bigCtx.lineWidth = 1.5;
+            bigCtx.beginPath();
+            bigCtx.arc(tx, ty, 14, 0, Math.PI * 2);
+            bigCtx.stroke();
+
+            // Reticle brackets
+            bigCtx.beginPath();
+            bigCtx.moveTo(tx - 18, ty); bigCtx.lineTo(tx - 12, ty);
+            bigCtx.moveTo(tx + 12, ty); bigCtx.lineTo(tx + 18, ty);
+            bigCtx.moveTo(tx, ty - 18); bigCtx.lineTo(tx, ty - 12);
+            bigCtx.moveTo(tx, ty + 12); bigCtx.lineTo(tx, ty + 18);
+            bigCtx.stroke();
+          }
+
+          // Blip circle
+          bigCtx.fillStyle = isHit ? '#ffffff' : (m.active ? '#00f3ff' : m.color);
+          bigCtx.beginPath();
+          bigCtx.arc(tx, ty, isHit ? 8 : (isSelected ? 6 : 4.5), 0, Math.PI * 2);
+          bigCtx.fill();
+
+          if (isHit) {
+            bigCtx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+            bigCtx.lineWidth = 2;
+            bigCtx.beginPath();
+            bigCtx.arc(tx, ty, 18, 0, Math.PI * 2);
+            bigCtx.stroke();
+          }
+
+          // Label
+          bigCtx.fillStyle = isHit ? '#ffffff' : (isSelected ? '#00f3ff' : 'rgba(200, 255, 200, 0.85)');
+          bigCtx.font = isSelected ? 'bold 11px monospace' : '10px monospace';
+          bigCtx.fillText(`${m.name} (${m.distKm}k)`, tx + 10, ty + 4);
+        });
+
+        // Center Lab Origin Dot
+        bigCtx.fillStyle = '#ffffff';
+        bigCtx.beginPath();
+        bigCtx.arc(cx, cy, 3, 0, Math.PI * 2);
+        bigCtx.fill();
+        bigCtx.fillStyle = 'rgba(57, 255, 20, 0.8)';
+        bigCtx.font = '9px monospace';
+        bigCtx.fillText('RandeLab (857m)', cx + 6, cy - 6);
+      }
+
+      requestAnimationFrame(drawRadarFrame);
+    }
+
+    drawRadarFrame();
   }
 
   // Update DOM with incoming telemetry

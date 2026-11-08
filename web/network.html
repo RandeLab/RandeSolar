@@ -79,12 +79,16 @@
         <!-- Panel 1: 360° Tactical Radar Scope -->
         <div class="crt-panel">
           <div class="crt-panel-header crt-glow-text">
-            <span>🎯 360° RADAR-PEILUNG // RANDEN (5 KM SCAN)</span>
-            <span class="crt-dim-text">SWEEP: ACTIVE</span>
+            <span>🎯 360° RADAR // RANDEN (5 KM SCAN)</span>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span class="crt-dim-text">SWEEP: ACTIVE</span>
+              <button class="crt-btn" onclick="openRadarModal()" style="padding:2px 8px; font-size:0.7rem;" title="Radar Großansicht / Pop-up öffnen">⛶ EXPAND</button>
+            </div>
           </div>
 
-          <div class="crt-radar-container">
+          <div class="crt-radar-container" onclick="openRadarModal()" title="Klicken für interaktive 360° Tactical Radar Großansicht">
             <canvas id="crtRadarCanvas" width="280" height="280"></canvas>
+            <div class="crt-radar-expand-hint">[ 🔍 KLICKEN FÜR GROSSANSICHT / HUD ⛶ ]</div>
           </div>
 
           <div style="font-size:0.72rem; color:var(--crt-dim); text-align:center; margin-top:4px;">
@@ -347,6 +351,103 @@
         <span>ANTENNEN: 4×4 MIMO</span>
         <span>STANDORT: Merishausen 857m</span>
         <span>C64 ENGINE: ACTIVE 🥋</span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- BIG RADAR SCOPE POPUP MODAL (CRT RETRO HUD) -->
+  <!-- ===================================================================== -->
+  <div id="crtRadarModal" class="crt-modal-overlay" onclick="onRadarModalBackdrop(event)">
+    <div class="crt-modal-card">
+      
+      <!-- Modal Header -->
+      <div class="crt-modal-header">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="crt-blink-dot"></span>
+          <span class="crt-glow-text" style="font-weight:800; font-size:0.85rem; letter-spacing:1px;">
+            📡 360° TACTICAL RADAR SCOPE // RANDEN RF FIELD
+          </span>
+        </div>
+        
+        <!-- Controls in Header -->
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <!-- Range Zoom -->
+          <div style="display:flex; gap:4px;">
+            <button class="crt-btn btn-radar-range" data-range="2.5" onclick="setRadarRange(2.5)">2.5km</button>
+            <button class="crt-btn btn-radar-range active" data-range="5.0" onclick="setRadarRange(5.0)">5km</button>
+            <button class="crt-btn btn-radar-range" data-range="10.0" onclick="setRadarRange(10.0)">10km</button>
+          </div>
+
+          <!-- Speed -->
+          <div style="display:flex; gap:4px;">
+            <button id="btnRadarSweepSpeed" class="crt-btn" onclick="toggleRadarSpeed()">SWEEP: 1X</button>
+          </div>
+
+          <!-- Audio Ping Toggle -->
+          <button id="btnRadarModalAudio" class="crt-btn" onclick="toggleSound()">🔊 PING</button>
+
+          <!-- Close Button -->
+          <button class="crt-btn" onclick="closeRadarModal()" style="color:#ff3344; font-weight:800;" title="Schließen (ESC)">✕ SCHLIESSEN</button>
+        </div>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="crt-modal-body">
+        
+        <!-- Big Circular Radar Canvas -->
+        <div style="position:relative; display:flex; justify-content:center; align-items:center;">
+          <canvas id="crtBigRadarCanvas" width="560" height="560" class="crt-big-radar-canvas" title="Klicke auf einen Masten auf dem Radar"></canvas>
+          <div id="radarCrosshairTooltip" style="position:absolute; pointer-events:none; display:none; background:rgba(0,0,0,0.85); border:1px solid var(--crt-border); padding:4px 8px; border-radius:4px; font-size:0.7rem; color:var(--crt-main); box-shadow:0 0 10px var(--crt-glow); z-index:10;"></div>
+        </div>
+
+        <!-- Right Side: HUD Inspector & Mast Selector -->
+        <div style="display:flex; flex-direction:column; gap:12px; max-height:560px; overflow-y:auto; padding-right:4px;">
+          
+          <!-- Inspector Target Card -->
+          <div class="crt-radar-hud-card" id="radarTargetCard">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--crt-border); padding-bottom:6px; margin-bottom:8px;">
+              <span style="font-size:0.7rem; color:var(--crt-dim);">GEPEILTES ZIEL (HUD INSPECTOR)</span>
+              <span id="targetStatusBadge" class="crt-glow-text" style="font-size:0.7rem; font-weight:700;">🟢 ACTIVE SERVING CELL</span>
+            </div>
+            
+            <div id="targetName" class="crt-glow-text" style="font-size:1.05rem; font-weight:800; margin-bottom:4px;">
+              🇨🇭 Merishausen Südhang
+            </div>
+            
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.72rem; margin:8px 0;">
+              <div>DISTANZ: <b class="crt-glow-text" id="targetDist">0.78 km</b></div>
+              <div>PEILUNG: <b class="crt-glow-text" id="targetBearing">150° (SSE)</b></div>
+              <div>OPERATOR: <b id="targetOperator">GoMo / Salt CH</b></div>
+              <div>BÄNDER: <b id="targetBand">LTE B3 + 5G n1</b></div>
+              <div>SIGNAL: <b class="crt-glow-text" id="targetRsrp">-93 dBm (SINR -1dB)</b></div>
+              <div>BANDBREITE: <b id="targetBandwidth">40 MHz (20M + 20M)</b></div>
+            </div>
+
+            <div style="font-size:0.7rem; color:var(--crt-dim); border-top:1px dashed var(--crt-border); padding-top:6px; margin-top:6px;">
+              <div>GPS: <span id="targetCoords">47.7645° N, 8.5790° E</span></div>
+              <div id="targetDesc" style="color:var(--crt-main); margin-top:4px; font-style:italic;">
+                Hauptzelle 23667202. Band 8 erfolgreich gebypasst. 58.8 Mbit/s Upload.
+              </div>
+            </div>
+          </div>
+
+          <!-- Mast Quick-Select List -->
+          <div class="crt-radar-hud-card">
+            <div style="font-size:0.7rem; color:var(--crt-dim); margin-bottom:8px;">
+              FUNKMASTEN IM RANDEN-KORRIDOR (8 ZIELE):
+            </div>
+            <div id="radarMastsList"></div>
+          </div>
+
+          <!-- Keyboard / Touch Hint -->
+          <div style="font-size:0.68rem; color:var(--crt-dim); text-align:center;">
+            Tastatur: <kbd class="crt-btn" style="padding:1px 5px; font-size:0.65rem;">ESC</kbd> schließt Modal • Klick auf Radar-Blip zoomt Ziel
+          </div>
+
+        </div>
+
       </div>
 
     </div>

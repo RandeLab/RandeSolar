@@ -354,10 +354,19 @@ body.crt-pink {
 /* Radar Scope Container */
 .crt-radar-container {
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: 12px 0;
+  padding: 8px 0;
   position: relative;
+  cursor: pointer;
+}
+
+.crt-radar-container:hover #crtRadarCanvas {
+  box-shadow: 0 0 35px var(--crt-glow), inset 0 0 25px rgba(0, 0, 0, 0.9);
+  border-color: var(--crt-main);
+  transform: scale(1.02);
+  transition: all 0.2s ease;
 }
 
 #crtRadarCanvas {
@@ -365,6 +374,144 @@ body.crt-pink {
   border: 2px solid var(--crt-border);
   background: radial-gradient(circle, #021206 0%, #000 80%);
   box-shadow: 0 0 25px rgba(0, 0, 0, 0.9), inset 0 0 20px rgba(0, 0, 0, 0.8), 0 0 15px var(--crt-glow);
+  transition: all 0.2s ease;
+}
+
+.crt-radar-expand-hint {
+  font-size: 0.68rem;
+  color: var(--crt-dim);
+  text-align: center;
+  margin-top: 6px;
+  letter-spacing: 1px;
+  transition: color 0.2s;
+}
+
+.crt-radar-container:hover .crt-radar-expand-hint {
+  color: var(--crt-main);
+  text-shadow: 0 0 8px var(--crt-glow);
+}
+
+/* =========================================================================
+   BIG RADAR SCOPE POPUP MODAL (CRT RETRO HUD)
+   ========================================================================= */
+.crt-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(1, 8, 3, 0.92);
+  backdrop-filter: blur(8px);
+  z-index: 999999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.crt-modal-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.crt-modal-card {
+  background: var(--crt-bg);
+  border: 2px solid var(--crt-border);
+  box-shadow: 0 0 45px var(--crt-glow), inset 0 0 35px rgba(0, 0, 0, 0.9);
+  border-radius: 8px;
+  max-width: 980px;
+  width: 100%;
+  max-height: 94vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  transform: scale(0.92);
+  transition: transform 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+.crt-modal-overlay.open .crt-modal-card {
+  transform: scale(1);
+}
+
+.crt-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 18px;
+  border-bottom: 2px solid var(--crt-border);
+  background: rgba(0, 0, 0, 0.7);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.crt-modal-body {
+  display: grid;
+  grid-template-columns: minmax(320px, 1.2fr) minmax(280px, 1fr);
+  gap: 20px;
+  padding: 18px;
+  overflow-y: auto;
+  align-items: center;
+}
+
+@media (max-width: 820px) {
+  .crt-modal-body {
+    grid-template-columns: 1fr;
+    padding: 12px;
+    gap: 14px;
+  }
+}
+
+.crt-big-radar-canvas {
+  width: 100%;
+  max-width: 520px;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  border: 2px solid var(--crt-border);
+  background: radial-gradient(circle, #021607 0%, #000 85%);
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.95), inset 0 0 30px rgba(0, 0, 0, 0.9), 0 0 25px var(--crt-glow);
+  display: block;
+  margin: 0 auto;
+  cursor: crosshair;
+}
+
+.crt-radar-hud-card {
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid var(--crt-border);
+  border-radius: 6px;
+  padding: 14px;
+  box-shadow: inset 0 0 15px rgba(0,0,0,0.85);
+}
+
+.crt-mast-pill {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--crt-border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.72rem;
+  transition: all 0.15s ease;
+  color: var(--crt-dim);
+}
+
+.crt-mast-pill:hover, .crt-mast-pill.selected {
+  background: var(--crt-main);
+  color: #000 !important;
+  font-weight: 700;
+  box-shadow: 0 0 14px var(--crt-glow);
+}
+
+.crt-mast-pill.selected .crt-glow-text,
+.crt-mast-pill:hover .crt-glow-text {
+  color: #000 !important;
+  text-shadow: none !important;
 }
 
 /* ASCII Header Banner */
