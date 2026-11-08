@@ -1,8 +1,8 @@
 /**
- * RandeLab DISCO MODE // Virtual 5050 NeoPixel & Remote Controller (web/disco.js)
- * Dual MQTT HiveMQ WebSockets (randelab/solar/cmd) + Local REST API (/api/led),
- * Web Audio procedural 80s disco synthesizer & beat machine,
- * Live ACK roundtrip latency measurement, CRT scanline & phosphor toggles.
+ * RandeLab COCO-DISCO // Tropical Tiki Hardware Controller (web/disco.js)
+ * High-voltage mountain-top coconut disco, dual HiveMQ MQTT (randelab/solar/cmd) + REST (/api/led),
+ * Procedural Web Audio tropical marimba synth & funky disco beat,
+ * Coconut Disco Ball simulation & live hardware ACK latency tracking.
  */
 
 (function () {
@@ -12,14 +12,14 @@
   let mqttClient = null;
   let audioCtx = null;
   let isSoundActive = false;
-  let discoBeatTimer = null;
+  let cocoBeatTimer = null;
   let strobeTimer = null;
   let currentDurationSec = 10;
   let lastCommandSentMs = 0;
   let currentTargetColor = 'strobe';
   let isConnectedMqtt = false;
 
-  // --- Web Audio Synthesizer Engine ---
+  // --- Procedural Web Audio Engine (Tropical Synth & Cowbell/Marimba) ---
   function getAudioContext() {
     if (!audioCtx) {
       const AudioClass = window.AudioContext || window.webkitAudioContext;
@@ -31,8 +31,8 @@
     return audioCtx;
   }
 
-  // Laser Zap / Synth Chime for button clicks
-  function playSynthZap(freqStart, freqEnd, type, duration) {
+  // Tropical Coconut Marimba & Laser Zap
+  function playCocoZap(freq, type, duration) {
     if (!isSoundActive) return;
     try {
       const ctx = getAudioContext();
@@ -40,12 +40,12 @@
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
 
-      osc.type = type || 'sawtooth';
+      osc.type = type || 'sine';
       const now = ctx.currentTime;
-      osc.frequency.setValueAtTime(freqStart, now);
-      osc.frequency.exponentialRampToValueAtTime(freqEnd, now + duration);
+      osc.frequency.setValueAtTime(freq, now);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.4, now + duration);
 
-      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.setValueAtTime(0.3, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
       osc.connect(gain);
@@ -56,23 +56,49 @@
     } catch (e) {}
   }
 
-  // 4-on-the-floor Disco Bass Drum & Synth Arpeggio
-  let beatStep = 0;
-  const DISCO_SCALE = [130.81, 164.81, 196.00, 246.94, 261.63, 329.63, 392.00, 493.88]; // C Major / Pentatonic Synth
+  // Tropical Woodblock / Coconut Click
+  function playCoconutClick(freq) {
+    if (!isSoundActive) return;
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
 
-  function triggerBeatStep() {
+      osc.type = 'triangle';
+      const now = ctx.currentTime;
+      osc.frequency.setValueAtTime(freq || 850, now);
+      osc.frequency.exponentialRampToValueAtTime(200, now + 0.04);
+
+      gain.gain.setValueAtTime(0.4, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.04);
+    } catch (e) {}
+  }
+
+  // Funky Tropical Disco Beat (~114 BPM)
+  let beatStep = 0;
+  // Tropical Island Pentatonic Scale (Marimba tones)
+  const TROPICAL_SCALE = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25];
+
+  function triggerCocoBeat() {
     if (!isSoundActive) return;
     try {
       const ctx = getAudioContext();
       if (!ctx) return;
       const now = ctx.currentTime;
 
-      // Kick drum every 4 beats (step % 2 === 0)
+      // 1. Kick Drum every 2 steps (4-on-the-floor)
       if (beatStep % 2 === 0) {
         const kickOsc = ctx.createOscillator();
         const kickGain = ctx.createGain();
-        kickOsc.frequency.setValueAtTime(140, now);
-        kickOsc.frequency.exponentialRampToValueAtTime(32, now + 0.12);
+        kickOsc.frequency.setValueAtTime(150, now);
+        kickOsc.frequency.exponentialRampToValueAtTime(35, now + 0.12);
         kickGain.gain.setValueAtTime(0.35, now);
         kickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
         kickOsc.connect(kickGain);
@@ -81,33 +107,31 @@
         kickOsc.stop(now + 0.12);
       }
 
-      // Funky Arpeggiator Synth note
-      const arpOsc = ctx.createOscillator();
-      const arpGain = ctx.createGain();
-      arpOsc.type = 'sawtooth';
-      const noteFreq = DISCO_SCALE[(beatStep * 3) % DISCO_SCALE.length];
-      arpOsc.frequency.setValueAtTime(noteFreq, now);
-
-      arpGain.gain.setValueAtTime(0.08, now);
-      arpGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-
-      arpOsc.connect(arpGain);
-      arpGain.connect(ctx.destination);
-      arpOsc.start(now);
-      arpOsc.stop(now + 0.1);
-
-      // Bounce on-screen dancer
-      const dancer = document.getElementById('discoDancer');
-      if (dancer) {
-        dancer.style.transform = (beatStep % 2 === 0) ? 'translateY(-6px) scale(1.05)' : 'translateY(0) scale(1)';
+      // 2. Tropical Coconut Woodblock / Cowbell on offbeats
+      if (beatStep % 2 === 1) {
+        playCoconutClick(beatStep % 4 === 1 ? 920 : 740);
       }
 
-      // Random Equalizer Bar Bounce
-      const eqBars = document.querySelectorAll('.disco-eq-bar');
-      eqBars.forEach((bar) => {
-        const h = Math.floor(Math.random() * 85) + 10;
-        bar.style.height = h + '%';
-      });
+      // 3. Funky Marimba / Steel Drum Melody Arpeggio
+      const marimbaOsc = ctx.createOscillator();
+      const marimbaGain = ctx.createGain();
+      marimbaOsc.type = 'sine';
+      const noteFreq = TROPICAL_SCALE[(beatStep * 2 + 1) % TROPICAL_SCALE.length];
+      marimbaOsc.frequency.setValueAtTime(noteFreq, now);
+
+      marimbaGain.gain.setValueAtTime(0.12, now);
+      marimbaGain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+
+      marimbaOsc.connect(marimbaGain);
+      marimbaGain.connect(ctx.destination);
+      marimbaOsc.start(now);
+      marimbaOsc.stop(now + 0.09);
+
+      // Bounce Bruce Lee and Coconut Drink
+      const bruce = document.getElementById('tikiBruce');
+      if (bruce) {
+        bruce.style.transform = (beatStep % 2 === 0) ? 'translateY(-8px) scale(1.08)' : 'translateY(0) scale(1)';
+      }
 
       beatStep = (beatStep + 1) % 16;
     } catch (e) {}
@@ -118,49 +142,49 @@
     const btn = document.getElementById('btnToggleSound');
     if (isSoundActive) {
       getAudioContext();
-      if (!discoBeatTimer) discoBeatTimer = setInterval(triggerBeatStep, 135); // ~111 BPM funky disco beat
+      if (!cocoBeatTimer) cocoBeatTimer = setInterval(triggerCocoBeat, 131); // ~114 BPM Tropical Disco
       if (btn) {
         btn.classList.add('active');
-        btn.innerHTML = '🔊 SOUND: ON';
+        btn.innerHTML = '🥥 SOUND: ON';
       }
-      playSynthZap(800, 200, 'sawtooth', 0.2);
-      logTerminal('[AUDIO 🎵] Procedural Web Audio Synth & Beatbox gestartet (~111 BPM)');
+      playCocoZap(880, 'triangle', 0.2);
+      logTerminal('[COCO-BEAT 🥥] Tropischer Disco-Synthesizer & Woodblock gestartet (~114 BPM)');
     } else {
-      if (discoBeatTimer) {
-        clearInterval(discoBeatTimer);
-        discoBeatTimer = null;
+      if (cocoBeatTimer) {
+        clearInterval(cocoBeatTimer);
+        cocoBeatTimer = null;
       }
       if (btn) {
         btn.classList.remove('active');
-        btn.innerHTML = '🔈 SOUND: OFF';
+        btn.innerHTML = '🥥 SOUND: OFF';
       }
-      logTerminal('[AUDIO 🔇] Sound stummgeschaltet.');
+      logTerminal('[COCO-BEAT 🔇] Sound stummgeschaltet.');
     }
   };
 
   // --- Terminal Logger ---
   function logTerminal(msg, type) {
-    const term = document.getElementById('discoTerminal');
+    const term = document.getElementById('cocoTerminal');
     if (!term) return;
     const line = document.createElement('div');
-    line.className = 'disco-log-line ' + (type ? 'disco-log-' + type : '');
+    line.className = 'disco-log-line ' + (type ? 'coco-log-' + type : '');
     const ts = new Date().toTimeString().split(' ')[0];
     line.textContent = `[${ts}] ${msg}`;
     term.appendChild(line);
     term.scrollTop = term.scrollHeight;
 
-    // Limit log lines to 100
-    while (term.children.length > 100) {
+    while (term.children.length > 80) {
       term.removeChild(term.firstChild);
     }
   }
 
-  // --- Virtual 5050 NeoPixel Renderer ---
-  function renderVirtualPixel(r, g, b, isStrobe) {
-    const pixelEl = document.getElementById('virtualNeoPixel');
-    const auraEl = document.getElementById('virtualAura');
-    const emitters = document.querySelectorAll('.die-emitter');
-    const colorHexLabel = document.getElementById('currentColorHex');
+  // --- Coconut Disco Ball Simulator Renderer ---
+  function renderCoconutBall(r, g, b, isStrobe) {
+    const ballEl = document.getElementById('coconutBall');
+    const lensEl = document.getElementById('coconutLens');
+    const auraEl = document.getElementById('coconutAura');
+    const emitterEl = document.getElementById('cocoEmitter');
+    const labelEl = document.getElementById('currentCocktailLabel');
 
     if (strobeTimer) {
       clearInterval(strobeTimer);
@@ -168,67 +192,80 @@
     }
 
     if (isStrobe) {
-      if (pixelEl) pixelEl.classList.add('neopixel-active');
+      if (ballEl) ballEl.style.transform = 'scale(1.08) rotate(3deg)';
       const rainbowColors = [
-        [255, 0, 0],
-        [0, 255, 0],
-        [0, 0, 255],
-        [255, 220, 0],
-        [255, 0, 220],
-        [0, 245, 255]
+        [255, 0, 127],   // Coco-Pink
+        [0, 255, 102],   // Jungle-Green
+        [0, 240, 255],   // Bikini-Cyan
+        [255, 183, 0],   // Solar-Mango
+        [255, 16, 48],   // Spicy-Tiki
+        [255, 255, 255]  // Coconut-Milk
       ];
       let step = 0;
       strobeTimer = setInterval(() => {
         const c = rainbowColors[step % rainbowColors.length];
         const colStr = `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
-        if (auraEl) {
-          auraEl.style.background = `radial-gradient(circle, ${colStr} 20%, rgba(${c[0]}, ${c[1]}, ${c[2]}, 0.4) 60%, transparent 85%)`;
+        if (lensEl) {
+          lensEl.style.borderColor = colStr;
+          lensEl.style.boxShadow = `0 0 25px ${colStr}`;
         }
-        emitters.forEach(e => {
-          e.style.background = colStr;
-          e.style.boxShadow = `0 0 10px ${colStr}`;
-        });
-        if (colorHexLabel) colorHexLabel.textContent = `DISCO STROBE // ⚡ ${colStr}`;
+        if (emitterEl) {
+          emitterEl.style.background = colStr;
+          emitterEl.style.boxShadow = `0 0 20px ${colStr}`;
+        }
+        if (auraEl) {
+          auraEl.style.background = `radial-gradient(circle, ${colStr} 0%, rgba(${c[0]}, ${c[1]}, ${c[2]}, 0.35) 50%, transparent 80%)`;
+        }
+        if (labelEl) labelEl.textContent = `⚡ COCO PARTY STROBE // ${colStr}`;
         step++;
       }, 70); // Match firmware 70ms cycle!
       return;
     }
 
     const colStr = `rgb(${r}, ${g}, ${b})`;
+
     if (r === 0 && g === 0 && b === 0) {
-      if (pixelEl) pixelEl.classList.remove('neopixel-active');
+      if (ballEl) ballEl.style.transform = 'scale(1) rotate(0deg)';
+      if (lensEl) {
+        lensEl.style.borderColor = '#333';
+        lensEl.style.boxShadow = 'none';
+      }
+      if (emitterEl) {
+        emitterEl.style.background = '#222';
+        emitterEl.style.boxShadow = 'none';
+      }
       if (auraEl) auraEl.style.opacity = '0';
-      emitters.forEach(e => {
-        e.style.background = '#222';
-        e.style.boxShadow = 'none';
-      });
-      if (colorHexLabel) colorHexLabel.textContent = 'OFF // BLACKOUT';
+      if (labelEl) labelEl.textContent = '🌙 COCO BLACKOUT // OFF';
       return;
     }
 
-    if (pixelEl) pixelEl.classList.add('neopixel-active');
-    if (auraEl) {
-      auraEl.style.opacity = '0.9';
-      auraEl.style.background = `radial-gradient(circle, ${colStr} 20%, rgba(${r}, ${g}, ${b}, 0.4) 60%, transparent 85%)`;
+    if (ballEl) ballEl.style.transform = 'scale(1.04)';
+    if (lensEl) {
+      lensEl.style.borderColor = colStr;
+      lensEl.style.boxShadow = `0 0 25px ${colStr}`;
     }
-    emitters.forEach(e => {
-      e.style.background = colStr;
-      e.style.boxShadow = `0 0 12px ${colStr}`;
-    });
-    if (colorHexLabel) {
+    if (emitterEl) {
+      emitterEl.style.background = colStr;
+      emitterEl.style.boxShadow = `0 0 20px ${colStr}`;
+    }
+    if (auraEl) {
+      auraEl.style.opacity = '0.95';
+      auraEl.style.background = `radial-gradient(circle, ${colStr} 0%, rgba(${r}, ${g}, ${b}, 0.35) 50%, transparent 75%)`;
+    }
+    if (labelEl) {
       const hex = '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
-      colorHexLabel.textContent = `${hex} // RGB(${r}, ${g}, ${b})`;
+      labelEl.textContent = `🥥 ${hex} // RGB(${r}, ${g}, ${b})`;
     }
   }
 
-  // --- MQTT Client Setup (HiveMQ WebSockets) ---
+  // --- HiveMQ WebSockets Setup ---
   function setupMQTT() {
     if (typeof mqtt === 'undefined') {
       logTerminal('MQTT.js Library nicht geladen.', 'err');
       return;
     }
 
-    const clientId = 'RandeDisco_' + Math.random().toString(16).substr(2, 8);
+    const clientId = 'RandeCoco_' + Math.random().toString(16).substr(2, 8);
     const brokerUrl = 'wss://broker.hivemq.com:8884/mqtt';
 
     try {
@@ -241,15 +278,15 @@
 
       mqttClient.on('connect', function () {
         isConnectedMqtt = true;
-        logTerminal('[MQTT] Verbunden mit HiveMQ Broker (wss://broker.hivemq.com:8884)', 'ack');
+        logTerminal('[TIKI UPLINK 🌴] Verbunden mit HiveMQ (wss://broker.hivemq.com:8884)', 'ack');
         logTerminal('[MQTT] Subscribed zu Topic: randelab/solar/ack & randelab/solar/cmd');
         mqttClient.subscribe('randelab/solar/ack', { qos: 0 });
         mqttClient.subscribe('randelab/solar/cmd', { qos: 0 });
 
         const statusEl = document.getElementById('mqttLinkStatus');
         if (statusEl) {
-          statusEl.innerHTML = '<span class="crt-blink-dot" style="background:#39ff14;"></span> MQTT LIVE LINK';
-          statusEl.style.color = '#39ff14';
+          statusEl.innerHTML = '<span class="crt-blink-dot" style="background:#00ff66;"></span> COCO-LINK ACTIVE';
+          statusEl.style.color = '#00ff66';
         }
       });
 
@@ -260,8 +297,8 @@
           try {
             const ack = JSON.parse(payloadStr);
             const rtt = lastCommandSentMs > 0 ? (Date.now() - lastCommandSentMs) : 0;
-            const rttStr = rtt > 0 ? ` (Roundtrip: ${rtt} ms)` : '';
-            logTerminal(`[ESP32 ACK 💡] Bestätigung erhalten: ${ack.action || 'ok'} // R=${ack.r || 0} G=${ack.g || 0} B=${ack.b || 0} für ${ack.duration_sec || 10}s${rttStr}`, 'ack');
+            const rttStr = rtt > 0 ? ` (Ping: ${rtt} ms)` : '';
+            logTerminal(`[ESP32 ACK 🌴] NeoPixel bestätigt: ${ack.action || 'ok'} // R=${ack.r || 0} G=${ack.g || 0} B=${ack.b || 0} für ${ack.duration_sec || 10}s${rttStr}`, 'ack');
 
             const pingEl = document.getElementById('ackLatencyBadge');
             if (pingEl && rtt > 0) {
@@ -270,20 +307,20 @@
             }
 
             if (ack.action === 'disco_strobe') {
-              renderVirtualPixel(0, 0, 0, true);
+              renderCoconutBall(0, 0, 0, true);
             } else if (ack.r !== undefined && ack.g !== undefined && ack.b !== undefined) {
-              renderVirtualPixel(ack.r, ack.g, ack.b, false);
+              renderCoconutBall(ack.r, ack.g, ack.b, false);
             }
           } catch (e) {
-            logTerminal(`[ESP32 ACK 💡] ${payloadStr}`, 'ack');
+            logTerminal(`[ESP32 ACK 🌴] ${payloadStr}`, 'ack');
           }
         } else if (topic === 'randelab/solar/cmd') {
           try {
             const cmd = JSON.parse(payloadStr);
             if (cmd.action === 'led' && cmd.color) {
-              logTerminal(`[REMOTE CMD 📡] Externer Befehl empfangen: ${cmd.color}`, 'tx');
+              logTerminal(`[REMOTE TIKI 📡] Befehl empfangen: ${cmd.color}`, 'tx');
               if (cmd.color === 'disco' || cmd.color === 'strobe' || cmd.color === 'party') {
-                renderVirtualPixel(0, 0, 0, true);
+                renderCoconutBall(0, 0, 0, true);
               }
             }
           } catch (e) {}
@@ -294,7 +331,7 @@
         isConnectedMqtt = false;
         const statusEl = document.getElementById('mqttLinkStatus');
         if (statusEl) {
-          statusEl.innerHTML = '<span class="crt-blink-dot" style="background:#ff3860;"></span> MQTT OFFLINE';
+          statusEl.innerHTML = '<span class="crt-blink-dot" style="background:#ff3860;"></span> OFFLINE';
           statusEl.style.color = '#ff3860';
         }
       });
@@ -308,22 +345,22 @@
   }
 
   // --- Dispatch Command (MQTT + Local REST) ---
-  window.triggerDiscoColor = async function (colorName, rgbPreset) {
+  window.triggerCocoColor = async function (colorName, rgbPreset) {
     currentTargetColor = colorName;
     lastCommandSentMs = Date.now();
 
-    playSynthZap(400, 900, 'sawtooth', 0.15);
+    playCocoZap(580, 'sine', 0.12);
 
-    // 1. Update on-screen virtual pixel immediately
+    // 1. Immediate visual feedback
     if (colorName === 'disco' || colorName === 'strobe' || colorName === 'party') {
-      renderVirtualPixel(0, 0, 0, true);
+      renderCoconutBall(0, 0, 0, true);
     } else if (rgbPreset && rgbPreset.length === 3) {
-      renderVirtualPixel(rgbPreset[0], rgbPreset[1], rgbPreset[2], false);
+      renderCoconutBall(rgbPreset[0], rgbPreset[1], rgbPreset[2], false);
     }
 
-    logTerminal(`[TX 🚀] Sende LED-Befehl: "${colorName.toUpperCase()}" (${currentDurationSec}s)...`, 'tx');
+    logTerminal(`[TIKI TX 🚀] Sende Cocktail: "${colorName.toUpperCase()}" (${currentDurationSec}s)...`, 'tx');
 
-    // 2. Publish via MQTT (Reaches ESP32 anywhere via 5G/HiveMQ)
+    // 2. Publish to MQTT (Works worldwide via HiveMQ)
     if (mqttClient && mqttClient.connected) {
       const payload = {
         action: 'led',
@@ -332,7 +369,7 @@
         t: Date.now()
       };
       mqttClient.publish('randelab/solar/cmd', JSON.stringify(payload));
-      logTerminal(`[MQTT 📤] randelab/solar/cmd -> ${JSON.stringify(payload)}`);
+      logTerminal(`[MQTT 🥥] randelab/solar/cmd -> ${colorName}`);
     } else {
       logTerminal('[MQTT ⚠️] HiveMQ nicht verbunden, versuche lokalen REST-Aufruf...', 'err');
     }
@@ -357,30 +394,18 @@
     } catch (e) {}
   };
 
-  // Duration Selector
+  // Duration Selector (Sips)
   window.setDuration = function (sec, btnEl) {
     currentDurationSec = sec;
-    document.querySelectorAll('.btn-dur').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.btn-sip').forEach(b => b.classList.remove('active'));
     if (btnEl) btnEl.classList.add('active');
-    playSynthZap(300, 500, 'sine', 0.08);
-    logTerminal(`[DURATION ⏱️] Leuchtdauer auf ${sec} Sekunden eingestellt.`);
+    playCoconutClick(800);
+    logTerminal(`[SIP TIMER 🍹] Leuchtdauer auf ${sec} Sekunden eingestellt.`);
   };
 
-  // Custom Color Picker
-  window.sendCustomColor = function () {
-    const input = document.getElementById('customColorPicker');
-    if (!input) return;
-    const hex = input.value;
-    const r = parseInt(hex.substr(1, 2), 16);
-    const g = parseInt(hex.substr(3, 2), 16);
-    const b = parseInt(hex.substr(5, 2), 16);
-    // Choose closest simple name or pass hex/rgb
-    window.triggerDiscoColor(hex, [r, g, b]);
-  };
-
-  // --- Phosphor Theme Switcher ---
+  // Phosphor Mode
   window.setPhosphorMode = function (palette) {
-    document.body.className = '';
+    document.body.className = 'coco-theme';
     document.body.classList.add('crt-' + palette);
     document.querySelectorAll('.btn-phosphor').forEach(b => {
       b.classList.toggle('active', b.getAttribute('data-color') === palette);
@@ -388,7 +413,7 @@
     localStorage.setItem('randesolar-phosphor', palette);
   };
 
-  // --- Scanlines Toggle ---
+  // Scanlines Toggle
   window.toggleScanlines = function () {
     const scanlineEl = document.querySelector('.crt-scanlines');
     const btn = document.getElementById('btnToggleScanlines');
@@ -407,12 +432,8 @@
     }
   };
 
-  // --- Init on DOM Load ---
+  // Init on DOM Load
   document.addEventListener('DOMContentLoaded', () => {
-    // Restore saved phosphor
-    const savedPalette = localStorage.getItem('randesolar-phosphor') || 'pink';
-    window.setPhosphorMode(savedPalette);
-
     // Restore saved scanlines
     const savedLines = localStorage.getItem('randesolar-scanlines');
     if (savedLines === 'off') {
@@ -425,12 +446,12 @@
       }
     }
 
-    logTerminal('RandeLab DISCO CONTROLLER initialisiert.');
+    logTerminal('🌴 Willkommen in der RandeLab COCO-DISCO! 🥥');
     logTerminal('Verbinde mit HiveMQ MQTT & ESP32 Onboard-NeoPixel (GPIO 48)...');
     setupMQTT();
 
-    // Default neon magenta visualizer state
-    renderVirtualPixel(255, 0, 180, false);
+    // Default Coco-Pink state
+    renderCoconutBall(255, 0, 127, false);
   });
 
 })();
