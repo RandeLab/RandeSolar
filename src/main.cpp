@@ -2488,16 +2488,25 @@ void loop() {
         triggerWifiScanAndPublish();
     }
 
-    // Scheduled Router 5G Speedtest every 10 minutes (600,000 ms)
+    // Scheduled Router 5G Speedtest every 6 hours (21,600,000 ms)
+    // Conserves GoMo mobile data (~1.2 GB/month instead of ~500 GB) & solar battery
     static uint32_t lastSpeedtestTrigger = 0;
-    if (lastSpeedtestTrigger == 0) {
-        lastSpeedtestTrigger = (now > 540000) ? (now - 540000) : 1; // Run first test ~60s after boot
-    }
-    if (WiFi.status() == WL_CONNECTED && (now - lastSpeedtestTrigger >= 600000)) {
+    static bool firstSpeedtestDone = false;
+    if (!firstSpeedtestDone) {
+        if (now >= 60000) {
+            firstSpeedtestDone = true;
+            lastSpeedtestTrigger = now;
+            if (WiFi.status() == WL_CONNECTED) {
+                triggerRouterSpeedtest();
+                measureLatency();
+                Serial.println("[Speedtest ⏱️] Initial boot router Ookla speedtest triggered!");
+            }
+        }
+    } else if (WiFi.status() == WL_CONNECTED && (now - lastSpeedtestTrigger >= 21600000UL)) {
         lastSpeedtestTrigger = now;
         triggerRouterSpeedtest();
         measureLatency();
-        Serial.println("[Speedtest ⏱️] 10-Minute scheduled router Ookla speedtest triggered!");
+        Serial.println("[Speedtest ⏱️] 6-Hour scheduled router Ookla speedtest triggered!");
     }
 
     // Publish to MQTT every 5 seconds when BLE data is active
