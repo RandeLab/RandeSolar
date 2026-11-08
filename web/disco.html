@@ -3,283 +3,233 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🥥 RandeLab COCO-DISCO // 857 m ü. M. Tropical Hardware Controller 🌴</title>
+  <title>🥥 RandeLab Coconut Research Lab Disco // 857 m ü. M. Underes Ätzisloo</title>
   <link rel="icon" href="./arai-icon.svg" type="image/svg+xml">
 
-  <!-- Google Fonts: JetBrains Mono & Inter -->
+  <!-- Google Fonts: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700;800&display=swap" rel="stylesheet">
 
   <!-- MQTT.js CDN for Real-Time HiveMQ WebSockets Link -->
   <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
 
-  <link rel="stylesheet" href="./style.css?v=2.1">
-  <link rel="stylesheet" href="./crt-scanner.css?v=2.0">
-  <link rel="stylesheet" href="./disco.css?v=2.0">
+  <link rel="stylesheet" href="./disco.css?v=3.0">
 </head>
-<body class="coco-theme crt-pink">
+<body>
 
-  <!-- Outer CRT Glass Monitor Chassis -->
-  <div class="crt-monitor">
-    <!-- Scanline & Phosphor Overlay -->
-    <div class="crt-scanlines"></div>
+  <!-- Floating Starry Randen Night Sky -->
+  <div class="randen-stars"></div>
 
-    <!-- Inner CRT Screen Tube -->
-    <div class="crt-screen crt-flicker-active">
+  <div class="coco-container">
 
-      <!-- ASCII Art Tropical Coco-Disco Banner -->
-      <pre class="crt-ascii-banner crt-glow-text" style="color:var(--mango-gold); text-shadow:0 0 12px rgba(255,183,0,0.8);">
-  ██████╗ ██████╗  ██████╗ ██████╗       ██████╗ ██╗███████╗ ██████╗ ██████╗ 
- ██╔════╝██╔═══██╗██╔════╝██╔═══██╗      ██╔══██╗██║██╔════╝██╔════╝██╔═══██╗
- ██║     ██║   ██║██║     ██║   ██║█████╗██║  ██║██║███████╗██║     ██║   ██║
- ██║     ██║   ██║██║     ██║   ██║╚════╝██║  ██║██║╚════██║██║     ██║   ██║
- ╚██████╗╚██████╔╝╚██████╗╚██████╔╝      ██████╔╝██║███████║╚██████╗╚██████╔╝
-  ╚═════╝ ╚═════╝  ╚═════╝ ╚═════╝       ╚═════╝ ╚═╝╚══════╝ ╚═════╝ ╚═════╝ 
- [ 🥥 RANDELAB COCO-DISCO // 857 M Ü. M. // TROPICAL TIKI HARDWARE CONTROLLER 🌴 ]</pre>
-
-      <!-- Bezel Top Bar & Terminal Controls -->
-      <div class="crt-bezel-bar" style="margin-top:10px;">
-        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-          <div class="crt-badge-status crt-glow-text" id="mqttLinkStatus">
-            <span class="crt-blink-dot" style="background:#00ff66;"></span>
-            <span>CONNECTING TIKI UPLINK...</span>
+    <!-- Header & Laboratory Brand -->
+    <header class="lab-header">
+      <div class="lab-title-row">
+        <div class="lab-branding">
+          <div class="lab-logo-coco">🥥</div>
+          <div class="lab-headings">
+            <h1>RandeLab Coconut Research Disco</h1>
+            <p>Bio-Acoustic Solar Laboratory • 857 m ü. M. Underes Ätzisloo • Merishausen</p>
           </div>
-          <span id="ackLatencyBadge" class="crt-badge-status" style="display:none; background:rgba(255,183,0,0.2); border-color:#ffb700; color:#ffb700; font-size:0.75rem;">
-            ⚡ PING: -- ms
+        </div>
+
+        <!-- Hardware Live Status Pill -->
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div id="hardwareBadge" class="hardware-status-badge">
+            <span class="status-dot"></span>
+            <span>CONNECTING...</span>
+          </div>
+          <span id="pingLatencyBadge" class="hardware-status-badge" style="display:none; color:var(--text-accent); border-color:var(--text-accent);">
+            ⚡ -- ms
           </span>
-          <span class="crt-dim-text" style="font-size:0.75rem;">TARGET: ESP32-S3 (GPIO 48) • TOPIC: randelab/solar/cmd</span>
+        </div>
+      </div>
+
+      <!-- Navigation & Sound Engine -->
+      <nav class="lab-nav">
+        <a href="./index.html" class="nav-pill" title="Zum Solar Power Dashboard wechseln">
+          <span>☀️ Solar Studio</span>
+        </a>
+        <a href="./network.html" class="nav-pill" title="Zum 5G Radio &amp; Tower Scanner wechseln">
+          <span>🌐 5G Studio</span>
+        </a>
+        <a href="./wifi.html" class="nav-pill" title="Zum Wi-Fi Scanner wechseln">
+          <span>📶 Wi-Fi Scanner</span>
+        </a>
+        <a href="./disco.html" class="nav-pill active" title="Aktive Coconut Research Disco">
+          <span>🥥 Coco-Disco</span>
+        </a>
+
+        <!-- Sound Synthesizer Button -->
+        <button id="btnToggleSound" class="nav-pill btn-sound-toggle" onclick="toggleSound()" title="Tropical Web Audio Synthesizer &amp; Coconut Marimba ein-/ausschalten">
+          🥥 Sound: OFF
+        </button>
+      </nav>
+    </header>
+
+    <!-- Main Resonator Hero Stage -->
+    <section class="hero-coconut-stage">
+      <div class="stage-foliage-left">🌲🌴</div>
+      <div class="stage-foliage-right">🌴🌲</div>
+
+      <div class="coconut-resonator">
+        <div class="lab-suspension-wire"></div>
+
+        <!-- The Floating Bioluminescent Coconut Sphere -->
+        <div id="coconutSphere" class="coconut-sphere" onclick="triggerCocoColor('disco', null, '⚡ RANDEN COCO-PARTY STROBE')" title="Tippe die Kokosnuss an für Party-Strobe!">
+          <div class="coconut-tri-eyes">
+            <div class="tri-eye"></div>
+            <div class="tri-eye"></div>
+            <div class="tri-eye"></div>
+          </div>
+
+          <div id="radianceAura" class="coconut-radiance-aura"></div>
+
+          <!-- Central NeoPixel Silicon Chamber -->
+          <div id="neopixelChamber" class="neopixel-chamber">
+            <div id="siliconDie" class="silicon-die"></div>
+          </div>
         </div>
 
-        <!-- CRT Control Deck -->
-        <div class="crt-controls-group">
-          <!-- Main Navigation -->
-          <a href="./index.html" class="crt-btn" title="Zum Solar Power Dashboard wechseln">
-            <span>☀️ [ SOLAR STUDIO ]</span>
-          </a>
-          <a href="./network.html" class="crt-btn" title="Zum 5G Radio &amp; Tower Scanner wechseln">
-            <span>🌐 [ 5G SCANNER ]</span>
-          </a>
-          <a href="./wifi.html" class="crt-btn" title="Zum Wi-Fi 2.4/5GHz Scanner wechseln">
-            <span>📶 [ WI-FI SCANNER ]</span>
-          </a>
-          <a href="./disco.html" class="crt-btn active" title="Aktive Coco-Disco Ansicht">
-            <span>🥥 [ COCO-DISCO ]</span>
-          </a>
+        <!-- Resonator Status Display -->
+        <div class="resonator-status-bar">
+          <div id="activeColorLabel" class="active-color-name">🌺 ÄTZISLOO COCO-PINK</div>
+          <div id="activeDetailLabel" class="active-telemetry-detail">#FF007F • RGB(255, 0, 127) • 10s Timer</div>
+        </div>
+      </div>
 
-          <!-- Phosphor Palette Buttons -->
-          <button class="crt-btn btn-phosphor" data-color="green" onclick="setPhosphorMode('green')" title="P1 Jungle Green">P1-JGL</button>
-          <button class="crt-btn btn-phosphor" data-color="amber" onclick="setPhosphorMode('amber')" title="P3 Solar Mango">P3-MANGO</button>
-          <button class="crt-btn btn-phosphor" data-color="cyan" onclick="setPhosphorMode('cyan')" title="C64 Lagoon Cyan">C64-CYN</button>
-          <button class="crt-btn btn-phosphor active" data-color="pink" onclick="setPhosphorMode('pink')" title="Cyber Tiki Pink">TIKI-PNK</button>
+      <!-- Stage Bottom: Bouncing Drink & Bruce Lee Sprite -->
+      <div class="stage-characters">
+        <div class="coconut-lab-drink" title="Bio-Coconut Lab Cocktail">🥥🍹</div>
+        <img id="bruceDancer" class="bruce-lab-dancer" src="../docs/artwork/bruce.gif" alt="Bruce Lee groovt im RandeLab" title="Bruce Lee im Coconut Research Lab!">
+      </div>
+    </section>
 
-          <!-- Scanlines Toggle -->
-          <button id="btnToggleScanlines" class="crt-btn active" onclick="toggleScanlines()" title="Horizontale CRT Scanlines ein-/ausschalten">
-            📺 LINES: ON
+    <!-- Control Matrix -->
+    <section class="lab-grid">
+
+      <!-- Left Card: Party Strobe Master -->
+      <div class="lab-card">
+        <div class="card-title">
+          <span>COCO-PARTY STROBE MASTER</span>
+          <span class="tag">70ms HIGH-SPEED</span>
+        </div>
+
+        <button class="btn-master-strobe" onclick="triggerCocoColor('disco', null, '⚡ RANDEN COCO-PARTY STROBE')">
+          ⚡ COCO PARTY STROBE 🥥
+        </button>
+
+        <div>
+          <div class="duration-label">TIMER OVERRIDE DAUER:</div>
+          <div class="duration-pills">
+            <button class="dur-pill" onclick="setDuration(5, this)">5s Fast</button>
+            <button class="dur-pill active" onclick="setDuration(10, this)">10s Lab</button>
+            <button class="dur-pill" onclick="setDuration(30, this)">30s Dance</button>
+            <button class="dur-pill" onclick="setDuration(60, this)">60s Party</button>
+          </div>
+        </div>
+
+        <div class="local-direct-hint">
+          <b>Direkter Lab-Aufruf im RandeLab-WLAN:</b><br>
+          <a href="http://192.168.1.100/api/led?color=disco" target="_blank">http://192.168.1.100/api/led?color=disco</a>
+        </div>
+      </div>
+
+      <!-- Middle Card: Bio-Acoustic Coconut Colors -->
+      <div class="lab-card">
+        <div class="card-title">
+          <span>RANDEN COCO-SPECTRUM</span>
+          <span class="tag">HARDWARE MATRIX</span>
+        </div>
+
+        <div class="color-pads-wrap">
+          <!-- Ätzisloo Pink -->
+          <button class="color-pad-btn" onclick="triggerCocoColor('pink', [255, 0, 127], '🌺 ÄTZISLOO COCO-PINK')" title="Ätzisloo Coco-Pink">
+            <div class="pad-dot" style="background:#ff007f; color:#ff007f;"></div>
+            <span>COCO-PINK</span>
           </button>
 
-          <!-- Sound Synthesizer Toggle -->
-          <button id="btnToggleSound" class="crt-btn" onclick="toggleSound()" title="Tropical Web Audio 80s Disco Synthesizer &amp; Coconut Marimba ein-/ausschalten">
-            🥥 SOUND: OFF
+          <!-- Randenwald Green -->
+          <button class="color-pad-btn" onclick="triggerCocoColor('green', [0, 255, 136], '🌲 RANDENWALD PINE GREEN')" title="Randenwald Pine Green">
+            <div class="pad-dot" style="background:#00ff88; color:#00ff88;"></div>
+            <span>PINE GREEN</span>
+          </button>
+
+          <!-- Jura Night Blue -->
+          <button class="color-pad-btn" onclick="triggerCocoColor('blue', [0, 102, 255], '🌌 JURA NIGHT BLUE')" title="Jura Night Blue">
+            <div class="pad-dot" style="background:#0066ff; color:#0066ff;"></div>
+            <span>JURA BLUE</span>
+          </button>
+
+          <!-- Solar MPPT Gold -->
+          <button class="color-pad-btn" onclick="triggerCocoColor('yellow', [255, 183, 0], '☀️ SOLAR MPPT GOLD')" title="Solar MPPT Gold">
+            <div class="pad-dot" style="background:#ffb700; color:#ffb700;"></div>
+            <span>SOLAR GOLD</span>
+          </button>
+
+          <!-- Merishausen Cyan -->
+          <button class="color-pad-btn" onclick="triggerCocoColor('cyan', [0, 240, 255], '💎 MERISHAUSEN GLACIER CYAN')" title="Merishausen Glacier Cyan">
+            <div class="pad-dot" style="background:#00f0ff; color:#00f0ff;"></div>
+            <span>CYAN</span>
+          </button>
+
+          <!-- Wild Berry Red -->
+          <button class="color-pad-btn" onclick="triggerCocoColor('red', [255, 16, 48], '🍓 RANDEN WILD BERRY RED')" title="Randen Wild Berry Red">
+            <div class="pad-dot" style="background:#ff1030; color:#ff1030;"></div>
+            <span>BERRY RED</span>
+          </button>
+
+          <!-- Sunset Amber -->
+          <button class="color-pad-btn" onclick="triggerCocoColor('orange', [255, 120, 0], '🍂 RANDEN SUNSET AMBER')" title="Randen Sunset Amber">
+            <div class="pad-dot" style="background:#ff7700; color:#ff7700;"></div>
+            <span>AMBER</span>
+          </button>
+
+          <!-- Pure Coconut Pulp -->
+          <button class="color-pad-btn" onclick="triggerCocoColor('white', [255, 255, 255], '🥥 PURE COCONUT PULP WHITE')" title="Pure Coconut Pulp White">
+            <div class="pad-dot" style="background:#ffffff; color:#ffffff;"></div>
+            <span>COCO PULP</span>
+          </button>
+
+          <!-- Standby Blackout -->
+          <button class="color-pad-btn" onclick="triggerCocoColor('off', [0, 0, 0], '🌙 DEEP FOREST BLACKOUT')" title="LED Standby / Aus">
+            <div class="pad-dot" style="background:#000000; border-color:#555; color:#000;"></div>
+            <span style="color:#ff3860;">BLACKOUT</span>
           </button>
         </div>
       </div>
 
-      <!-- Main Coconut Disco Stage -->
-      <div class="coco-stage">
-
-        <!-- 3D Perspective Tiki Dancefloor & Rotating Coconut Disco Ball -->
-        <div class="coco-dancefloor">
-          <!-- Swaying Neon Palm Trees -->
-          <div class="palm-decor-left">🌴</div>
-          <div class="palm-decor-right">🌴</div>
-
-          <div class="coco-grid-floor"></div>
-
-          <!-- The Floating Coconut Disco Ball -->
-          <div class="coconut-ball-wrapper">
-            <div class="coconut-rope"></div>
-
-            <div id="coconutBall" class="coconut-discoball" onclick="triggerCocoColor('disco', null)" title="Tippe die Kokosnuss an für Disco Party!">
-              <!-- 3 Coconut Eyes -->
-              <div class="coconut-eyes">
-                <div class="coconut-eye"></div>
-                <div class="coconut-eye"></div>
-                <div class="coconut-eye"></div>
-              </div>
-
-              <!-- Retro Cool Sunglasses -->
-              <div class="coconut-shades">🕶️</div>
-
-              <!-- Aura & Inner NeoPixel Core -->
-              <div id="coconutAura" class="coconut-aura"></div>
-              <div id="coconutLens" class="coconut-core-lens">
-                <div id="cocoEmitter" class="coco-emitter"></div>
-              </div>
-            </div>
-
-            <!-- Current Cocktail / Hex Label -->
-            <div class="coconut-label">
-              <span id="currentCocktailLabel">🌺 #FF007F // TIKI COCO-PINK</span>
-            </div>
-          </div>
-
-          <!-- Bouncing Cocktail Drink & Bruce Lee Dancer -->
-          <div class="tiki-dancers-row">
-            <div class="bouncing-coco-drink" title="Tropical Coconut Drink">🥥🍹</div>
-            <img id="tikiBruce" class="tiki-bruce-dancer" src="../docs/artwork/bruce.gif" alt="Bruce Lee Disco" title="Bruce Lee groovt in der Coco-Disco!">
-          </div>
+      <!-- Right Card: Live Protocol Feed -->
+      <div class="lab-card">
+        <div class="card-title">
+          <span>RESEARCH TELEMETRY STREAM</span>
+          <button onclick="document.getElementById('telemetryStream').innerHTML=''" style="background:none; border:none; color:var(--text-dim); font-size:0.75rem; cursor:pointer;">CLEAR</button>
         </div>
 
-        <!-- Controls Matrix -->
-        <div class="coco-controls-grid">
+        <div id="telemetryStream" class="telemetry-log-stream"></div>
 
-          <!-- Left Column: Master Coconut Strobe -->
-          <div class="tiki-card">
-            <div class="tiki-card-header">
-              <div class="tiki-card-title">
-                <span>🥥</span> COCO PARTY STROBE
-              </div>
-              <span class="crt-dim-text" style="font-size:0.75rem;">70ms High-Voltage Pulse</span>
-            </div>
-
-            <!-- Big Pulsing Coco Strobe Button -->
-            <button class="btn-coco-strobe" onclick="triggerCocoColor('disco', null)">
-              ⚡ COCO PARTY STROBE 🌴
-            </button>
-
-            <!-- Duration Selector (Tiki Sips) -->
-            <div>
-              <div class="crt-dim-text" style="font-size:0.75rem; margin-bottom:6px; font-weight:800; color:var(--mango-gold);">
-                COCKTAIL-SIP DAUER (OVERRIDE):
-              </div>
-              <div class="tiki-duration-bar">
-                <button class="btn-sip" onclick="setDuration(5, this)">5s Sip</button>
-                <button class="btn-sip active" onclick="setDuration(10, this)">10s Sip</button>
-                <button class="btn-sip" onclick="setDuration(30, this)">30s Drink</button>
-                <button class="btn-sip" onclick="setDuration(60, this)">60s Pitcher</button>
-              </div>
-            </div>
-
-            <!-- Direct URL Link -->
-            <div style="font-size:0.75rem; color:var(--crt-dim); line-height:1.4; border-top:1px dashed rgba(255,0,127,0.3); padding-top:8px;">
-              <span>🌴 <b>Lokal im RandeLab-WLAN?</b></span><br>
-              <a href="http://192.168.1.100/api/led?color=disco" target="_blank" style="color:var(--jungle-green); text-decoration:underline;">http://192.168.1.100/api/led?color=disco</a>
-            </div>
-          </div>
-
-          <!-- Middle Column: Tropical Cocktail Pads -->
-          <div class="tiki-card">
-            <div class="tiki-card-header">
-              <div class="tiki-card-title">
-                <span>🍹</span> TIKI COCKTAILS
-              </div>
-              <span class="crt-dim-text" style="font-size:0.75rem;">Live Color Matrix</span>
-            </div>
-
-            <div class="cocktail-pads-matrix">
-              <!-- Coco-Pink -->
-              <button class="cocktail-pad" onclick="triggerCocoColor('pink', [255, 0, 127])" title="Pink Pitaya Cocktail">
-                <span class="cocktail-icon">🌺</span>
-                <div class="cocktail-swatch" style="background:#ff007f; color:#ff007f;"></div>
-                <span>COCO-PINK</span>
-              </button>
-
-              <!-- Jungle-Green -->
-              <button class="cocktail-pad" onclick="triggerCocoColor('green', [0, 255, 102])" title="Palm Mint Caipirinha">
-                <span class="cocktail-icon">🌴</span>
-                <div class="cocktail-swatch" style="background:#00ff66; color:#00ff66;"></div>
-                <span>JUNGLE</span>
-              </button>
-
-              <!-- Curaçao Blue -->
-              <button class="cocktail-pad" onclick="triggerCocoColor('blue', [0, 102, 255])" title="Blue Lagoon Curaçao">
-                <span class="cocktail-icon">🌊</span>
-                <div class="cocktail-swatch" style="background:#0066ff; color:#0066ff;"></div>
-                <span>CURAÇAO</span>
-              </button>
-
-              <!-- Solar Mango -->
-              <button class="cocktail-pad" onclick="triggerCocoColor('yellow', [255, 183, 0])" title="Randen Solar Mango Punch">
-                <span class="cocktail-icon">🥭</span>
-                <div class="cocktail-swatch" style="background:#ffb700; color:#ffb700;"></div>
-                <span>MANGO</span>
-              </button>
-
-              <!-- Bikini Cyan -->
-              <button class="cocktail-pad" onclick="triggerCocoColor('cyan', [0, 240, 255])" title="Bikini Reef Blue">
-                <span class="cocktail-icon">🦩</span>
-                <div class="cocktail-swatch" style="background:#00f0ff; color:#00f0ff;"></div>
-                <span>CYAN</span>
-              </button>
-
-              <!-- Tiki Vulkan -->
-              <button class="cocktail-pad" onclick="triggerCocoColor('red', [255, 16, 48])" title="Spicy Volcano Tiki">
-                <span class="cocktail-icon">🌋</span>
-                <div class="cocktail-swatch" style="background:#ff1030; color:#ff1030;"></div>
-                <span>VULKAN</span>
-              </button>
-
-              <!-- Papaya Orange -->
-              <button class="cocktail-pad" onclick="triggerCocoColor('orange', [255, 120, 0])" title="Papaya Sunset">
-                <span class="cocktail-icon">🍊</span>
-                <div class="cocktail-swatch" style="background:#ff7700; color:#ff7700;"></div>
-                <span>PAPAYA</span>
-              </button>
-
-              <!-- Pure Coconut Milk -->
-              <button class="cocktail-pad" onclick="triggerCocoColor('white', [255, 255, 255])" title="Pure Cold Coconut Milk">
-                <span class="cocktail-icon">🥥</span>
-                <div class="cocktail-swatch" style="background:#ffffff; color:#ffffff;"></div>
-                <span>KOKOSMILCH</span>
-              </button>
-
-              <!-- Jungle Blackout -->
-              <button class="cocktail-pad" onclick="triggerCocoColor('off', [0, 0, 0])" title="Dschungel Nacht / LED Aus">
-                <span class="cocktail-icon">🌙</span>
-                <div class="cocktail-swatch" style="background:#000000; border-color:#666; color:#000;"></div>
-                <span style="color:#ff3860;">NACHT</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Right Column: Tropical Telemetry Terminal -->
-          <div class="tiki-card">
-            <div class="tiki-card-header">
-              <div class="tiki-card-title">
-                <span>📡</span> TIKI LOG &amp; HARDWARE ACK
-              </div>
-              <button class="crt-btn" style="padding:2px 8px; font-size:0.7rem;" onclick="document.getElementById('cocoTerminal').innerHTML=''">CLEAR</button>
-            </div>
-
-            <!-- Terminal Window -->
-            <div id="cocoTerminal" class="coco-terminal"></div>
-
-            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.7rem; color:var(--crt-dim);">
-              <span>BROKER: broker.hivemq.com:8884</span>
-              <span>TOPIC: randelab/solar/cmd</span>
-            </div>
-          </div>
-
+        <div style="display:flex; justify-content:space-between; font-size:0.72rem; color:var(--text-dim); font-family:'JetBrains Mono', monospace;">
+          <span>BROKER: broker.hivemq.com:8884</span>
+          <span>TOPIC: randelab/solar/cmd</span>
         </div>
-
       </div>
 
-      <!-- Signature Bruce Lee Rules Tropical Footer -->
-      <footer style="margin-top:25px; padding-top:15px; border-top:1px solid rgba(255,0,127,0.4); text-align:center;">
-        <div style="display:flex; justify-content:center; align-items:center; gap:14px; margin-bottom:8px;">
-          <a href="https://dusseiller.ch/" target="_blank" rel="noopener noreferrer">
-            <img src="../docs/artwork/c64_bruce_showdown.gif" alt="Bruce Lee Showdown" style="height:38px; image-rendering:pixelated;" title="Bruce Lee rules · dusseiller.ch">
-          </a>
-        </div>
-        <div style="font-family:'JetBrains Mono', monospace; font-size:0.75rem; color:var(--crt-dim);">
-          <span style="color:var(--mango-gold); font-weight:800;">Bruce Lee rules</span> · RandeLab Mountain-Top Coco-Disco · 857 m ü. M.
-        </div>
-      </footer>
+    </section>
 
-    </div>
+    <!-- Footer -->
+    <footer class="lab-footer">
+      <a href="https://dusseiller.ch/" target="_blank" rel="noopener noreferrer" class="footer-bruce-badge">
+        <img src="../docs/artwork/c64_bruce_showdown.gif" alt="Bruce Lee Showdown">
+        <span>Bruce Lee rules · dusseiller.ch</span>
+      </a>
+      <div class="footer-coords">
+        47.7701° N, 8.5738° E • 857 m ü. M. • RandeLab Off-Grid Research Facility
+      </div>
+    </footer>
+
   </div>
 
-  <script src="./disco.js?v=2.0"></script>
+  <script src="./disco.js?v=3.0"></script>
 </body>
 </html>

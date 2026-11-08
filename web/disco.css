@@ -1,460 +1,681 @@
 /**
- * RandeLab COCO-DISCO // Tropical Solar Tiki Lounge & Hardware Controller (web/disco.css)
- * 857 m ü. M. Mountain-Top Tropical Disco, Rotating Coconut Mirror Ball,
- * Neon Palm Fronds, Bouncing Coconuts & Funky Tiki Color Cocktails.
+ * RandeLab Coconut Research Lab Disco // Modern Tropical Solar Science UI (web/disco.css)
+ * 857 m ü. M. Underes Ätzisloo / Merishausen • Pure bespoke aesthetic
+ * Glassmorphic dark theme, bioluminescent coconut resonator, Randen night sky vibes.
  */
 
 :root {
-  --coco-brown: #3e2723;
+  --bg-deep: #07030c;
+  --bg-surface: rgba(22, 10, 35, 0.75);
+  --bg-card: rgba(30, 14, 48, 0.65);
+  --border-glow: rgba(255, 0, 127, 0.35);
+  --border-subtle: rgba(255, 255, 255, 0.1);
+
   --coco-shell: #5d4037;
-  --coco-cream: #fff8e1;
-  --coco-hairy: #2b1d0c;
-  --jungle-green: #00ff66;
-  --tropical-pink: #ff007f;
-  --tiki-cyan: #00f0ff;
-  --mango-gold: #ffb700;
-  --ocean-blue: #0077ff;
+  --coco-meat: #fff9e6;
+  --randen-pine: #00ff88;
+  --tiki-pink: #ff007f;
+  --solar-amber: #ffb700;
+  --glacier-cyan: #00f0ff;
+  --deep-blue: #0066ff;
+
+  --text-main: #f5f0fa;
+  --text-dim: #9d8ca8;
+  --text-accent: #ffb700;
 }
 
-/* ==================== TROPICAL RETRO COCO-LOUNGE ==================== */
-body.coco-theme {
-  background: radial-gradient(circle at 50% 20%, #1a0826 0%, #0c0214 45%, #030108 100%);
-  color: #fff8e1;
-  font-family: 'JetBrains Mono', monospace;
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-deep);
+  background-image: 
+    radial-gradient(circle at 50% 10%, rgba(255, 0, 127, 0.18) 0%, transparent 60%),
+    radial-gradient(circle at 85% 70%, rgba(0, 240, 255, 0.12) 0%, transparent 50%),
+    radial-gradient(circle at 15% 80%, rgba(0, 255, 136, 0.08) 0%, transparent 50%),
+    linear-gradient(to bottom, #07030c 0%, #0a0414 100%);
+  background-attachment: fixed;
+  color: var(--text-main);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
   overflow-x: hidden;
 }
 
-/* Tropical CRT Glow Overrides */
-body.crt-pink {
-  --crt-main: #ff007f;
-  --crt-dim: #99004d;
-  --crt-glow: rgba(255, 0, 127, 0.6);
-  --crt-border: #ff007f;
-  --crt-panel: rgba(26, 8, 38, 0.88);
+/* Atmospheric Floating Coconut Spores / Stars */
+.randen-stars {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    radial-gradient(1px 1px at 20px 30px, #ffffff, rgba(0,0,0,0)),
+    radial-gradient(1.5px 1.5px at 150px 80px, rgba(255,183,0,0.8), rgba(0,0,0,0)),
+    radial-gradient(1px 1px at 300px 180px, #00f0ff, rgba(0,0,0,0)),
+    radial-gradient(1.5px 1.5px at 500px 120px, #ff007f, rgba(0,0,0,0)),
+    radial-gradient(1px 1px at 750px 220px, #ffffff, rgba(0,0,0,0)),
+    radial-gradient(1.5px 1.5px at 900px 50px, #00ff88, rgba(0,0,0,0));
+  background-repeat: repeat;
+  background-size: 1000px 500px;
+  opacity: 0.45;
+  pointer-events: none;
+  z-index: 0;
 }
 
-/* ==================== COCONUT DISCO STAGE ==================== */
-.coco-stage {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+/* Container */
+.coco-container {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 20px 60px;
   position: relative;
   z-index: 2;
-  margin-top: 15px;
-}
-
-/* Tropical Tiki Dancefloor */
-.coco-dancefloor {
-  position: relative;
-  width: 100%;
-  min-height: 270px;
-  border-radius: 12px;
-  border: 2px solid var(--tropical-pink);
-  background: 
-    radial-gradient(circle at 50% 40%, rgba(255, 0, 127, 0.22), rgba(0, 240, 255, 0.1) 45%, #08020f 85%),
-    repeating-linear-gradient(45deg, rgba(255, 183, 0, 0.03) 0px, rgba(255, 183, 0, 0.03) 20px, transparent 20px, transparent 40px);
-  overflow: hidden;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 
-    0 0 30px rgba(255, 0, 127, 0.35),
-    inset 0 0 50px rgba(0, 0, 0, 0.9);
+  gap: 24px;
 }
 
-/* Neon Palm Tree Silhouettes */
-.palm-decor-left,
-.palm-decor-right {
-  position: absolute;
-  top: 10px;
-  font-size: 3.5rem;
-  opacity: 0.85;
-  filter: drop-shadow(0 0 15px #00ff66);
-  pointer-events: none;
-  animation: palmSway 4s ease-in-out infinite alternate;
-  user-select: none;
-}
-
-.palm-decor-left { left: 20px; transform-origin: bottom left; }
-.palm-decor-right { right: 20px; transform-origin: bottom right; animation-delay: -2s; }
-
-@keyframes palmSway {
-  0% { transform: rotate(-5deg) scale(1); }
-  100% { transform: rotate(5deg) scale(1.03); }
-}
-
-/* Perspective Checkerboard Tiki Dancefloor Grid */
-.coco-grid-floor {
-  position: absolute;
-  bottom: 0;
-  width: 240%;
-  height: 120px;
-  left: -70%;
-  background-image: 
-    linear-gradient(to right, rgba(0, 240, 255, 0.35) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 0, 127, 0.35) 1px, transparent 1px);
-  background-size: 45px 22px;
-  transform: perspective(280px) rotateX(68deg);
-  transform-origin: bottom center;
-  animation: cocoGridScroll 3.5s linear infinite;
-}
-
-@keyframes cocoGridScroll {
-  0% { background-position: 0 0; }
-  100% { background-position: 0 44px; }
-}
-
-/* ==================== THE ROTATING COCONUT DISCO BALL ==================== */
-.coconut-ball-wrapper {
-  position: relative;
-  z-index: 10;
+/* ==================== HEADER & TOP BAR ==================== */
+.lab-header {
   display: flex;
   flex-direction: column;
+  gap: 16px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.lab-title-row {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  margin-top: 10px;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
-/* Suspension Rope */
-.coconut-rope {
-  width: 4px;
-  height: 35px;
-  background: repeating-linear-gradient(to bottom, #d7ccc8, #8d6e63 4px, #4e342e 8px);
-  box-shadow: 0 0 8px rgba(0,0,0,0.8);
-}
-
-/* The Coconut Sphere */
-.coconut-discoball {
-  position: relative;
-  width: 110px;
-  height: 125px;
-  border-radius: 50% 50% 48% 48% / 55% 55% 45% 45%;
-  background: radial-gradient(circle at 35% 30%, #8d6e63 15%, #4e342e 55%, #271406 100%);
-  box-shadow: 
-    0 15px 35px rgba(0, 0, 0, 0.9),
-    inset -8px -8px 20px rgba(0, 0, 0, 0.8),
-    inset 8px 8px 15px rgba(255, 255, 255, 0.15);
+.lab-branding {
   display: flex;
   align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  animation: coconutFloat 3s ease-in-out infinite;
+  gap: 14px;
 }
 
-@keyframes coconutFloat {
-  0%, 100% { transform: translateY(0) rotate(-1deg); }
-  50% { transform: translateY(-8px) rotate(2deg); }
+.lab-logo-coco {
+  font-size: 2.6rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 15px rgba(255, 0, 127, 0.8));
+  animation: cocoBob 3s ease-in-out infinite alternate;
 }
 
-/* Coconut Mirror Facets / Disco Glitz */
-.coconut-discoball::after {
-  content: '';
-  position: absolute;
-  top: 5px;
-  left: 5px;
-  right: 5px;
-  bottom: 5px;
-  border-radius: inherit;
-  background-image: 
-    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.15) 0px, rgba(255, 255, 255, 0.15) 1px, transparent 1px, transparent 12px),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.15) 0px, rgba(255, 255, 255, 0.15) 1px, transparent 1px, transparent 12px);
-  mix-blend-mode: overlay;
-  pointer-events: none;
+@keyframes cocoBob {
+  0% { transform: translateY(0) rotate(-4deg); }
+  100% { transform: translateY(-5px) rotate(4deg); }
 }
 
-/* 3 Iconic Coconut "Eyes" */
-.coconut-eyes {
-  position: absolute;
-  top: 22px;
-  display: flex;
-  gap: 12px;
-}
-
-.coconut-eye {
-  width: 10px;
-  height: 10px;
-  background: #120904;
-  border-radius: 50%;
-  box-shadow: inset 0 2px 4px #000, 0 1px 2px rgba(255, 255, 255, 0.2);
-}
-
-.coconut-eye:nth-child(2) {
-  margin-top: -6px;
-}
-
-/* NeoPixel Lens inside opened Coconut */
-.coconut-core-lens {
-  position: relative;
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  background: #111;
-  border: 3px solid #ff007f;
-  box-shadow: 0 0 20px #ff007f, inset 0 0 10px #000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-/* Central Silicon Emitters */
-.coco-emitter {
-  width: 22px;
-  height: 22px;
-  background: #ff007f;
-  border-radius: 4px;
-  box-shadow: 0 0 15px #ff007f;
-  transition: all 0.15s ease;
-}
-
-/* Tropical Disco Laser Aura */
-.coconut-aura {
-  position: absolute;
-  width: 240px;
-  height: 240px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 0, 127, 0.5) 0%, rgba(0, 240, 255, 0.2) 50%, transparent 75%);
-  pointer-events: none;
-  mix-blend-mode: screen;
-  transition: all 0.25s ease;
-  animation: auraPulse 2.5s ease-in-out infinite alternate;
-}
-
-@keyframes auraPulse {
-  0% { transform: scale(0.9); opacity: 0.7; }
-  100% { transform: scale(1.15); opacity: 1; }
-}
-
-/* Coconut Sunglasses for extra Swag */
-.coconut-shades {
-  position: absolute;
-  top: 38px;
-  font-size: 2.2rem;
-  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.9));
-  z-index: 12;
-  user-select: none;
-}
-
-/* Label below the Coconut */
-.coconut-label {
-  margin-top: 10px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.8rem;
+.lab-headings h1 {
+  font-size: 1.6rem;
   font-weight: 800;
-  letter-spacing: 1.5px;
-  color: var(--mango-gold);
-  text-shadow: 0 0 10px rgba(255, 183, 0, 0.8);
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #fff 20%, var(--solar-amber) 60%, var(--tiki-pink) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-/* Bouncing Coconut Cocktail & Bruce Lee */
-.tiki-dancers-row {
+.lab-headings p {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  font-family: 'JetBrains Mono', monospace;
+  margin-top: 2px;
+}
+
+/* Status & Telemetry Pill */
+.hardware-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(15, 6, 24, 0.8);
+  border: 1px solid var(--border-glow);
+  border-radius: 30px;
+  padding: 6px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--randen-pine);
+  box-shadow: 0 0 8px var(--randen-pine);
+  animation: pulseDot 2s infinite;
+}
+
+@keyframes pulseDot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.6; }
+}
+
+/* Nav Pills */
+.lab-nav {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.nav-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.nav-pill:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+
+.nav-pill.active {
+  background: linear-gradient(135deg, rgba(255, 0, 127, 0.3), rgba(255, 183, 0, 0.2));
+  border-color: var(--tiki-pink);
+  color: #fff;
+  box-shadow: 0 0 15px rgba(255, 0, 127, 0.4);
+}
+
+.btn-sound-toggle {
+  margin-left: auto;
+  cursor: pointer;
+  background: rgba(255, 183, 0, 0.12);
+  border-color: rgba(255, 183, 0, 0.4);
+  color: var(--solar-amber);
+}
+
+.btn-sound-toggle.active {
+  background: var(--solar-amber);
+  color: #120502;
+  box-shadow: 0 0 15px rgba(255, 183, 0, 0.6);
+  font-weight: 700;
+}
+
+/* ==================== HERO: COCONUT DISCO RESONATOR ==================== */
+.hero-coconut-stage {
+  position: relative;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-glow);
+  border-radius: 18px;
+  padding: 35px 20px 25px;
+  overflow: hidden;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), inset 0 0 60px rgba(255, 0, 127, 0.12);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 310px;
+}
+
+/* Subtle Randen Tree Silhouette Line */
+.stage-foliage-left,
+.stage-foliage-right {
   position: absolute;
-  bottom: 8px;
-  left: 20px;
-  right: 20px;
+  bottom: -5px;
+  font-size: 3rem;
+  opacity: 0.35;
+  filter: drop-shadow(0 0 10px var(--randen-pine));
+  pointer-events: none;
+  user-select: none;
+}
+.stage-foliage-left { left: 20px; }
+.stage-foliage-right { right: 20px; }
+
+/* The Coconut Resonator Module */
+.coconut-resonator {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 5;
+}
+
+/* Hanging Lab Wire / Cord */
+.lab-suspension-wire {
+  width: 2px;
+  height: 40px;
+  background: linear-gradient(to bottom, #888, #444);
+  box-shadow: 0 0 5px rgba(255, 0, 127, 0.5);
+}
+
+/* The Coconut Sphere */
+.coconut-sphere {
+  position: relative;
+  width: 125px;
+  height: 140px;
+  border-radius: 50% 50% 48% 48% / 55% 55% 45% 45%;
+  background: radial-gradient(circle at 35% 30%, #795548 10%, #4e342e 50%, #271406 100%);
+  border: 2px solid rgba(255, 183, 0, 0.3);
+  box-shadow: 
+    0 20px 40px rgba(0, 0, 0, 0.9),
+    inset -10px -10px 25px rgba(0, 0, 0, 0.9),
+    inset 8px 8px 20px rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  animation: coconutFloat 4s ease-in-out infinite;
+}
+
+@keyframes coconutFloat {
+  0%, 100% { transform: translateY(0) rotate(-1.5deg); }
+  50% { transform: translateY(-7px) rotate(1.5deg); }
+}
+
+.coconut-sphere:hover {
+  transform: scale(1.05);
+}
+
+/* Micro-Facets on Shell */
+.coconut-sphere::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: inherit;
+  background-image: 
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0px, rgba(255, 255, 255, 0.1) 1px, transparent 1px, transparent 14px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.1) 0px, rgba(255, 255, 255, 0.1) 1px, transparent 1px, transparent 14px);
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+/* 3 Natural Eyes */
+.coconut-tri-eyes {
+  position: absolute;
+  top: 24px;
+  display: flex;
+  gap: 14px;
+  z-index: 6;
+}
+
+.tri-eye {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #140903;
+  box-shadow: inset 0 2px 4px #000, 0 1px 2px rgba(255, 255, 255, 0.25);
+}
+
+.tri-eye:nth-child(2) {
+  margin-top: -6px;
+}
+
+/* The Opened Core: NeoPixel Silicon Chamber */
+.neopixel-chamber {
+  position: relative;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: #0d0612;
+  border: 3px solid var(--tiki-pink);
+  box-shadow: 0 0 25px var(--tiki-pink), inset 0 0 12px #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  z-index: 7;
+}
+
+.silicon-die {
+  width: 26px;
+  height: 26px;
+  background: var(--tiki-pink);
+  border-radius: 4px;
+  box-shadow: 0 0 20px var(--tiki-pink);
+  transition: all 0.15s ease;
+}
+
+/* Radial Light Aura */
+.coconut-radiance-aura {
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 0, 127, 0.45) 0%, rgba(255, 183, 0, 0.2) 40%, transparent 70%);
+  pointer-events: none;
+  mix-blend-mode: screen;
+  transition: all 0.3s ease;
+  z-index: 1;
+}
+
+/* Resonator Metrics readout */
+.resonator-status-bar {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.active-color-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--solar-amber);
+  text-shadow: 0 0 12px rgba(255, 183, 0, 0.6);
+  letter-spacing: 1px;
+}
+
+.active-telemetry-detail {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+/* Floating Bruce Lee & Drinks */
+.stage-characters {
+  position: absolute;
+  bottom: 12px;
+  left: 24px;
+  right: 24px;
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
   pointer-events: none;
 }
 
-.bouncing-coco-drink {
-  font-size: 2.8rem;
-  filter: drop-shadow(0 0 10px #ff007f);
-  animation: drinkBounce 0.5s ease-in-out infinite alternate;
-  user-select: none;
+.coconut-lab-drink {
+  font-size: 2.2rem;
+  filter: drop-shadow(0 0 12px var(--tiki-pink));
+  animation: drinkWiggle 1s ease-in-out infinite alternate;
 }
 
-@keyframes drinkBounce {
-  0% { transform: translateY(0) rotate(-6deg); }
-  100% { transform: translateY(-12px) rotate(6deg); }
+@keyframes drinkWiggle {
+  0% { transform: rotate(-5deg); }
+  100% { transform: rotate(5deg) translateY(-4px); }
 }
 
-.tiki-bruce-dancer {
-  height: 75px;
+.bruce-lab-dancer {
+  height: 70px;
   image-rendering: pixelated;
-  filter: drop-shadow(0 0 12px #00f0ff);
+  filter: drop-shadow(0 0 14px var(--glacier-cyan));
   transition: transform 0.1s ease;
 }
 
-/* ==================== TIKI CONTROLS & COCKTAIL MATRIX ==================== */
-.coco-controls-grid {
+/* ==================== CONTROL MATRIX ==================== */
+.lab-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
 }
 
-.tiki-card {
-  background: rgba(22, 6, 32, 0.9);
-  border: 1px solid var(--tropical-pink);
-  border-radius: 10px;
-  padding: 16px;
+.lab-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+  padding: 20px;
+  backdrop-filter: blur(10px);
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6), 0 0 12px rgba(255, 0, 127, 0.2);
+  gap: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  transition: border-color 0.2s ease;
 }
 
-.tiki-card-header {
+.lab-card:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.card-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-main);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px dashed rgba(255, 0, 127, 0.4);
-  padding-bottom: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-.tiki-card-title {
+.card-title span.tag {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.9rem;
-  font-weight: 800;
-  color: var(--mango-gold);
-  text-shadow: 0 0 8px rgba(255, 183, 0, 0.6);
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  font-size: 0.7rem;
+  color: var(--solar-amber);
+  font-weight: 600;
 }
 
-/* Big Hero Coconut Strobe Party Button */
-.btn-coco-strobe {
+/* Strobe Party Master Button */
+.btn-master-strobe {
   position: relative;
   width: 100%;
-  padding: 18px 12px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 1.15rem;
-  font-weight: 900;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  color: #fff8e1;
-  background: linear-gradient(135deg, #ff007f 0%, #ffb700 35%, #00ff66 70%, #00f0ff 100%);
+  padding: 20px 16px;
+  border-radius: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  background: linear-gradient(135deg, #ff007f 0%, #ffb700 35%, #00ff88 70%, #00f0ff 100%);
   background-size: 300% 300%;
-  border: 2px solid #fff;
-  border-radius: 8px;
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
   cursor: pointer;
   box-shadow: 
-    0 0 30px rgba(255, 0, 127, 0.7),
-    inset 0 0 15px rgba(255, 255, 255, 0.4);
-  animation: cocoRainbowStrobe 2.8s ease infinite;
-  transition: transform 0.1s, box-shadow 0.1s;
+    0 10px 30px rgba(255, 0, 127, 0.5),
+    inset 0 0 20px rgba(255, 255, 255, 0.4);
+  animation: strobeGlow 3s ease infinite;
+  transition: transform 0.15s, box-shadow 0.15s;
 }
 
-.btn-coco-strobe:hover {
+.btn-master-strobe:hover {
   transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 0 45px rgba(0, 240, 255, 0.9), inset 0 0 25px #fff;
+  box-shadow: 0 12px 40px rgba(0, 240, 255, 0.8), inset 0 0 25px #fff;
 }
 
-.btn-coco-strobe:active {
+.btn-master-strobe:active {
   transform: translateY(1px) scale(0.99);
 }
 
-@keyframes cocoRainbowStrobe {
+@keyframes strobeGlow {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
   100% { background-position: 0% 50%; }
 }
 
-/* Tropical Cocktail Matrix */
-.cocktail-pads-matrix {
+/* Duration Bar */
+.duration-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.duration-pills {
+  display: flex;
+  gap: 8px;
+}
+
+.dur-pill {
+  flex: 1;
+  padding: 10px 6px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.dur-pill:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.dur-pill.active {
+  background: linear-gradient(135deg, var(--solar-amber), #ff8800);
+  border-color: #ffaa00;
+  color: #1a0802;
+  box-shadow: 0 0 15px rgba(255, 183, 0, 0.5);
+}
+
+/* Local REST Endpoint Helper */
+.local-direct-hint {
+  font-size: 0.76rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.local-direct-hint a {
+  color: var(--randen-pine);
+  text-decoration: none;
+  font-family: 'JetBrains Mono', monospace;
+  word-break: break-all;
+}
+
+.local-direct-hint a:hover {
+  text-decoration: underline;
+}
+
+/* Color Pads Matrix */
+.color-pads-wrap {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(82px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
 
-.cocktail-pad {
+.color-pad-btn {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 12px 6px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(14, 4, 20, 0.85);
-  color: #fff8e1;
+  padding: 12px 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-main);
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   font-weight: 700;
   cursor: pointer;
-  transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  transition: all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-.cocktail-pad:hover {
-  transform: translateY(-3px);
+.color-pad-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
   border-color: #fff;
 }
 
-.cocktail-pad:active {
+.color-pad-btn:active {
   transform: translateY(1px);
 }
 
-.cocktail-icon {
-  font-size: 1.4rem;
-  line-height: 1;
-}
-
-.cocktail-swatch {
-  width: 24px;
-  height: 24px;
+.pad-dot {
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 0 0 8px currentColor;
+  box-shadow: 0 0 12px currentColor;
+  border: 2px solid rgba(255, 255, 255, 0.7);
 }
 
-/* Tiki Sips Duration Selector */
-.tiki-duration-bar {
-  display: flex;
-  gap: 6px;
-}
-
-.btn-sip {
-  flex: 1;
-  padding: 8px 6px;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid var(--tropical-pink);
-  color: var(--mango-gold);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.75rem;
-  font-weight: 800;
-  border-radius: 6px;
-  cursor: pointer;
-  text-align: center;
-}
-
-.btn-sip.active,
-.btn-sip:hover {
-  background: var(--tropical-pink);
-  color: #fff8e1;
-  box-shadow: 0 0 15px rgba(255, 0, 127, 0.8);
-}
-
-/* Tropical Terminal Console */
-.coco-terminal {
-  background: #06010a;
-  border: 1px solid var(--tropical-pink);
-  border-radius: 6px;
-  padding: 10px;
-  height: 140px;
+/* Telemetry & Protocol Feed */
+.telemetry-log-stream {
+  background: rgba(5, 2, 8, 0.9);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 12px;
+  height: 170px;
   overflow-y: auto;
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.75rem;
-  line-height: 1.4;
-  color: #00ff66;
+  line-height: 1.5;
+  color: var(--text-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.coco-log-ack {
-  color: #ffb700;
-  font-weight: 800;
+.log-entry {
+  word-break: break-all;
 }
 
-.coco-log-tx {
-  color: #00f0ff;
+.log-entry-ack {
+  color: var(--randen-pine);
+  font-weight: 700;
 }
 
-.coco-log-err {
+.log-entry-tx {
+  color: var(--glacier-cyan);
+}
+
+.log-entry-err {
   color: #ff3860;
+}
+
+/* Footer */
+.lab-footer {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.footer-bruce-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 30px;
+  border: 1px solid var(--border-subtle);
+  text-decoration: none;
+  color: var(--text-main);
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.footer-bruce-badge:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--tiki-pink);
+  transform: translateY(-1px);
+}
+
+.footer-bruce-badge img {
+  height: 28px;
+  image-rendering: pixelated;
+}
+
+.footer-coords {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-dim);
 }
