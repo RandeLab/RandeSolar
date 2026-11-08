@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1440 1080" width="100%" height="100%" style="background:#0b0f19; font-family:system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
 
   <defs>
-    <!-- Glow Filters -->
+    <!-- Glow and Shadow Filters -->
     <filter id="glow-cyan" x="-20%" y="-20%" width="140%" height="140%">
       <feGaussianBlur stdDeviation="3" result="blur" />
       <feComposite in="SourceGraphic" in2="blur" operator="over" />
@@ -19,29 +19,73 @@
       <feComposite in="SourceGraphic" in2="blur" operator="over" />
     </filter>
     <filter id="card-shadow" x="-10%" y="-10%" width="120%" height="120%">
-      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.6"/>
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.65"/>
     </filter>
-    <linearGradient id="beam-cyan" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.85"/>
-      <stop offset="100%" stop-color="#06b6d4" stop-opacity="0.15"/>
-    </linearGradient>
-    <linearGradient id="beam-pink" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ec4899" stop-opacity="0.85"/>
-      <stop offset="100%" stop-color="#ec4899" stop-opacity="0.15"/>
-    </linearGradient>
-    <linearGradient id="beam-gold" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.85"/>
-      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.15"/>
-    </linearGradient>
-    <linearGradient id="beam-green" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#10b981" stop-opacity="0.85"/>
-      <stop offset="100%" stop-color="#10b981" stop-opacity="0.15"/>
-    </linearGradient>
-    <linearGradient id="beam-de" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#ef4444" stop-opacity="0.9"/>
-      <stop offset="50%" stop-color="#f59e0b" stop-opacity="0.6"/>
-      <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.2"/>
-    </linearGradient>
+    <filter id="card-hover-shadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000" flood-opacity="0.85"/>
+    </filter>
+    <filter id="flyout-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.95"/>
+    </filter>
+
+    <style>
+      .mast-group {
+        cursor: pointer;
+      }
+      .mast-card-bg {
+        transition: stroke-width 0.2s ease, stroke 0.2s ease, fill-opacity 0.2s ease;
+      }
+      .mast-beam-line {
+        transition: stroke-width 0.2s ease, stroke-opacity 0.2s ease;
+      }
+      .mast-marker-halo {
+        transition: r 0.2s ease, fill-opacity 0.2s ease;
+      }
+      .mast-leader-line {
+        transition: stroke-width 0.2s ease, stroke-opacity 0.2s ease;
+      }
+      .mast-flyout {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      .flyout-down {
+        transform: translateY(-4px);
+      }
+      .flyout-up {
+        transform: translateY(4px);
+      }
+      .mast-group:hover .mast-card-bg {
+        stroke-width: 2.2px;
+        fill-opacity: 0.98;
+      }
+      .mast-group:hover .mast-beam-line {
+        stroke-width: 4px;
+        stroke-dasharray: none;
+        stroke-opacity: 1;
+      }
+      .mast-group:hover .mast-marker-halo {
+        r: 22px;
+        fill-opacity: 0.45;
+      }
+      .mast-group:hover .mast-leader-line {
+        stroke-width: 1.8px;
+        stroke-opacity: 1;
+      }
+      .mast-group:hover .mast-flyout {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0);
+      }
+      .sidebar-row {
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .sidebar-row:hover rect {
+        stroke-width: 1.5px;
+        fill-opacity: 0.9;
+      }
+    </style>
   </defs>
 
 
@@ -107,89 +151,258 @@
   <path d="M 979.4 434.8 L 980.0 431.9 L 991.6 429.5 L 992.1 418.8 L 991.4 409.7 L 992.7 404.7 L 995.6 399.4" fill="none" stroke="#ef4444" stroke-width="2.8" stroke-dasharray="10 5" stroke-linecap="round"/>
   <path d="M 979.4 434.8 L 980.0 431.9 L 991.6 429.5 L 992.1 418.8 L 991.4 409.7 L 992.7 404.7 L 995.6 399.4" fill="none" stroke="#ffffff" stroke-width="1.2" stroke-dasharray="3 12" stroke-linecap="round"/>
 
-  <g transform="translate(680, 310)" filter="url(#card-shadow)">
-    <rect x="-110" y="-12" width="220" height="24" rx="5" fill="#0f172a" fill-opacity="0.92" stroke="#ef4444" stroke-width="1.5"/>
-    <text x="0" y="4" text-anchor="middle" fill="#f87171" font-size="11" font-weight="bold" letter-spacing="1">🇨🇭 SCHWEIZ  |  DEUTSCHLAND 🇩🇪</text>
+  <g class="mast-group" transform="translate(500, 380)" filter="url(#card-shadow)">
+    <title>🇨🇭 SCHWEIZERISCH-DEUTSCHE STAATSGRENZE (Kanton SH / Baden-Württemberg)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 Offizielle Grenzrelation: 384 GPS-Grenzsteine &amp; Vermessungspunkte
+📏 Distanz zum RandeLab: ca. 1.5 km nördlich
+📡 HF-Grenzlinie: Trennt Schweizer Mobilfunknetz (MCC 228) von deutschem Netz (MCC 262)
+🇩🇪 Grenz-Overspill: Deutsche Sendemasten (Wiechs, Tengen) reichen ungedämpft ins RandeLab
+💡 Praxis-Option: Deutsche SIM (Telekom) nutzt volles Inlandsvolumen ohne Roaming-Limit!</title>
+    <rect class="mast-card-bg" x="0" y="0" width="215" height="26" rx="5" fill="#0f172a" fill-opacity="0.94" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="107.5" y="17" text-anchor="middle" fill="#f87171" font-size="10.5" font-weight="bold" letter-spacing="0.8">🇨🇭 SCHWEIZ  |  DEUTSCHLAND 🇩🇪</text>
+    
+    <!-- Hover Flyout for Border -->
+    <g class="mast-flyout flyout-down" transform="translate(0, 30)" filter="url(#flyout-shadow)">
+      <rect x="0" y="0" width="235" height="96" rx="6" fill="#090d16" fill-opacity="0.97" stroke="#ef4444" stroke-width="1.2"/>
+      <text x="10" y="18" fill="#f87171" font-size="10" font-weight="bold">🛂 3GPP-Grenztopologie &amp; Roaming</text>
+      <text x="10" y="36" fill="#e2e8f0" font-size="9">• 384 amtliche GPS-Grenzpunkte (Swisstopo)</text>
+      <text x="10" y="52" fill="#cbd5e1" font-size="9">• Deutsche Masten überstrahlen Randen-Kamm</text>
+      <text x="10" y="68" fill="#cbd5e1" font-size="9">• DE-SIM wählt Telekom.de als Heimnetz (kein Roaming!)</text>
+      <text x="10" y="84" fill="#38bdf8" font-size="8.5">💡 Maximale Redundanz bei Ausfall von Schweizer Netzen</text>
+    </g>
   </g>
 
-  <line x1="554.0" y1="645.3" x2="517.7" y2="611.2" stroke="#f59e0b" stroke-width="2.5" stroke-dasharray="6 3" stroke-opacity="0.85"/>
-  <line x1="554.0" y1="645.3" x2="584.3" y2="698.2" stroke="#10b981" stroke-width="2.5" stroke-dasharray="6 3" stroke-opacity="0.85"/>
-  <line x1="554.0" y1="645.3" x2="654.2" y2="745.9" stroke="#06b6d4" stroke-width="2.5" stroke-dasharray="6 3" stroke-opacity="0.85"/>
-  <line x1="554.0" y1="645.3" x2="732.8" y2="481.5" stroke="#ec4899" stroke-width="2.5" stroke-dasharray="6 3" stroke-opacity="0.85"/>
-  <line x1="554.0" y1="645.3" x2="625.1" y2="342.7" stroke="#ef4444" stroke-width="2.5" stroke-dasharray="6 3" stroke-opacity="0.85"/>
-  <line x1="554.0" y1="645.3" x2="427.0" y2="230.0" stroke="#8b5cf6" stroke-width="2.5" stroke-dasharray="6 3" stroke-opacity="0.85"/>
-  <circle cx="517.7" cy="611.2" r="15" fill="#f59e0b" fill-opacity="0.25" stroke="#f59e0b" stroke-width="1.5"/>
-  <circle cx="517.7" cy="611.2" r="6" fill="#f59e0b" stroke="#ffffff" stroke-width="1.5"/>
-  <line x1="517.7" y1="611.2" x2="335.0" y2="551.0" stroke="#f59e0b" stroke-width="1" stroke-opacity="0.5"/>
-  <!-- Card for hagenturm -->
-  <g filter="url(#card-shadow)">
-    <rect x="180.0" y="520.0" width="310" height="62" rx="6" fill="#0f172a" fill-opacity="0.94" stroke="#f59e0b" stroke-width="1.5"/>
-    <text x="190.0" y="538.0" fill="#ffffff" font-size="12" font-weight="bold">🇨🇭 Hagenturm (912 m ü. M.)</text>
-    <text x="190.0" y="555.0" fill="#f59e0b" font-size="10" font-weight="600">Swisscom (228 01) &amp; Sunrise (228 02)</text>
-    <text x="190.0" y="571.0" fill="#94a3b8" font-size="9">0.64 km • 313° (NW) • 🏔️ Höchster Punkt Kanton SH • 640 m NW vom RandeLab!</text>
+  <line class="mast-beam-line" x1="554.0" y1="645.3" x2="427.0" y2="230.0" stroke="#8b5cf6" stroke-width="2.2" stroke-dasharray="6 3" stroke-opacity="0.75"/>
+  <line class="mast-beam-line" x1="554.0" y1="645.3" x2="625.1" y2="342.7" stroke="#ef4444" stroke-width="2.2" stroke-dasharray="6 3" stroke-opacity="0.75"/>
+  <line class="mast-beam-line" x1="554.0" y1="645.3" x2="732.8" y2="481.5" stroke="#ec4899" stroke-width="2.2" stroke-dasharray="6 3" stroke-opacity="0.75"/>
+  <line class="mast-beam-line" x1="554.0" y1="645.3" x2="517.7" y2="611.2" stroke="#f59e0b" stroke-width="2.2" stroke-dasharray="6 3" stroke-opacity="0.75"/>
+  <line class="mast-beam-line" x1="554.0" y1="645.3" x2="654.2" y2="745.9" stroke="#06b6d4" stroke-width="2.2" stroke-dasharray="6 3" stroke-opacity="0.75"/>
+  <line class="mast-beam-line" x1="554.0" y1="645.3" x2="584.3" y2="698.2" stroke="#10b981" stroke-width="2.2" stroke-dasharray="6 3" stroke-opacity="0.75"/>
+  <!-- Interactive Mast Group: tengen -->
+  <g class="mast-group" data-id="tengen">
+    <title>🇩🇪 Tengen / Kommingen (Hegau, Baden-Württemberg)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 Koordinaten: 47.8180° N, 8.5520° E • ~680 m ü. M.
+📏 Distanz / Peilung: 5.57 km • 343° (NNW) vom RandeLab
+🏢 Netzbetreiber: 1+1 Mobilfunk (262 23) &amp; Telefónica o2 (262 03)
+📡 Frequenzen: 1+1 5G Band n78 (C-Band) • o2 LTE Band 20 &amp; Band 1
+🔬 HF-Charakteristik: Sendet über den Hegau-Kamm nach Süden
+💡 Besonderheit: 1+1 nutzt modernstes europäisches Open-RAN Netz</title>
+    <line class="mast-leader-line" x1="427.0" y1="230.0" x2="305.0" y2="104.0" stroke="#8b5cf6" stroke-width="1.2" stroke-opacity="0.55"/>
+    <circle cx="305.0" cy="104.0" r="2.5" fill="#8b5cf6"/>
+    <circle class="mast-marker-halo" cx="427.0" cy="230.0" r="15" fill="#8b5cf6" fill-opacity="0.22" stroke="#8b5cf6" stroke-width="1.5"/>
+    <circle cx="427.0" cy="230.0" r="5.5" fill="#8b5cf6" stroke="#ffffff" stroke-width="1.5"/>
+    <g filter="url(#card-shadow)">
+      <rect class="mast-card-bg" x="30" y="70" width="275" height="68" rx="6" fill="#0f172a" fill-opacity="0.94" stroke="#8b5cf6" stroke-width="1.4"/>
+      <text x="40" y="89" fill="#ffffff" font-size="11.5" font-weight="bold">🇩🇪 Tengen / Kommingen (Hegau)</text>
+      <text x="40" y="106" fill="#8b5cf6" font-size="10" font-weight="600">1+1 (262 23) &amp; o2 - de (262 03)</text>
+      <text x="40" y="123" fill="#94a3b8" font-size="9">5.57 km • 343° (NNW) • 🇩🇪 1+1 5G Open-RAN &amp; o2 über Hegau</text>
+    </g>
+    <g class="mast-flyout flyout-down" filter="url(#flyout-shadow)">
+      <rect x="30" y="142" width="275" height="112" rx="6" fill="#090d16" fill-opacity="0.97" stroke="#8b5cf6" stroke-width="1.3"/>
+      <text x="40" y="160" fill="#8b5cf6" font-size="10" font-weight="bold">🔬 HF-DETAIL &amp; SPEZIFIKATION</text>
+      <text x="40" y="178" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">Frequenzen:</tspan> 1+1 n78 (3.5 GHz) • o2 LTE B20/B1</text>
+      <text x="40" y="196" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">Topologie:</tspan> 5.57 km NNW • Einstrahlung über Hegau-Kämme</text>
+      <text x="40" y="214" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">Besonderheit:</tspan> Neuestes deutsches 5G-Kernnetz (Open-RAN)</text>
+      <text x="40" y="232" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">Status:</tspan> Empfangbar mit hoher Antennenposition</text>
+    </g>
   </g>
-  <circle cx="584.3" cy="698.2" r="15" fill="#10b981" fill-opacity="0.25" stroke="#10b981" stroke-width="1.5"/>
-  <circle cx="584.3" cy="698.2" r="6" fill="#10b981" stroke="#ffffff" stroke-width="1.5"/>
-  <line x1="584.3" y1="698.2" x2="742.5" y2="706.0" stroke="#10b981" stroke-width="1" stroke-opacity="0.5"/>
-  <!-- Card for randen_b8 -->
-  <g filter="url(#card-shadow)">
-    <rect x="600.0" y="675.0" width="285" height="62" rx="6" fill="#0f172a" fill-opacity="0.94" stroke="#10b981" stroke-width="1.5"/>
-    <text x="610.0" y="693.0" fill="#ffffff" font-size="12" font-weight="bold">🇨🇭 Zelle Randen (900 MHz)</text>
-    <text x="610.0" y="710.0" fill="#10b981" font-size="10" font-weight="600">Salt / GoMo • LTE Band 8</text>
-    <text x="610.0" y="726.0" fill="#94a3b8" font-size="9">0.78 km • 150° (SSE) • 🔋 Ruhe-Anker: -81 dBm (10 MHz) • 9.7 / 14.9 Mbit/s</text>
+  <!-- Interactive Mast Group: wiechs -->
+  <g class="mast-group" data-id="wiechs">
+    <title>🇩🇪 Wiechs am Randen (Baden-Württemberg)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 Koordinaten: 47.8050° N, 8.5860° E • ~700 m ü. M.
+📏 Distanz / Peilung: 3.99 km • 13° (NNE) vom RandeLab
+🏢 Netzbetreiber: Telekom Deutschland (262 01) &amp; Vodafone (262 02)
+📡 Funkstandard: 5G NR (n28 700 MHz &amp; n78 3.5 GHz) + LTE B8/B20
+📶 Signalstärke: Direkter Grenzübertritt; beide Netze im 3GPP-Scan sichtbar
+💡 Highlight: Mit deutscher SIM (Telekom) volles Flatrate-Inlandsvolumen!</title>
+    <line class="mast-leader-line" x1="625.1" y1="342.7" x2="557.0" y2="138.0" stroke="#ef4444" stroke-width="1.2" stroke-opacity="0.55"/>
+    <circle cx="557.0" cy="138.0" r="2.5" fill="#ef4444"/>
+    <circle class="mast-marker-halo" cx="625.1" cy="342.7" r="15" fill="#ef4444" fill-opacity="0.22" stroke="#ef4444" stroke-width="1.5"/>
+    <circle cx="625.1" cy="342.7" r="5.5" fill="#ef4444" stroke="#ffffff" stroke-width="1.5"/>
+    <g filter="url(#card-shadow)">
+      <rect class="mast-card-bg" x="420" y="70" width="275" height="68" rx="6" fill="#0f172a" fill-opacity="0.94" stroke="#ef4444" stroke-width="1.4"/>
+      <text x="430" y="89" fill="#ffffff" font-size="11.5" font-weight="bold">🇩🇪 Wiechs am Randen (Baden-Württ.)</text>
+      <text x="430" y="106" fill="#ef4444" font-size="10" font-weight="600">Telekom.de (262 01) &amp; Vodafone (262 02)</text>
+      <text x="430" y="123" fill="#94a3b8" font-size="9">3.99 km • 13° (NNE) • 🇩🇪 DE Grenz-Overspill: 5G NR direkt empfangen!</text>
+    </g>
+    <g class="mast-flyout flyout-down" filter="url(#flyout-shadow)">
+      <rect x="420" y="142" width="275" height="112" rx="6" fill="#090d16" fill-opacity="0.97" stroke="#ef4444" stroke-width="1.3"/>
+      <text x="430" y="160" fill="#ef4444" font-size="10" font-weight="bold">🔬 HF-DETAIL &amp; SPEZIFIKATION</text>
+      <text x="430" y="178" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">Frequenzen:</tspan> Telekom 5G n28/n78 • B8/B20 | Vodafone 5G</text>
+      <text x="430" y="196" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">Topologie:</tspan> 3.99 km NNE • Weitbereichs-Mast im Hegau</text>
+      <text x="430" y="214" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">SIM-Option:</tspan> Deutsche SIM gilt hier als Inland (kein Roaming!)</text>
+      <text x="430" y="232" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">Praxis:</tspan> Perfekter Ausfallschutz bei Schweizer Störungen</text>
+    </g>
   </g>
-  <circle cx="654.2" cy="745.9" r="15" fill="#06b6d4" fill-opacity="0.25" stroke="#06b6d4" stroke-width="1.5"/>
-  <circle cx="654.2" cy="745.9" r="6" fill="#06b6d4" stroke="#ffffff" stroke-width="1.5"/>
-  <line x1="654.2" y1="745.9" x2="832.5" y2="786.0" stroke="#06b6d4" stroke-width="1" stroke-opacity="0.5"/>
-  <!-- Card for merishausen -->
-  <g filter="url(#card-shadow)">
-    <rect x="675.0" y="755.0" width="315" height="62" rx="6" fill="#0f172a" fill-opacity="0.94" stroke="#06b6d4" stroke-width="1.5"/>
-    <text x="685.0" y="773.0" fill="#ffffff" font-size="12" font-weight="bold">🇨🇭 Mast Merishausen Südhang</text>
-    <text x="685.0" y="790.0" fill="#06b6d4" font-size="10" font-weight="600">Salt / GoMo • LTE B3 (20 MHz) + 5G N1/N78</text>
-    <text x="685.0" y="806.0" fill="#94a3b8" font-size="9">1.82 km • 135° (SE) • 🏆 High-Speed Sieger: 44.8 Mbit/s | -93 dBm | SINR 11 dB</text>
+  <!-- Interactive Mast Group: bargen -->
+  <g class="mast-group" data-id="bargen">
+    <title>🇨🇭 Mast Bargen (A4-Verkehrsachse / Randen Osthang)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 Koordinaten: 47.7890° N, 8.6045° E • ~645 m ü. M.
+📏 Distanz / Peilung: 3.11 km • 48° (NE) vom RandeLab
+🏢 Netzbetreiber: Salt Schweiz / GoMo (228 03)
+📡 Frequenz: LTE Band 20 (800 MHz, 10 MHz Bandbreite)
+🚀 Durchsatz-Messung: 14.33 Mbit/s Down / 54.84 Mbit/s Upload!
+🌲 Geländebeschaffenheit: Signal durchdringt 2.5 km dichten Randen-Mischwald
+💡 Phänomen: Enorm hoher Upload dank minimaler Störer auf 800 MHz</title>
+    <line class="mast-leader-line" x1="732.8" y1="481.5" x2="867.0" y2="248.0" stroke="#ec4899" stroke-width="1.2" stroke-opacity="0.55"/>
+    <circle cx="867.0" cy="248.0" r="2.5" fill="#ec4899"/>
+    <circle class="mast-marker-halo" cx="732.8" cy="481.5" r="15" fill="#ec4899" fill-opacity="0.22" stroke="#ec4899" stroke-width="1.5"/>
+    <circle cx="732.8" cy="481.5" r="5.5" fill="#ec4899" stroke="#ffffff" stroke-width="1.5"/>
+    <g filter="url(#card-shadow)">
+      <rect class="mast-card-bg" x="725" y="180" width="285" height="68" rx="6" fill="#0f172a" fill-opacity="0.94" stroke="#ec4899" stroke-width="1.4"/>
+      <text x="735" y="199" fill="#ffffff" font-size="11.5" font-weight="bold">🇨🇭 Mast Bargen (A4-Korridor)</text>
+      <text x="735" y="216" fill="#ec4899" font-size="10" font-weight="600">Salt / GoMo • LTE Band 20 (800 MHz)</text>
+      <text x="735" y="233" fill="#94a3b8" font-size="9">3.11 km • 48° (NE) • 🌲 Reichweiten-König: 14.3 / 54.8 Mbit/s • -88 dBm</text>
+    </g>
+    <g class="mast-flyout flyout-down" filter="url(#flyout-shadow)">
+      <rect x="725" y="252" width="285" height="112" rx="6" fill="#090d16" fill-opacity="0.97" stroke="#ec4899" stroke-width="1.3"/>
+      <text x="735" y="270" fill="#ec4899" font-size="10" font-weight="bold">🔬 HF-DETAIL &amp; SPEZIFIKATION</text>
+      <text x="735" y="288" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">Frequenz &amp; Band:</tspan> LTE Band 20 (800 MHz) • 10 MHz Bandbreite</text>
+      <text x="735" y="306" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">Performance:</tspan> ⬇️ 14.33 Mbit/s | ⬆️ 54.84 Mbit/s Uplink!</text>
+      <text x="735" y="324" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">HF-Vorteil:</tspan> Sub-1GHz durchdringt 2.5 km geschlossenen Wald</text>
+      <text x="735" y="342" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">Empfehlung:</tspan> Bester Backup-Träger bei extremem Schlechtwetter</text>
+    </g>
   </g>
-  <circle cx="732.8" cy="481.5" r="15" fill="#ec4899" fill-opacity="0.25" stroke="#ec4899" stroke-width="1.5"/>
-  <circle cx="732.8" cy="481.5" r="6" fill="#ec4899" stroke="#ffffff" stroke-width="1.5"/>
-  <line x1="732.8" y1="481.5" x2="890.0" y2="476.0" stroke="#ec4899" stroke-width="1" stroke-opacity="0.5"/>
-  <!-- Card for bargen -->
-  <g filter="url(#card-shadow)">
-    <rect x="750.0" y="445.0" width="280" height="62" rx="6" fill="#0f172a" fill-opacity="0.94" stroke="#ec4899" stroke-width="1.5"/>
-    <text x="760.0" y="463.0" fill="#ffffff" font-size="12" font-weight="bold">🇨🇭 Mast Bargen (A4-Korridor)</text>
-    <text x="760.0" y="480.0" fill="#ec4899" font-size="10" font-weight="600">Salt / GoMo • LTE Band 20 (800 MHz)</text>
-    <text x="760.0" y="496.0" fill="#94a3b8" font-size="9">3.11 km • 48° (NE) • 🌲 Reichweiten-König: 14.3 / 54.8 Mbit/s • -88 dBm durch Wald</text>
+  <!-- Interactive Mast Group: hagenturm -->
+  <g class="mast-group" data-id="hagenturm">
+    <title>🏔️ Hagenturm (912 m ü. M.) • Höchster Punkt Kanton Schaffhausen
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 Exakte Koordinaten: 47.77404° N, 8.56757° E • 912 m ü. M.
+📏 Distanz / Peilung: Nur 639.3 m • 313.3° (NW) direkt neben RandeLab!
+🏢 Netzbetreiber: Swisscom (228 01) &amp; Sunrise (228 02)
+📡 Funkstandard: 4G LTE &amp; 5G NR n78 (3.5 GHz C-Band)
+🔭 Sichtlinie: Perfekte optische Sichtverbindung ohne jede Geländebarre!
+📶 Signalpotenzial: RSRP bis zu -62 dBm, SINR > +22 dB
+🚀 Möglicher Durchsatz: 180 – 300 Mbit/s (Keine Walddämpfung!)
+💡 Upgrade-Tipp: Bei Wechsel zu Swisscom/Sunrise maximale Signalstärke.</title>
+    <line class="mast-leader-line" x1="517.7" y1="611.2" x2="335.0" y2="504.0" stroke="#f59e0b" stroke-width="1.2" stroke-opacity="0.55"/>
+    <circle cx="335.0" cy="504.0" r="2.5" fill="#f59e0b"/>
+    <circle class="mast-marker-halo" cx="517.7" cy="611.2" r="15" fill="#f59e0b" fill-opacity="0.22" stroke="#f59e0b" stroke-width="1.5"/>
+    <circle cx="517.7" cy="611.2" r="5.5" fill="#f59e0b" stroke="#ffffff" stroke-width="1.5"/>
+    <g filter="url(#card-shadow)">
+      <rect class="mast-card-bg" x="30" y="470" width="305" height="68" rx="6" fill="#0f172a" fill-opacity="0.94" stroke="#f59e0b" stroke-width="1.4"/>
+      <text x="40" y="489" fill="#ffffff" font-size="11.5" font-weight="bold">🇨🇭 Hagenturm (912 m ü. M.)</text>
+      <text x="40" y="506" fill="#f59e0b" font-size="10" font-weight="600">Swisscom (228 01) &amp; Sunrise (228 02)</text>
+      <text x="40" y="523" fill="#94a3b8" font-size="9">0.64 km • 313° (NW) • 🏔️ Höchster Punkt Kanton SH • 640 m NW vom RandeLab!</text>
+    </g>
+    <g class="mast-flyout flyout-up" filter="url(#flyout-shadow)">
+      <rect x="30" y="350" width="305" height="115" rx="6" fill="#090d16" fill-opacity="0.97" stroke="#f59e0b" stroke-width="1.3"/>
+      <text x="40" y="368" fill="#f59e0b" font-size="10" font-weight="bold">🔬 HF-DETAIL &amp; SPEZIFIKATION</text>
+      <text x="40" y="386" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">Standort &amp; Turm:</tspan> 40 m Stahlfachwerkturm • 912 m ü. M. (SH-Peak)</text>
+      <text x="40" y="404" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">HF-Bedingungen:</tspan> 100% freie Sichtlinie (LOS) über Waldkronen</text>
+      <text x="40" y="422" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">Bänder &amp; Funk:</tspan> Swisscom/Sunrise: LTE B3/B20/B1 &amp; 5G N78 (3.5G)</text>
+      <text x="40" y="440" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">Potenzial:</tspan> RSRP -62 dBm | SINR &gt;20 dB | &gt;180–300 Mbit/s möglich</text>
+    </g>
   </g>
-  <circle cx="625.1" cy="342.7" r="15" fill="#ef4444" fill-opacity="0.25" stroke="#ef4444" stroke-width="1.5"/>
-  <circle cx="625.1" cy="342.7" r="6" fill="#ef4444" stroke="#ffffff" stroke-width="1.5"/>
-  <line x1="625.1" y1="342.7" x2="782.5" y2="281.0" stroke="#ef4444" stroke-width="1" stroke-opacity="0.5"/>
-  <!-- Card for wiechs -->
-  <g filter="url(#card-shadow)">
-    <rect x="640.0" y="250.0" width="285" height="62" rx="6" fill="#0f172a" fill-opacity="0.94" stroke="#ef4444" stroke-width="1.5"/>
-    <text x="650.0" y="268.0" fill="#ffffff" font-size="12" font-weight="bold">🇩🇪 Wiechs am Randen (Baden-Württ.)</text>
-    <text x="650.0" y="285.0" fill="#ef4444" font-size="10" font-weight="600">Telekom.de (262 01) &amp; Vodafone (262 02)</text>
-    <text x="650.0" y="301.0" fill="#94a3b8" font-size="9">3.99 km • 13° (NNE) • 🇩🇪 DE Grenz-Overspill: 5G NR direkt empfangen!</text>
+  <!-- Interactive Mast Group: merishausen -->
+  <g class="mast-group" data-id="merishausen">
+    <title>🇨🇭 Mast Merishausen Südhang (eNodeB Korridor)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 Koordinaten: 47.7585° N, 8.5910° E • ~620 m ü. M.
+📏 Distanz / Peilung: 1.82 km • 135° (SE) vom RandeLab
+🏢 Netzbetreiber: Salt Schweiz / GoMo (228 03)
+📡 Frequenzen: LTE Band 3 (1800 MHz 20MHz) + 5G NR n1 (2100) + n78 (3500)
+🏆 High-Speed Rekord: 44.78 Mbit/s Down / 83.16 Mbit/s Upload (Nacht 02:09)
+🌧️ Mikroklima: Nasses Blätterdach dämpft 1.8–2.1 GHz (SINR sinkt auf -3 dB)
+💡 Antennen-Tipp: 4x4 MIMO Richtantenne blendet Waldreflexionen aus (+9 dBi)</title>
+    <line class="mast-leader-line" x1="654.2" y1="745.9" x2="725.0" y2="764.0" stroke="#06b6d4" stroke-width="1.2" stroke-opacity="0.55"/>
+    <circle cx="725.0" cy="764.0" r="2.5" fill="#06b6d4"/>
+    <circle class="mast-marker-halo" cx="654.2" cy="745.9" r="15" fill="#06b6d4" fill-opacity="0.22" stroke="#06b6d4" stroke-width="1.5"/>
+    <circle cx="654.2" cy="745.9" r="5.5" fill="#06b6d4" stroke="#ffffff" stroke-width="1.5"/>
+    <g filter="url(#card-shadow)">
+      <rect class="mast-card-bg" x="725" y="730" width="290" height="68" rx="6" fill="#0f172a" fill-opacity="0.94" stroke="#06b6d4" stroke-width="1.4"/>
+      <text x="735" y="749" fill="#ffffff" font-size="11.5" font-weight="bold">🇨🇭 Mast Merishausen Südhang</text>
+      <text x="735" y="766" fill="#06b6d4" font-size="10" font-weight="600">Salt / GoMo • LTE B3 (20 MHz) + 5G N1/N78</text>
+      <text x="735" y="783" fill="#94a3b8" font-size="9">1.82 km • 135° (SE) • 🏆 High-Speed Sieger: 44.8 Mbit/s | -93 dBm | SINR 11 dB</text>
+    </g>
+    <g class="mast-flyout flyout-down" filter="url(#flyout-shadow)">
+      <rect x="725" y="802" width="290" height="112" rx="6" fill="#090d16" fill-opacity="0.97" stroke="#06b6d4" stroke-width="1.3"/>
+      <text x="735" y="820" fill="#06b6d4" font-size="10" font-weight="bold">🔬 HF-DETAIL &amp; SPEZIFIKATION</text>
+      <text x="735" y="838" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">Trägerfrequenzen:</tspan> LTE B3 (1800 20MHz) + 5G N1 (2100) + 5G N78 (3.5G)</text>
+      <text x="735" y="856" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">Nacht-Benchmark:</tspan> ⬇️ 44.78 Mbit/s | ⬆️ 83.16 Mbit/s | SINR +11 dB</text>
+      <text x="735" y="874" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">Wetterdämpfung:</tspan> Bei Herbstnebel/Regen sinkt SINR auf -3 dB</text>
+      <text x="735" y="892" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">Empfehlung:</tspan> 4x4 MIMO Richtantenne stabilisiert dauerhaft &gt;50M</text>
+    </g>
   </g>
-  <circle cx="427.0" cy="230.0" r="15" fill="#8b5cf6" fill-opacity="0.25" stroke="#8b5cf6" stroke-width="1.5"/>
-  <circle cx="427.0" cy="230.0" r="6" fill="#8b5cf6" stroke="#ffffff" stroke-width="1.5"/>
-  <line x1="427.0" y1="230.0" x2="282.5" y2="226.0" stroke="#8b5cf6" stroke-width="1" stroke-opacity="0.5"/>
-  <!-- Card for tengen -->
-  <g filter="url(#card-shadow)">
-    <rect x="140.0" y="195.0" width="285" height="62" rx="6" fill="#0f172a" fill-opacity="0.94" stroke="#8b5cf6" stroke-width="1.5"/>
-    <text x="150.0" y="213.0" fill="#ffffff" font-size="12" font-weight="bold">🇩🇪 Tengen / Kommingen (Hegau)</text>
-    <text x="150.0" y="230.0" fill="#8b5cf6" font-size="10" font-weight="600">1+1 (262 23) &amp; o2 - de (262 03)</text>
-    <text x="150.0" y="246.0" fill="#94a3b8" font-size="9">5.57 km • 343° (NNW) • 🇩🇪 Neues 1+1 5G Kernnetz &amp; o2 LTE über Hegau-Kamm</text>
+  <!-- Interactive Mast Group: randen_b8 -->
+  <g class="mast-group" data-id="randen_b8">
+    <title>🇨🇭 Zelle Randen (LTE Band 8 • 900 MHz)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 Koordinaten: 47.7640° N, 8.5790° E • ~830 m ü. M.
+📏 Distanz / Peilung: 0.78 km • 150° (SSE) vom RandeLab
+🏢 Netzbetreiber: Salt Schweiz / GoMo (Cell ID: 23669005, PCID: 107)
+📡 Frequenz: LTE Band 8 (900 MHz, 10 MHz Bandbreite)
+📶 Aktuelle Live-Werte: RSRP -81 dBm • SINR +5 dB • Signalqualität 57%
+🔋 Funktion: Primärer Ruhe-Anker; schont Strom &amp; hält stabilen Uplink
+⚡ Dynamische Carrier Aggregation: Schaltet bei Speedtest sofort 5G N78 zu!</title>
+    <line class="mast-leader-line" x1="584.3" y1="698.2" x2="542.0" y2="860.0" stroke="#10b981" stroke-width="1.2" stroke-opacity="0.55"/>
+    <circle cx="542.0" cy="860.0" r="2.5" fill="#10b981"/>
+    <circle class="mast-marker-halo" cx="584.3" cy="698.2" r="15" fill="#10b981" fill-opacity="0.22" stroke="#10b981" stroke-width="1.5"/>
+    <circle cx="584.3" cy="698.2" r="5.5" fill="#10b981" stroke="#ffffff" stroke-width="1.5"/>
+    <g filter="url(#card-shadow)">
+      <rect class="mast-card-bg" x="400" y="860" width="285" height="68" rx="6" fill="#0f172a" fill-opacity="0.94" stroke="#10b981" stroke-width="1.4"/>
+      <text x="410" y="879" fill="#ffffff" font-size="11.5" font-weight="bold">🇨🇭 Zelle Randen (900 MHz)</text>
+      <text x="410" y="896" fill="#10b981" font-size="10" font-weight="600">Salt / GoMo • LTE Band 8 (10 MHz)</text>
+      <text x="410" y="913" fill="#94a3b8" font-size="9">0.78 km • 150° (SSE) • 🔋 Ruhe-Anker: -81 dBm (10 MHz) • 9.7 / 14.9 Mbit/s</text>
+    </g>
+    <g class="mast-flyout flyout-up" filter="url(#flyout-shadow)">
+      <rect x="400" y="740" width="285" height="115" rx="6" fill="#090d16" fill-opacity="0.97" stroke="#10b981" stroke-width="1.3"/>
+      <text x="410" y="758" fill="#10b981" font-size="10" font-weight="bold">🔬 HF-DETAIL &amp; SPEZIFIKATION</text>
+      <text x="410" y="776" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">Träger &amp; Zelle:</tspan> LTE Band 8 (900 MHz) • Cell ID: 23669005 (TAC 40120)</text>
+      <text x="410" y="794" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">Aktueller Empfang:</tspan> RSRP -81 dBm (sehr stark) • SINR +5 dB • Güte 57%</text>
+      <text x="410" y="812" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">Scheduler-Rolle:</tspan> Automatischer Ruhe-Anker (Idle Carrier) des TRB500</text>
+      <text x="410" y="830" fill="#cbd5e1" font-size="9"><tspan fill="#ffffff" font-weight="bold">Dynamik:</tspan> Bei Datenlast schaltet Modem sofort auf B3 + 5G N78 um</text>
+    </g>
   </g>
-  <!-- RandeLab Central Station -->
-  <circle cx="554.0" cy="645.3" r="32" fill="#06b6d4" fill-opacity="0.2" stroke="#06b6d4" stroke-width="2" stroke-dasharray="3 3"/>
-  <circle cx="554.0" cy="645.3" r="18" fill="#ec4899" fill-opacity="0.35" stroke="#ec4899" stroke-width="2"/>
-  <circle cx="554.0" cy="645.3" r="7" fill="#fbbf24" stroke="#ffffff" stroke-width="2"/>
-  <line x1="554.0" y1="645.3" x2="389.0" y2="680.3" stroke="#38bdf8" stroke-width="1.5" stroke-opacity="0.6"/>
-  <g filter="url(#card-shadow)">
-    <rect x="244.0" y="680.3" width="290" height="78" rx="8" fill="#0f172a" fill-opacity="0.96" stroke="#38bdf8" stroke-width="2"/>
-    <text x="256.0" y="702.3" fill="#38bdf8" font-size="13.5" font-weight="bold">📍 RANDELAB OBSERVATORIUM</text>
-    <text x="256.0" y="720.3" fill="#facc15" font-size="11" font-weight="bold">Höhe: 857 m ü. M. • Underes Ätzisloo 189</text>
-    <text x="256.0" y="736.3" fill="#e2e8f0" font-size="9.5">📡 Teltonika TRB500 (Qualcomm Snapdragon X55)</text>
-    <text x="256.0" y="750.3" fill="#94a3b8" font-size="9">⚡ ESP32-S3 (24/7 Autark direkt an 12V Batterie)</text>
+
+  <!-- RandeLab Central Station Group -->
+  <g class="mast-group" data-id="randelab">
+    <title>📍 RandeLab Observatorium &amp; Autarkes Solar-Inselnetz (857 m ü. M.)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏠 Gebäude: Underes Ätzisloo 189, 8232 Merishausen / Randen
+🌍 Koordinaten: 47.7701° N, 8.5738° E • Höhe: 857 m ü. M. (Amtl. GWR)
+📡 5G Gateway: Teltonika TRB500 Industrial CPE (Qualcomm Snapdragon X55)
+⚡ Microcontroller: ESP32-S3 (randesolar.local) • 24/7 autark an 12V-Batterie
+🔋 Batteriebank: 4x VOLTIC DIN 595 parallel (380 Ah @ 12V = 4.56 kWh Brutto)
+🔀 230V Umschalter (1-0-2): RDDSPON 6000W Inverter vs. Schuppen-Generator
+🔌 Schweizer T13 Hausnetz (SEV 1011) versorgt TRB500 &amp; TP-Link Omada AP
+💾 Flash-Speicher: 35'000 Offline-Messungen (48 Tage Pufferung bei Stromausfall)</title>
+
+    <!-- Pulsing Central Marker -->
+    <circle class="mast-marker-halo" cx="554.0" cy="645.3" r="32" fill="#06b6d4" fill-opacity="0.22" stroke="#06b6d4" stroke-width="2" stroke-dasharray="3 3"/>
+    <circle cx="554.0" cy="645.3" r="18" fill="#ec4899" fill-opacity="0.35" stroke="#ec4899" stroke-width="2"/>
+    <circle cx="554.0" cy="645.3" r="7" fill="#fbbf24" stroke="#ffffff" stroke-width="2"/>
+
+    <!-- Leader Line to RandeLab Card (345, 662) -->
+    <line class="mast-leader-line" x1="554.0" y1="645.3" x2="345" y2="662" stroke="#38bdf8" stroke-width="1.5" stroke-opacity="0.65"/>
+    <circle cx="345" cy="662" r="3" fill="#38bdf8"/>
+
+    <!-- Main RandeLab Card -->
+    <g filter="url(#card-shadow)">
+      <rect class="mast-card-bg" x="30" y="620" width="315" height="84" rx="8" fill="#0f172a" fill-opacity="0.96" stroke="#38bdf8" stroke-width="2"/>
+      <text x="42" y="642" fill="#38bdf8" font-size="13.5" font-weight="bold">📍 RANDELAB OBSERVATORIUM</text>
+      <text x="42" y="660" fill="#facc15" font-size="11" font-weight="bold">Höhe: 857 m ü. M. • Underes Ätzisloo 189</text>
+      <text x="42" y="676" fill="#e2e8f0" font-size="9.5">📡 Teltonika TRB500 (Qualcomm Snapdragon X55)</text>
+      <text x="42" y="691" fill="#94a3b8" font-size="9">⚡ ESP32-S3 (24/7 Autark direkt an 12V Batterie)</text>
+    </g>
+
+    <!-- Hover Flyout for RandeLab (opens DOWNWARD at y: 708) -->
+    <g class="mast-flyout flyout-down" filter="url(#flyout-shadow)">
+      <rect x="30" y="708" width="315" height="120" rx="8" fill="#090d16" fill-opacity="0.97" stroke="#38bdf8" stroke-width="1.4"/>
+      <text x="42" y="728" fill="#38bdf8" font-size="10.5" font-weight="bold">⚙️ AUTARKE SYSTEM-TOPOLOGIE</text>
+      <text x="42" y="746" fill="#cbd5e1" font-size="9">• <tspan fill="#ffffff" font-weight="bold">Duale 230V Speisung:</tspan> 6000W Inverter &amp; Schuppen-Generator</text>
+      <text x="42" y="763" fill="#cbd5e1" font-size="9">• <tspan fill="#ffffff" font-weight="bold">1-0-2 Schalter:</tspan> Speist Schweizer T13 Hausnetz &amp; beide Router</text>
+      <text x="42" y="780" fill="#cbd5e1" font-size="9">• <tspan fill="#ffffff" font-weight="bold">12V Direktabgriff:</tspan> ESP32 loggt 24/7 auch bei 230V AUS (&lt;0.5W)</text>
+      <text x="42" y="797" fill="#cbd5e1" font-size="9">• <tspan fill="#ffffff" font-weight="bold">LittleFS Puffer:</tspan> 35'000 Datensätze (48 Tage autark)</text>
+      <text x="42" y="814" fill="#facc15" font-size="8.5">🌐 Live Web-OTA, ubus JSON-RPC &amp; MQTT HiveMQ Stream</text>
+    </g>
   </g>
+
+
   <!-- Compass Rose -->
   <g transform="translate(985, 71)">
     <circle cx="0" cy="0" r="28" fill="#0f172a" fill-opacity="0.85" stroke="#475569" stroke-width="1.5"/>
@@ -204,6 +417,8 @@
     <text x="32" y="3" text-anchor="middle" fill="#94a3b8" font-size="9">O</text>
     <text x="-32" y="3" text-anchor="middle" fill="#94a3b8" font-size="9">W</text>
   </g>
+
+
   <!-- Scale Bar -->
   <g transform="translate(40, 1010)">
     <rect x="-8" y="-18" width="179.6" height="32" rx="4" fill="#0f172a" fill-opacity="0.85" stroke="#334155"/>
@@ -214,8 +429,9 @@
     <text x="0" y="-8" fill="#ffffff" font-size="9" text-anchor="middle">0</text>
     <text x="77.8" y="-8" fill="#ffffff" font-size="9" text-anchor="middle">1 km</text>
     <text x="155.6" y="-8" fill="#ffffff" font-size="9" text-anchor="middle">2 km</text>
-    <text x="77.8" y="10" fill="#94a3b8" font-size="8" text-anchor="middle">OpenStreetMap Cartography &amp; Swisstopo Border</text>
+    <text x="77.8" y="10" fill="#94a3b8" font-size="8" text-anchor="middle">OpenStreetMap &amp; Swisstopo Border</text>
   </g>
+
 </g>
 <rect x="16" y="16" width="1024" height="1024" rx="12" fill="none" stroke="#334155" stroke-width="2"/>
 <g transform="translate(1056, 16)">
@@ -228,7 +444,8 @@
   </g>
 
 
-  <g transform="translate(18, 76)">
+  <g class="sidebar-row" transform="translate(18, 76)">
+    <title>3GPP Grenzscan: Empfangene Mobilfunknetze an der Grenze SH / BW</title>
     <rect x="0" y="0" width="332" height="185" rx="8" fill="#1e293b" fill-opacity="0.65" stroke="#334155" stroke-width="1"/>
     <text x="12" y="20" fill="#facc15" font-size="12" font-weight="bold">📡 3GPP-Grenzscan (MCC 228 &amp; 262)</text>
     <text x="12" y="36" fill="#94a3b8" font-size="9.5">Empfangene Mobilfunknetze über den Randen-Kamm:</text>
@@ -245,7 +462,8 @@
   </g>
 
 
-  <g transform="translate(18, 276)">
+  <g class="sidebar-row" transform="translate(18, 276)">
+    <title>Masten-Olympiade: Vergleich aller Frequenzen und Signalqualitäten</title>
     <rect x="0" y="0" width="332" height="215" rx="8" fill="#1e293b" fill-opacity="0.65" stroke="#334155" stroke-width="1"/>
     <text x="12" y="20" fill="#38bdf8" font-size="12" font-weight="bold">🏆 Masten-Olympiade &amp; Frequenzen</text>
     
@@ -264,13 +482,14 @@
     <text x="18" y="144" fill="#f59e0b" font-size="11" font-weight="bold">Hagenturm (912 m ü. M.) - 640 m NW</text>
     <text x="18" y="160" fill="#e2e8f0" font-size="9.5">Swisscom &amp; Sunrise 4G/5G | Direkte Sichtlinie</text>
 
-    <!-- Table Row 4: Band 8 & 78 -->
+    <!-- Table Row 4: Band 8 &amp; 78 -->
     <rect x="10" y="176" width="312" height="32" rx="4" fill="#0f172a" stroke="#10b981" stroke-dasharray="3 2"/>
     <text x="18" y="196" fill="#10b981" font-size="9.5">Band 8 (-81 dBm) im Idle • 5G N78 schaltet bei Last zu!</text>
   </g>
 
 
-  <g transform="translate(18, 506)">
+  <g class="sidebar-row" transform="translate(18, 506)">
+    <title>Antennen-Praxis: Warum eine 4x4 MIMO Richtantenne bei Nebel und Regen hilft</title>
     <rect x="0" y="0" width="332" height="210" rx="8" fill="#1e293b" fill-opacity="0.65" stroke="#334155" stroke-width="1"/>
     <text x="12" y="20" fill="#ec4899" font-size="12" font-weight="bold">📡 Antennen-Upgrade-Praxis</text>
     
@@ -291,7 +510,8 @@
   </g>
 
 
-  <g transform="translate(18, 730)">
+  <g class="sidebar-row" transform="translate(18, 730)">
+    <title>Stromversorgung &amp; Grenz-SIM Details</title>
     <rect x="0" y="0" width="332" height="270" rx="8" fill="#1e293b" fill-opacity="0.65" stroke="#334155" stroke-width="1"/>
     <text x="12" y="20" fill="#10b981" font-size="12" font-weight="bold">⚡ Duale Stromversorgung &amp; Grenz-SIM</text>
 
