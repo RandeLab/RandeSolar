@@ -169,9 +169,60 @@ Messungen im Live-Betrieb (November 2026) deckten das dynamische Band-Scheduling
 
 ## 5. Speed-Tuning: Frequenzband- & Funkzellen-Optimierung
 
-Im Teltonika TRB500 lässt sich über **Network → Mobile → Band Selection** die automatische Frequenzwahl auf manuelle Band- und Zellensteuerung umstellen. Folgende Hebel stehen zur Verfügung:
+### 5.1 Praxisbericht & Feldversuch: Die „Band 8 Falle“ & Lösung durch manuelles Band-Locking (November 2026) 💡
 
-### 5.1 Frequenzbänder von Salt Schweiz
+Im Live-Laborbetrieb am Randen trat ein lehrreiches Phänomen auf, das die Tücken automatischer Mobilfunk-Algorithmen im Waldgebiet perfekt illustriert:
+
+#### Das Problem: Unerwarteter Einbruch auf ~1.5 Mbit/s
+Obwohl der Teltonika TRB500 guten Empfang (`58% Good`, RSRP `-81 dBm`) und `5G (NSA)` anzeigte, brach die gemessene Geschwindigkeit dramatisch ein:
+* **Download:** nur noch **`1.53 – 2.47 Mbit/s`**
+* **Upload:** nur noch **`5.41 – 13.66 Mbit/s`**
+* **Carrier Aggregation:** **`Inactive`**
+
+#### Warum ein Neustart (`Restart connection`) wirkungslos blieb:
+Ein manueller Klick auf den blauen Button `Restart connection` im Statusmenü startete die Verbindung zwar in wenigen Sekunden neu, das Modem buchte sich aber **sofort wieder exakt in dieselbe langsame Verbindung ein**.
+
+**Die HF-technische Ursache:**
+1. **Wald-Durchdringung:** Das tiefe 900-MHz-Signal (LTE Band 8) durchdringt das dichte Laub und die Baumstämme mit minimaler Dämpfung. Es erreicht das RandeLab mit starken **`-81 dBm`**.
+2. **Die Algorithmus-Falle:** Das automatische Zellwahlverfahren des Quectel RG501Q Modems sortiert die verfügbaren Zellen primär nach Signalstärke (RSRP). Da das schnellere 1800-MHz-Signal (Band 3) durch das feuchte Geäst stärker gedämpft wird (RSRP `-93 dBm`), stuft das Modem die 900-MHz-Zelle fälschlicherweise als „besser“ ein.
+3. **Schmaler Flaschenhals:** Band 8 verfügt bei Salt nur über **10 MHz Kanalbandbreite** und unterstützt in dieser Zelle **kein Carrier Aggregation mit 5G**. Das gesamte Labor war auf diesem 10-MHz-Kanal gefangen.
+
+#### Die Lösung: Manuelles Band-Locking im RutOS WebUI
+
+Durch den gezielten Ausschluss von Band 8 wurde das Modem gezwungen, das etwas schwächere, aber viermal breitere 1800-MHz-Band mit 5G-Zusatzträger zu wählen.
+
+**Genaue Schritt-für-Schritt-Anleitung in RutOS 7 (TRB500):**
+1. WebUI aufrufen: `http://192.168.2.1` (Login: `admin`).
+2. Im Menü links navigieren zu: **`Network` ➔ `Mobile` ➔ `Connection`**  
+   *(Wichtig: Nicht unter Status suchen, sondern unter Network!)*
+3. **Achtung Stolperfalle:** 
+   * Zeile 2 ist `Preferred network type` (steht auf `5G/4G/3G auto` – so lassen!).
+   * Zwei Zeilen darunter (Zeile 4) befindet sich das eigenständige Feld **`Band selection`**.
+4. Dropdown **`Band selection`** von **`Auto`** auf **`Manual`** umstellen.
+5. In der aufklappenden Frequenzband-Liste:
+   * ❌ **Haken ENTFERNEN bei:** **`LTE B8`** (900 MHz) *(sperrt die langsame 10-MHz-Falle)*.
+   * ✅ **Haken AKTIV LASSEN bei:** **`LTE B3`** (1800 MHz), **`LTE B1`** (2100 MHz) sowie 5G **`N1`** und **`N78`**.
+6. Unten rechts auf den blauen Button **`Save & Apply`** klicken.
+
+#### Das reale Messergebnis nach dem Band-Locking:
+
+| Messwert / Parameter | Vorher (Automatisch auf Band 8) | **Nachher (Band-Locking auf B3 + 5G n1)** | Effekt |
+| :--- | :---: | :---: | :---: |
+| **Download** | `1.53 Mbit/s` | **`11.87 Mbit/s`** | **~8× schneller! 🚀** |
+| **Upload** | `5.41 Mbit/s` | **`58.80 Mbit/s`** | **>10× schneller! ⚡** |
+| **Carrier Aggregation** | *Inactive* | **`Active`** | **5G-Bündelung aktiv** |
+| **Funkkanal-Bandbreite** | nur `10 MHz` | **`20 MHz + 20 MHz (40 MHz)`** | **4× mehr Funkspektrum** |
+| **Verbundene Träger** | nur `LTE B8` | **`LTE B3 (1800) + 5G n1 (2100)`** | **Echtes 5G-NSA** |
+| **Zellen-ID** | `30556191` (Zelle Randen B8) | **`23667202` (High-Capacity Mast)** | Starker Hauptmast |
+| **Physical Cell ID (PCID)** | `107` | **`54 / 951` (Dual-Träger)** | Bündelung aktiv |
+
+> [!TIP]
+> **Erkenntnis für Off-Grid- & Waldstandorte:**  
+> Bei Mobilfunk-Routern im Wald niemals blind auf „Auto-Band“ vertrauen! Niedrige Frequenzen (700–900 MHz) täuschen hervorragende Empfangsbalken vor, haben aber oft minimale Bandbreite und keine 5G-Bündelung. Manuelles Band-Locking auf mittlere Frequenzen (1800–2100 MHz) schaltet echte Carrier Aggregation frei und vervielfacht den Durchsatz.
+
+---
+
+### 5.2 Frequenzbänder von Salt Schweiz
 
 Salt betreibt in der Schweiz folgende Mobilfunkbänder:
 
@@ -179,32 +230,32 @@ Salt betreibt in der Schweiz folgende Mobilfunkbänder:
 | :--- | :--- | :--- | :--- |
 | **B28 / N28** | **700 MHz** | 4G / 5G | **Extrem hohe Reichweite & Wald-Durchdringung.** Überwindet feuchtes Laub problemlos. Steigert den SINR oft auf über +10 dB! Bandbreite ca. 10–15 MHz. |
 | **B20** | **800 MHz** | 4G (LTE) | Hohe Reichweite, exzellente Gebäudedurchdringung, 10 MHz Bandbreite. |
-| **B8** | **900 MHz** | 4G (LTE) | Vorwiegend ländliche Grundversorgung. |
+| **B8** | **900 MHz** | 4G (LTE) | Vorwiegend ländliche Grundversorgung. *Achtung: Automatische Falle am Randen, da ohne 5G-Bündelung!* |
 | **B3** | **1800 MHz** | 4G (LTE) | *(Aktuell als Anker aktiv)* 20 MHz Bandbreite. Gute Standardkapazität, aber empfindlich für Laubdämpfung. |
 | **B1 / N1** | **2100 MHz** | 4G / 5G | *(Aktuell als 5G aktiv)* 20 MHz Bandbreite (Re-Farmed 4G). |
 | **B7** | **2600 MHz** | 4G (LTE) | Hohe Kapazität (20 MHz), schwache Durchdringung im Wald. |
 | **N78** | **3500 MHz** | **5G NR (C-Band)** | **Echtes High-Speed-5G.** 70 bis 100 MHz Bandbreite! Ermöglicht **150 bis 400+ Mbit/s**, benötigt aber Sichtverbindung. |
 
-### 5.2 Strategie 1: 5G N78 (3.5 GHz) erzwingen
+### 5.3 Strategie 1: 5G N78 (3.5 GHz) erzwingen
 * **Ziel:** Prüfen, ob der erreichbare Salt-Mast über Band N78 verfügt.
 * **Vorgehen:** In RutOS unter *Band Selection* alle 5G-Bänder ausser **N78** deaktivieren.
 * **Ergebnis:** Falls N78 empfangbar ist, steigt der Download typischerweise sofort über **100 Mbit/s**. Falls kein Empfang besteht, bucht sich der Router nicht ein (Fallback auf Auto).
 
-### 5.3 Strategie 2: Tiefe Frequenzbänder als 4G-Anker erzwingen (B28 / B20)
+### 5.4 Strategie 2: Tiefe Frequenzbänder als 4G-Anker erzwingen (B28 / B20)
 * **Ziel:** Den negativen Störabstand (`SINR = -3 dB`) beseitigen.
 * **Vorgehen:** LTE Band 3 abwählen und stattdessen **Band 28 (700 MHz)** oder **Band 20 (800 MHz)** als primäres LTE-Band vorgeben.
 * **Physikalischer Effekt:** Die 700-MHz-Wellen dringen durch das nasse Blätterdach des Randen fast ohne Streuung hindurch. Der SINR kann auf positive Werte (+5 bis +15 dB) klettern, wodurch fehlerhafte Paketwiederholungen entfallen.
 
-### 5.4 Strategie 3: Cell-Locking (Bindung an alternativen Mast)
+### 5.5 Strategie 3: Cell-Locking (Bindung an alternativen Mast)
 Auf dem Randen sind je nach Antennenausrichtung mehrere Masten sichtbar:
 * Mast Merishausen Dorf
 * Mast Bargen / Schlauch
 * Mast Randenturm / Hagenturm
 * Masten Richtung Herblingen / Schaffhausen
 
-Wenn der aktuell genutzte Mast (Cell ID `29858817`) überlastet ist, kann über AT-Befehle (`AT+QNWLOCK="common/4g",...`) oder die RutOS-Zellensperre eine feste Bindung an einen weniger frequentierten Nachbarmasten konfiguriert werden.
+Wenn der aktuell genutzte Mast überlastet ist, kann über AT-Befehle (`AT+QNWLOCK="common/4g",...`) oder die RutOS-Zellensperre eine feste Bindung an einen weniger frequentierten Nachbarmasten konfiguriert werden.
 
-### 5.5 Antennen-Upgrade-Guide: Welche Außenantenne lohnt sich am Randen? (In einfacher Sprache)
+### 5.6 Antennen-Upgrade-Guide: Welche Außenantenne lohnt sich am Randen? (In einfacher Sprache)
 
 Aktuell nutzt der TRB500 vier kleine schwarze Standard-Stummelantennen direkt am Gehäuse unter dem Holzvordach. Das reicht für eine Grundverbindung, aber bei nassen Bäumen im Herbst streut das Signal. Folgende Antennen-Optionen stehen zur Wahl:
 
@@ -223,7 +274,7 @@ Aktuell nutzt der TRB500 vier kleine schwarze Standard-Stummelantennen direkt am
 
 ---
 
-### 5.6 Provider-Optionen & Grenzfunk: Swisscom vs. Deutsche SIM (Was würde ein Wechsel bedeuten?)
+### 5.7 Provider-Optionen & Grenzfunk: Swisscom vs. Deutsche SIM (Was würde ein Wechsel bedeuten?)
 
 Da das RandeLab auf **857 m ü. M.** oben auf der Hügelkuppe thront, liegt es in einem extrem spannenden HF-Korridor. Der 3GPP-Scan zeigt, dass sowohl das Schweizer Kernnetz als auch deutsche Sender direkt empfangen werden:
 
