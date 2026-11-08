@@ -30,7 +30,6 @@
 
   // Laser beam zap sound
   function playLaserZap(freqStart, freqEnd, duration) {
-    if (!isSoundActive) return;
     try {
       const ctx = getAudioContext();
       if (!ctx) return;
@@ -50,6 +49,230 @@
 
       osc.start(now);
       osc.stop(now + duration);
+    } catch (e) {}
+  }
+
+  // --- Dedicated Cocktail Procedural Synthesizers ---
+  function playCocktailSound(colorName) {
+    try {
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+
+      switch (colorName) {
+        case 'disco':
+        case 'strobe':
+        case 'party': {
+          // ⚡ High-speed sci-fi UFO abduction beam charge + hyper-arpeggio
+          const freqs = [330, 440, 554, 659, 880, 1108, 1318, 1760];
+          freqs.forEach((f, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(f, now + idx * 0.035);
+            gain.gain.setValueAtTime(0.18, now + idx * 0.035);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.035 + 0.08);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + idx * 0.035);
+            osc.stop(now + idx * 0.035 + 0.08);
+          });
+          break;
+        }
+
+        case 'pink': {
+          // 🌺 COCO-PINK: Sweet sparkling bubble fizz / shimmering pop chord
+          [523.25, 659.25, 783.99, 1046.50].forEach((f, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(f, now + i * 0.04);
+            osc.frequency.exponentialRampToValueAtTime(f * 1.5, now + i * 0.04 + 0.12);
+            gain.gain.setValueAtTime(0.2, now + i * 0.04);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.04 + 0.15);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now + i * 0.04);
+            osc.stop(now + i * 0.04 + 0.15);
+          });
+          break;
+        }
+
+        case 'green': {
+          // 🌴 JUNGLE MINT: Wooden organic marimba + bamboo shaker
+          const osc1 = ctx.createOscillator();
+          const gain1 = ctx.createGain();
+          osc1.type = 'triangle';
+          osc1.frequency.setValueAtTime(440, now);
+          osc1.frequency.exponentialRampToValueAtTime(110, now + 0.12);
+          gain1.gain.setValueAtTime(0.35, now);
+          gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+          osc1.connect(gain1);
+          gain1.connect(ctx.destination);
+          osc1.start(now);
+          osc1.stop(now + 0.12);
+
+          const osc2 = ctx.createOscillator();
+          const gain2 = ctx.createGain();
+          osc2.type = 'triangle';
+          osc2.frequency.setValueAtTime(880, now + 0.05);
+          osc2.frequency.exponentialRampToValueAtTime(220, now + 0.18);
+          gain2.gain.setValueAtTime(0.25, now + 0.05);
+          gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+          osc2.connect(gain2);
+          gain2.connect(ctx.destination);
+          osc2.start(now + 0.05);
+          osc2.stop(now + 0.18);
+          break;
+        }
+
+        case 'blue': {
+          // 🌊 BLUE CURAÇAO: Subaquatic liquid bubble drop & resonant bandpass sweep
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(220, now);
+          osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+          osc.frequency.exponentialRampToValueAtTime(330, now + 0.22);
+          gain.gain.setValueAtTime(0.32, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.22);
+          break;
+        }
+
+        case 'yellow': {
+          // 🥭 SOLAR MANGO: Punchy warm vintage 80s Moog brass stab
+          const osc1 = ctx.createOscillator();
+          const osc2 = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc1.type = 'sawtooth';
+          osc2.type = 'sawtooth';
+          osc1.frequency.setValueAtTime(220, now);
+          osc2.frequency.setValueAtTime(223, now); // Detuned for fat chorus
+          gain.gain.setValueAtTime(0.28, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+          osc1.connect(gain);
+          osc2.connect(gain);
+          gain.connect(ctx.destination);
+          osc1.start(now);
+          osc2.start(now);
+          osc1.stop(now + 0.25);
+          osc2.stop(now + 0.25);
+          break;
+        }
+
+        case 'cyan': {
+          // 🦩 BIKINI CYAN: Cyber-metallic Yamaha DX7 FM bell chime
+          const carrier = ctx.createOscillator();
+          const mod = ctx.createOscillator();
+          const modGain = ctx.createGain();
+          const mainGain = ctx.createGain();
+
+          carrier.type = 'sine';
+          carrier.frequency.setValueAtTime(987.77, now);
+          mod.type = 'sine';
+          mod.frequency.setValueAtTime(1975.54, now);
+          modGain.gain.setValueAtTime(600, now);
+          modGain.gain.exponentialRampToValueAtTime(1, now + 0.35);
+
+          mainGain.gain.setValueAtTime(0.25, now);
+          mainGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+          mod.connect(modGain);
+          modGain.connect(carrier.frequency);
+          carrier.connect(mainGain);
+          mainGain.connect(ctx.destination);
+
+          mod.start(now);
+          carrier.start(now);
+          mod.stop(now + 0.35);
+          carrier.stop(now + 0.35);
+          break;
+        }
+
+        case 'red': {
+          // 🌋 TIKI VULKAN: Deep 808 sub-bass explosion rumble & laser snap
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(180, now);
+          osc.frequency.exponentialRampToValueAtTime(38, now + 0.35);
+          gain.gain.setValueAtTime(0.4, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.35);
+          break;
+        }
+
+        case 'orange': {
+          // 🍊 PAPAYA SUNSET: Warm retro vibraphone / electric piano chord
+          [392.00, 493.88, 587.33].forEach(f => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(f, now);
+            gain.gain.setValueAtTime(0.18, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.28);
+          });
+          break;
+        }
+
+        case 'white': {
+          // 🥥 PURE KOKOSMILCH: Hollow coconut shell "THUNK" + crystal ding
+          const oscThunk = ctx.createOscillator();
+          const gainThunk = ctx.createGain();
+          oscThunk.type = 'sine';
+          oscThunk.frequency.setValueAtTime(650, now);
+          oscThunk.frequency.exponentialRampToValueAtTime(95, now + 0.07);
+          gainThunk.gain.setValueAtTime(0.45, now);
+          gainThunk.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+          oscThunk.connect(gainThunk);
+          gainThunk.connect(ctx.destination);
+          oscThunk.start(now);
+          oscThunk.stop(now + 0.07);
+
+          const oscChime = ctx.createOscillator();
+          const gainChime = ctx.createGain();
+          oscChime.type = 'sine';
+          oscChime.frequency.setValueAtTime(1760, now + 0.04);
+          gainChime.gain.setValueAtTime(0.18, now + 0.04);
+          gainChime.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+          oscChime.connect(gainChime);
+          gainChime.connect(ctx.destination);
+          oscChime.start(now + 0.04);
+          oscChime.stop(now + 0.25);
+          break;
+        }
+
+        case 'off': {
+          // 🌙 NACHT-DRINK: Sci-fi beam shutdown / tape-stop power-down
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(500, now);
+          osc.frequency.exponentialRampToValueAtTime(40, now + 0.35);
+          gain.gain.setValueAtTime(0.25, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.35);
+          break;
+        }
+
+        default:
+          playLaserZap(800, 200, 0.15);
+          break;
+      }
     } catch (e) {}
   }
 
@@ -223,7 +446,7 @@
   // --- Dispatch Command (MQTT + Local REST) ---
   window.triggerUfoColor = async function (colorName, rgbPreset, labelText) {
     lastCommandSentMs = Date.now();
-    playLaserZap(800, 200, 0.15);
+    playCocktailSound(colorName);
 
     // 1. Immediate visual update
     if (colorName === 'disco' || colorName === 'strobe' || colorName === 'party') {
