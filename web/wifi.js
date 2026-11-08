@@ -807,6 +807,7 @@
         triggerLogFrame('[MQTT] Link aufgebaut: wss://broker.hivemq.com:8884');
         triggerLogFrame('[MQTT] Subscribed zu Topic: randelab/solar/wifi');
         mqttClient.subscribe('randelab/solar/wifi', { qos: 0 });
+        mqttClient.subscribe('randelab/solar/ack', { qos: 0 });
 
         const statusEl = document.getElementById('scanStatus');
         if (statusEl && networks.length === 0) statusEl.innerText = 'MQTT LINK';
@@ -825,6 +826,11 @@
           } catch (e) {
             console.error('MQTT JSON parse error:', e);
           }
+        } else if (topic === 'randelab/solar/ack') {
+          try {
+            const ack = JSON.parse(message.toString());
+            triggerLogFrame(`[MQTT ACK 💡] ESP32 NeoPixel bestätigt: ${ack.action || 'aktiv'} (${ack.duration_sec || 8}s)`);
+          } catch (e) {}
         }
       });
 
@@ -835,6 +841,17 @@
       console.warn('MQTT connect error:', e);
     }
   }
+
+  // --- Remote Onboard NeoPixel LED Controller (MQTT) ---
+  window.sendLedCommand = function(color) {
+    playClickSound();
+    if (mqttClient && mqttClient.connected) {
+      mqttClient.publish('randelab/solar/cmd', JSON.stringify({ action: 'led', color: color, t: Date.now() }));
+      triggerLogFrame(`[MQTT TX 💡] Sende LED-Befehl an ESP32: ${color.toUpperCase()}...`);
+    } else {
+      triggerLogFrame(`[MQTT ⚠️] Nicht mit HiveMQ verbunden. Befehl konnte nicht gesendet werden.`);
+    }
+  };
 
   // --- Hardware Wi-Fi Scan API Fetcher (REST + MQTT) ---
   window.triggerWifiScan = async function () {

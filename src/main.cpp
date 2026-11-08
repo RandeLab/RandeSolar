@@ -349,6 +349,8 @@ static const int   MQTT_PORT           = 1883;
 static const char* MQTT_TOPIC          = "randelab/solar/telemetry";
 static const char* MQTT_TOPIC_WIFI     = "randelab/solar/wifi";
 static const char* MQTT_TOPIC_WIFI_CMD = "randelab/solar/wifi/cmd";
+static const char* MQTT_TOPIC_CMD      = "randelab/solar/cmd";
+static const char* MQTT_TOPIC_ACK      = "randelab/solar/ack";
 
 void mqttCallback(char* topic, byte* payload, unsigned int length);
 String performWifiScanJson();
@@ -368,6 +370,11 @@ static const uint16_t VICTRON_MFG_ID = 0x02E1;
 #endif
 
 static uint32_t g_lastTxFlashMs = 0;
+static uint32_t g_ledOverrideUntilMs = 0;
+static uint8_t  g_ledOverrideR = 0;
+static uint8_t  g_ledOverrideG = 0;
+static uint8_t  g_ledOverrideB = 0;
+static bool     g_ledOverrideStrobe = false;
 
 void setPixel(uint8_t r, uint8_t g, uint8_t b) {
     neopixelWrite(RGB_BUILTIN, r, g, b);
@@ -1686,10 +1693,53 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
         msg += (char)payload[i];
     }
     Serial.printf("[MQTT RX] %s: %s\n", topic, msg.c_str());
-    if (String(topic) == MQTT_TOPIC_WIFI_CMD) {
+    String t = String(topic);
+
+    if (t == MQTT_TOPIC_WIFI_CMD || t == MQTT_TOPIC_CMD) {
         if (msg.indexOf("scan") >= 0) {
             triggerWifiScanAndPublish();
+            return;
         }
+
+        // Remote LED Command Handler
+        uint32_t durationMs = 8000; // 8 seconds override
+        if (msg.indexOf("strobe") >= 0 || msg.indexOf("disco") >= 0 || msg.indexOf("blink") >= 0) {
+            g_ledOverrideStrobe = true;
+            g_ledOverrideUntilMs = millis() + durationMs;
+            mqttClient.publish(MQTT_TOPIC_ACK, "{\"status\":\"ok\",\"action\":\"disco_strobe\",\"duration_sec\":8}");
+            Serial.println("[MQTT 💡] Remote DISCO STROBE activated (8s)");
+            return;
+        }
+
+        g_ledOverrideStrobe = false;
+        if (msg.indexOf("red") >= 0 || msg.indexOf("rot") >= 0) {
+            g_ledOverrideR = 255; g_ledOverrideG = 0; g_ledOverrideB = 0;
+        } else if (msg.indexOf("green") >= 0 || msg.indexOf("grun") >= 0 || msg.indexOf("grün") >= 0) {
+            g_ledOverrideR = 0; g_ledOverrideG = 255; g_ledOverrideB = 0;
+        } else if (msg.indexOf("blue") >= 0 || msg.indexOf("blau") >= 0) {
+            g_ledOverrideR = 0; g_ledOverrideG = 60; g_ledOverrideB = 255;
+        } else if (msg.indexOf("pink") >= 0 || msg.indexOf("magenta") >= 0 || msg.indexOf("purple") >= 0) {
+            g_ledOverrideR = 255; g_ledOverrideG = 0; g_ledOverrideB = 180;
+        } else if (msg.indexOf("cyan") >= 0 || msg.indexOf("türkis") >= 0) {
+            g_ledOverrideR = 0; g_ledOverrideG = 240; g_ledOverrideB = 255;
+        } else if (msg.indexOf("yellow") >= 0 || msg.indexOf("gelb") >= 0 || msg.indexOf("gold") >= 0) {
+            g_ledOverrideR = 255; g_ledOverrideG = 200; g_ledOverrideB = 0;
+        } else if (msg.indexOf("white") >= 0 || msg.indexOf("weiss") >= 0) {
+            g_ledOverrideR = 255; g_ledOverrideG = 255; g_ledOverrideB = 255;
+        } else if (msg.indexOf("off") >= 0 || msg.indexOf("aus") >= 0) {
+            g_ledOverrideR = 0; g_ledOverrideG = 0; g_ledOverrideB = 0;
+        } else {
+            // Default bright neon flash
+            g_ledOverrideR = 255; g_ledOverrideG = 0; g_ledOverrideB = 255;
+        }
+
+        g_ledOverrideUntilMs = millis() + durationMs;
+        setPixel(g_ledOverrideR, g_ledOverrideG, g_ledOverrideB);
+        char ack[120];
+        snprintf(ack, sizeof(ack), "{\"status\":\"ok\",\"action\":\"led\",\"r\":%u,\"g\":%u,\"b\":%u,\"duration_sec\":8}",
+            g_ledOverrideR, g_ledOverrideG, g_ledOverrideB);
+        mqttClient.publish(MQTT_TOPIC_ACK, ack);
+        Serial.printf("[MQTT 💡] Remote LED override active: R=%u G=%u B=%u (8s)\n", g_ledOverrideR, g_ledOverrideG, g_ledOverrideB);
     }
 }
 
@@ -1706,6 +1756,7 @@ void reconnectMQTT() {
         if (mqttClient.connect(clientId.c_str())) {
             Serial.println("[MQTT] Connected to HiveMQ Broker!");
             mqttClient.subscribe(MQTT_TOPIC_WIFI_CMD);
+            mqttClient.subscribe(MQTT_TOPIC_CMD);
             triggerWifiScanAndPublish();
         } else {
             Serial.printf("[MQTT] Connect failed, rc=%d\n", mqttClient.state());
@@ -1715,6 +1766,24 @@ void reconnectMQTT() {
 
 void updateNeoPixel() {
     uint32_t now = millis();
+
+    // 0. Remote MQTT LED Override (8 seconds priority)
+    if (now < g_ledOverrideUntilMs) {
+        if (g_ledOverrideStrobe) {
+            uint8_t step = (now / 70) % 6;
+            switch (step) {
+                case 0: setPixel(255, 0, 0); break;     // Red
+                case 1: setPixel(0, 255, 0); break;     // Green
+                case 2: setPixel(0, 0, 255); break;     // Blue
+                case 3: setPixel(255, 220, 0); break;   // Yellow
+                case 4: setPixel(255, 0, 220); break;   // Magenta
+                default: setPixel(0, 0, 0); break;      // Off
+            }
+        } else {
+            setPixel(g_ledOverrideR, g_ledOverrideG, g_ledOverrideB);
+        }
+        return;
+    }
 
     // Subtle 40ms heartbeat wink when an MQTT packet is transmitted (every 5s)
     if (now - g_lastTxFlashMs < 40) {

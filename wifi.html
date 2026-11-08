@@ -93,6 +93,16 @@
           <button class="crt-btn" onclick="toggleGlitch()" title="Manuelle CRT Kathoden-Störung erzeugen">
             ⚡ GLITCH
           </button>
+
+          <!-- Remote Onboard LED Controller (MQTT) -->
+          <div style="display:inline-flex; align-items:center; gap:4px; margin-left:4px; background:rgba(0,0,0,0.6); border:1px solid var(--crt-border); border-radius:4px; padding:2px 6px;">
+            <span style="font-size:0.65rem; color:var(--crt-dim);">💡 LED (GPIO 48):</span>
+            <button class="crt-btn" style="padding:1px 5px; font-size:0.65rem; color:#ef4444;" onclick="sendLedCommand('red')" title="Onboard LED Rot">ROT</button>
+            <button class="crt-btn" style="padding:1px 5px; font-size:0.65rem; color:#10b981;" onclick="sendLedCommand('green')" title="Onboard LED Grün">GRÜN</button>
+            <button class="crt-btn" style="padding:1px 5px; font-size:0.65rem; color:#3b82f6;" onclick="sendLedCommand('blue')" title="Onboard LED Blau">BLAU</button>
+            <button class="crt-btn" style="padding:1px 5px; font-size:0.65rem; color:#ec4899;" onclick="sendLedCommand('pink')" title="Onboard LED Pink">PINK</button>
+            <button class="crt-btn" style="padding:1px 5px; font-size:0.65rem; color:#facc15; font-weight:800;" onclick="sendLedCommand('disco')" title="Onboard LED Disco Strobe">⚡ DISCO</button>
+          </div>
         </div>
       </div>
 
