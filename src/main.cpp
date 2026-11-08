@@ -918,12 +918,22 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
         if (d.gateway_ip) document.getElementById('gwAddr').textContent = d.gateway_ip;
         if (d.chip_temp !== undefined) document.getElementById('chipTemp').textContent = d.chip_temp.toFixed(1);
         if (d.free_heap_kb !== undefined) document.getElementById('freeHeap').textContent = d.free_heap_kb;
-        if (d.net_mbps !== undefined) document.getElementById('netDown').textContent = d.net_mbps.toFixed(2);
-        if (d.net_up_mbps !== undefined) document.getElementById('netUp').textContent = d.net_up_mbps.toFixed(2);
-        if (d.net_ping_ms !== undefined) document.getElementById('netPing').textContent = d.net_ping_ms;
-        if (d.gw_ping_ms !== undefined) document.getElementById('gwPing').textContent = d.gw_ping_ms;
-        if (d.dns_ms !== undefined) document.getElementById('dnsMs').textContent = d.dns_ms;
-        if (d.ttfb_ms !== undefined) document.getElementById('ttfbMs').textContent = d.ttfb_ms;
+        const downSpeed = (d.cell_down_mbps !== undefined && d.cell_down_mbps > 0) ? d.cell_down_mbps : d.net_mbps;
+        const upSpeed = (d.cell_up_mbps !== undefined && d.cell_up_mbps > 0) ? d.cell_up_mbps : d.net_up_mbps;
+        const elCd = document.getElementById('cellDown') || document.getElementById('netDown');
+        if (elCd && downSpeed !== undefined && downSpeed > 0) elCd.textContent = downSpeed.toFixed(2);
+        const elCu = document.getElementById('cellUp') || document.getElementById('netUp');
+        if (elCu && upSpeed !== undefined && upSpeed > 0) elCu.textContent = upSpeed.toFixed(2);
+
+        const elNp = document.getElementById('netPing');
+        if (elNp && d.net_ping_ms !== undefined) elNp.textContent = d.net_ping_ms;
+        const elGp = document.getElementById('gwPing');
+        if (elGp && d.gw_ping_ms !== undefined) elGp.textContent = d.gw_ping_ms;
+        const elDns = document.getElementById('dnsMs');
+        if (elDns && d.dns_ms !== undefined) elDns.textContent = d.dns_ms;
+        const elTtfb = document.getElementById('ttfbMs');
+        if (elTtfb && d.ttfb_ms !== undefined) elTtfb.textContent = d.ttfb_ms;
+
         if (d.cell_has_data) {
           const elRsrp = document.getElementById('cellRsrp');
           if (elRsrp) elRsrp.textContent = d.cell_rsrp;
@@ -940,13 +950,7 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
           const elId = document.getElementById('cellId');
           if (elId) elId.textContent = d.cell_id;
           const elTemp = document.getElementById('cellTemp');
-          if (elTemp) elTemp.textContent = d.cell_temp.toFixed(1);
-          if (d.cell_down_mbps !== undefined && d.cell_down_mbps > 0) {
-            const elCd = document.getElementById('cellDown');
-            if (elCd) elCd.textContent = d.cell_down_mbps.toFixed(2);
-            const elCu = document.getElementById('cellUp');
-            if (elCu) elCu.textContent = d.cell_up_mbps.toFixed(2);
-          }
+          if (elTemp && d.cell_temp !== undefined) elTemp.textContent = d.cell_temp.toFixed(1);
         }
         document.getElementById('beaconAge').textContent = d.age_sec + (curLang === 'de' ? ' Sek.' : 's ago');
       } catch (e) {

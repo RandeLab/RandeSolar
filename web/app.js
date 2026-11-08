@@ -1043,18 +1043,21 @@ function updateDashboard(data) {
     }
   }
 
-  if (data.net_mbps !== undefined) {
-    const downStr = Number(data.net_mbps).toFixed(2);
-    const upStr = data.net_up_mbps !== undefined ? ` / ⬆️ ${Number(data.net_up_mbps).toFixed(2)}` : '';
+  const downSpeed = (data.cell_down_mbps !== undefined && Number(data.cell_down_mbps) > 0) ? data.cell_down_mbps : data.net_mbps;
+  const upSpeed = (data.cell_up_mbps !== undefined && Number(data.cell_up_mbps) > 0) ? data.cell_up_mbps : data.net_up_mbps;
+
+  if (downSpeed !== undefined && Number(downSpeed) > 0) {
+    const downStr = Number(downSpeed).toFixed(2);
+    const upStr = (upSpeed !== undefined && Number(upSpeed) > 0) ? ` / ⬆️ ${Number(upSpeed).toFixed(2)}` : '';
     const ping = data.net_ping_ms !== undefined ? ` (${data.net_ping_ms} ms)` : '';
     if (el.netSpeedValue) el.netSpeedValue.textContent = `⬇️ ${downStr}${upStr} Mbit/s${ping}`;
 
-    const elDown = document.getElementById('netDownMbps');
+    const elDown = document.getElementById('cellDownMbps') || document.getElementById('netDownMbps');
     if (elDown) elDown.textContent = downStr;
   }
-  if (data.net_up_mbps !== undefined) {
-    const elUp = document.getElementById('netUpMbps');
-    if (elUp) elUp.textContent = Number(data.net_up_mbps).toFixed(2);
+  if (upSpeed !== undefined && Number(upSpeed) > 0) {
+    const elUp = document.getElementById('cellUpMbps') || document.getElementById('netUpMbps');
+    if (elUp) elUp.textContent = Number(upSpeed).toFixed(2);
   }
   if (data.net_ping_ms !== undefined) {
     const elPing = document.getElementById('netPingMs');
@@ -1103,11 +1106,11 @@ function updateDashboard(data) {
     const elTemp = document.getElementById('cellTemp');
     if (elTemp && data.cell_temp !== undefined) elTemp.textContent = Number(data.cell_temp).toFixed(1);
 
-    if (data.cell_down_mbps !== undefined && data.cell_down_mbps > 0) {
+    if (downSpeed !== undefined && Number(downSpeed) > 0) {
       const elCellDown = document.getElementById('cellDownMbps');
-      if (elCellDown) elCellDown.textContent = Number(data.cell_down_mbps).toFixed(2);
+      if (elCellDown) elCellDown.textContent = Number(downSpeed).toFixed(2);
       const elCellUp = document.getElementById('cellUpMbps');
-      if (elCellUp) elCellUp.textContent = Number(data.cell_up_mbps).toFixed(2);
+      if (elCellUp) elCellUp.textContent = Number(upSpeed).toFixed(2);
     }
   }
 
