@@ -1778,6 +1778,15 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
             return;
         }
 
+        if (msg.indexOf("speedtest") >= 0 || msg.indexOf("speed") >= 0) {
+            triggerRouterSpeedtest();
+            measureLatency();
+            fetchTeltonika5GMetrics(true);
+            mqttClient.publish(MQTT_TOPIC_ACK, "{\"status\":\"ok\",\"action\":\"speedtest_triggered\"}");
+            Serial.println("[MQTT 🚀] Remote speedtest triggered via MQTT command!");
+            return;
+        }
+
         // Remote LED Command Handler
         String ack = applyLedCommand(msg, 8);
         mqttClient.publish(MQTT_TOPIC_ACK, ack.c_str());
@@ -2477,6 +2486,18 @@ void loop() {
     if (now - lastWifiScanPublish >= 60000) {
         lastWifiScanPublish = now;
         triggerWifiScanAndPublish();
+    }
+
+    // Scheduled Router 5G Speedtest every 10 minutes (600,000 ms)
+    static uint32_t lastSpeedtestTrigger = 0;
+    if (lastSpeedtestTrigger == 0) {
+        lastSpeedtestTrigger = (now > 540000) ? (now - 540000) : 1; // Run first test ~60s after boot
+    }
+    if (WiFi.status() == WL_CONNECTED && (now - lastSpeedtestTrigger >= 600000)) {
+        lastSpeedtestTrigger = now;
+        triggerRouterSpeedtest();
+        measureLatency();
+        Serial.println("[Speedtest ⏱️] 10-Minute scheduled router Ookla speedtest triggered!");
     }
 
     // Publish to MQTT every 5 seconds when BLE data is active

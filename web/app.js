@@ -1510,11 +1510,22 @@ function initMQTT() {
       mqttClient.subscribe(MQTT_TOPIC, (err) => {
         if (!err) console.log(`[MQTT] Subscribed to ${MQTT_TOPIC}`);
       });
+      mqttClient.subscribe('randelab/solar/ack', (err) => {
+        if (!err) console.log('[MQTT] Subscribed to randelab/solar/ack');
+      });
     });
 
     mqttClient.on('message', (topic, message) => {
       try {
         const payload = JSON.parse(message.toString());
+        if (topic === 'randelab/solar/ack') {
+          console.log('[MQTT ACK]', payload);
+          if (payload.action === 'speedtest_triggered') {
+            const btn = document.getElementById('btnSpeedtestMain');
+            if (btn) btn.innerHTML = '⚡ Test läuft auf Router...';
+          }
+          return;
+        }
         isDemoMode = false;
         if (el.diagSource) el.diagSource.textContent = 'HiveMQ Cloud Live';
         if (el.statusText) el.statusText.textContent = 'Live MQTT (Hive)';
@@ -1532,6 +1543,51 @@ function initMQTT() {
     console.error('Failed to initialize MQTT:', e);
   }
 }
+
+// Live Speedtest On-Demand Trigger (Dual MQTT + REST)
+window.triggerSpeedtestLive = async function () {
+  const btn = document.getElementById('btnSpeedtestMain');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Test läuft (~20s)...';
+    btn.style.opacity = '0.7';
+  }
+
+  // 1. MQTT Command trigger
+  if (mqttClient && mqttClient.connected) {
+    mqttClient.publish('randelab/solar/cmd', JSON.stringify({ action: 'speedtest', t: Date.now() }));
+    console.log('[Speedtest 🚀] Triggered via MQTT command');
+  }
+
+  // 2. Parallel REST trigger if on local lab network
+  try {
+    const endpoints = [
+      '/api/speedtest',
+      'http://192.168.1.100/api/speedtest'
+    ];
+    for (const ep of endpoints) {
+      try {
+        const res = await fetch(ep, { method: 'GET', mode: 'cors', cache: 'no-store' });
+        if (res.ok) {
+          console.log('[Speedtest ⚡] Triggered via REST API');
+          break;
+        }
+      } catch (e) {}
+    }
+  } catch (e) {}
+
+  // 3. Reset button after 24s and trigger telemetry refresh
+  setTimeout(async () => {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '🔄 Live Speedtest';
+      btn.style.opacity = '1';
+    }
+    if (typeof fetchLiveTelemetry === 'function') {
+      fetchLiveTelemetry();
+    }
+  }, 22000);
+};
 
 // Resolve exact Telegram Bot @username dynamically from Bot API
 async function resolveTelegramBotLink() {

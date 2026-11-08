@@ -417,6 +417,7 @@
       <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--border); padding-bottom:6px; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
         <h2 id="lblNetDiagTitle" style="border:none; margin:0; padding:0;">🚀 5G-Mobilfunk &amp; ESP32-S3 Netzwerk-Diagnose</h2>
         <div style="display:flex; align-items:center; gap:8px;">
+          <button id="btnSpeedtestMain" onclick="triggerSpeedtestLive()" style="padding:4px 10px; background:var(--accent-pink); color:var(--bg-main, #0b0f19); border:none; border-radius:4px; font-weight:bold; font-size:0.75rem; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" title="Startet sofort einen frischen Ookla-Speedtest auf dem TRB500 5G-Router">🔄 Live Speedtest</button>
           <a href="https://github.com/RandeLab/RandeSolar/blob/main/NETWORK_5G_INFRASTRUCTURE.md" target="_blank" style="padding:4px 10px; background:rgba(0,180,255,0.18); border:1px solid var(--accent-blue); color:var(--accent-blue); text-decoration:none; border-radius:4px; font-weight:bold; font-size:0.75rem; display:inline-flex; align-items:center; gap:4px;">📖 5G-Doku</a>
           <a href="./docs/maps/randen_rf_map.svg" target="_blank" style="padding:4px 10px; background:var(--accent-blue); color:var(--bg-main, #0b0f19); text-decoration:none; border-radius:4px; font-weight:bold; font-size:0.75rem; display:inline-flex; align-items:center; gap:4px;">🗺️ HF-Karte (OSM)</a>
         </div>
@@ -584,6 +585,6 @@
     </footer>
   </div>
 
-  <script src="./web/app.js?v=3.7"></script>
+  <script src="./web/app.js?v=3.8"></script>
 </body>
 </html>
