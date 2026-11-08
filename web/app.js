@@ -11,6 +11,9 @@ let lastBeaconTime = null;
 let lastRecordedSpeedDown = null;
 let lastRecordedSpeedUp = null;
 let forceRecordNextSpeedtest = false;
+let lastSpeedtestMainTs = localStorage.getItem('randelab-main-speed-ts')
+  ? parseInt(localStorage.getItem('randelab-main-speed-ts'), 10)
+  : 0;
 const urlParams = new URLSearchParams(window.location.search);
 let currentTheme = urlParams.get('theme') || 'pinkograph'; // Start default with Pinkograph theme
 let activeEndpoint = localStorage.getItem('randesolar-endpoint') || 'http://randesolar.local';
@@ -1083,6 +1086,21 @@ function updateDashboard(data) {
 
     const elDown = document.getElementById('cellDownMbps') || document.getElementById('netDownMbps');
     if (elDown) elDown.textContent = downStr;
+
+    // Track when speedtest was conducted
+    if (data.cell_speed_epoch && Number(data.cell_speed_epoch) > 1700000000) {
+      lastSpeedtestMainTs = Number(data.cell_speed_epoch) * 1000;
+      localStorage.setItem('randelab-main-speed-ts', lastSpeedtestMainTs);
+    } else {
+      const curDown = downStr;
+      const lastDown = localStorage.getItem('randelab-main-last-dl');
+      if (curDown !== lastDown) {
+        lastSpeedtestMainTs = Date.now();
+        localStorage.setItem('randelab-main-speed-ts', lastSpeedtestMainTs);
+        localStorage.setItem('randelab-main-last-dl', curDown);
+      }
+    }
+    updateMainSpeedAge();
   }
   if (upSpeed !== undefined && Number(upSpeed) > 0) {
     const elUp = document.getElementById('cellUpMbps') || document.getElementById('netUpMbps');
@@ -1336,8 +1354,29 @@ function runSimulationStep(force = false) {
   appendChartPoint(demoData, force);
 }
 
+// Update Speedtest Elapsed Age Display on Main Dashboard
+function updateMainSpeedAge() {
+  const elElapsed = document.getElementById('lblSpeedElapsedMain');
+  const elTime = document.getElementById('lblSpeedTimeMain');
+  if (!elElapsed && !elTime) return;
+  if (!lastSpeedtestMainTs) {
+    if (elElapsed) elElapsed.textContent = 'noch keine';
+    if (elTime) elTime.textContent = '--:--:--';
+    return;
+  }
+  const d = new Date(lastSpeedtestMainTs);
+  if (elTime) elTime.textContent = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const sec = Math.max(0, Math.floor((Date.now() - lastSpeedtestMainTs) / 1000));
+  let str = '';
+  if (sec < 60) str = `vor ${sec}s`;
+  else if (sec < 3600) str = `vor ${Math.floor(sec / 60)} Min.`;
+  else str = `vor ${Math.floor(sec / 3600)}h ${Math.floor((sec % 3600) / 60)}m`;
+  if (elElapsed) elElapsed.textContent = str;
+}
+
 // Timer tick
 setInterval(() => {
+  updateMainSpeedAge();
   if (!lastBeaconTime) {
     if (el.lastSeenTimer) el.lastSeenTimer.textContent = 'Warte...';
     return;

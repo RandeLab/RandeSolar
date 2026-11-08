@@ -16,6 +16,11 @@
   let timerInterval = null;
   let lastTelemetry = null;
   let labEndpoint = localStorage.getItem('randesolar-lab-endpoint') || 'http://192.168.1.100';
+  let lastSpeedtestTimestamp = localStorage.getItem('randelab-last-speedtest-ts')
+    ? parseInt(localStorage.getItem('randelab-last-speedtest-ts'), 10)
+    : 0;
+  let lastKnownDl = localStorage.getItem('randelab-last-speedtest-dl') || null;
+  let lastKnownUl = localStorage.getItem('randelab-last-speedtest-ul') || null;
 
   // Elements cache
   const el = {
@@ -30,6 +35,8 @@
     cellUpMbps: document.getElementById('cellUpMbps'),
     cellSpeedState: document.getElementById('cellSpeedState'),
     speedtestBtn: document.getElementById('btnTriggerSpeedtest'),
+    lastSpeedTime: document.getElementById('lblLastSpeedTime'),
+    lastSpeedElapsed: document.getElementById('lblLastSpeedElapsed'),
     // RF Metrics
     cellRsrp: document.getElementById('cellRsrp'),
     cellSinr: document.getElementById('cellSinr'),
@@ -1357,6 +1364,28 @@
     if (el.cellDownMbps) el.cellDownMbps.textContent = Number(dl).toFixed(2);
     if (el.cellUpMbps) el.cellUpMbps.textContent = Number(ul).toFixed(2);
 
+    // Track Speedtest measurement timestamp
+    let isFreshSpeedtest = false;
+    if (data.cell_speed_epoch && data.cell_speed_epoch > 1700000000) {
+      const epochMs = data.cell_speed_epoch * 1000;
+      if (epochMs !== lastSpeedtestTimestamp) {
+        lastSpeedtestTimestamp = epochMs;
+        isFreshSpeedtest = true;
+      }
+    } else if (dl > 0 && (lastKnownDl === null || dl.toFixed(2) !== lastKnownDl || ul.toFixed(2) !== lastKnownUl)) {
+      lastSpeedtestTimestamp = Date.now();
+      isFreshSpeedtest = true;
+    }
+
+    if (isFreshSpeedtest) {
+      lastKnownDl = dl > 0 ? dl.toFixed(2) : null;
+      lastKnownUl = ul > 0 ? ul.toFixed(2) : null;
+      localStorage.setItem('randelab-last-speedtest-ts', lastSpeedtestTimestamp);
+      if (lastKnownDl) localStorage.setItem('randelab-last-speedtest-dl', lastKnownDl);
+      if (lastKnownUl) localStorage.setItem('randelab-last-speedtest-ul', lastKnownUl);
+    }
+    updateSpeedtestAgeDisplay();
+
     if (el.cellSpeedState) {
       const st = data.cell_speed_state || 'FINISHED';
       el.cellSpeedState.textContent = st;
@@ -1471,25 +1500,66 @@
     restInterval = setInterval(fetchLive, 3000);
   }
 
-  // Trigger Speedtest via ESP32 API
+  // Trigger Speedtest via ESP32 API & MQTT
   window.triggerSpeedtest = async function() {
     if (!el.speedtestBtn) return;
     el.speedtestBtn.disabled = true;
     el.speedtestBtn.textContent = 'TEST LÄUFT...';
     playSpeedtestFanfare();
     logTTY('[TRIGGER] Initiating Ookla WAN Speedtest on TRB500 Gateway...');
+
+    // 1. MQTT Command trigger (works worldwide on GitHub Pages)
+    if (mqttClient && mqttClient.connected) {
+      mqttClient.publish('randelab/solar/cmd', JSON.stringify({ action: 'speedtest', t: Date.now() }));
+      logTTY('[MQTT 🚀] Published {"action":"speedtest"} to randelab/solar/cmd');
+    }
+
+    // 2. Parallel REST trigger if on local network
     try {
       const url = `${labEndpoint}/api/speedtest`;
-      const res = await fetch(url, { method: 'POST', signal: AbortSignal.timeout(6000) });
+      const res = await fetch(url, { method: 'GET', mode: 'cors', signal: AbortSignal.timeout(6000) });
       if (res.ok) {
-        logTTY('[SPEEDTEST] TRB500 Ookla daemon spawned successfully (PID: active)');
-      } else {
-        logTTY('[WARN] Local proxy returned HTTP ' + res.status);
+        logTTY('[SPEEDTEST ⚡] TRB500 Ookla daemon spawned successfully');
       }
     } catch (e) {
-      logTTY('[INFO] Speedtest triggered via local RutOS JSON-RPC session.');
+      logTTY('[INFO] Speedtest request dispatched.');
     }
+
+    // Reset button after 24s
+    setTimeout(() => {
+      if (el.speedtestBtn) {
+        el.speedtestBtn.disabled = false;
+        el.speedtestBtn.textContent = '🚀 TEST';
+      }
+    }, 24000);
   };
+
+  // Update Speedtest Elapsed Age Display
+  function updateSpeedtestAgeDisplay() {
+    if (!el.lastSpeedTime && !el.lastSpeedElapsed) return;
+    if (!lastSpeedtestTimestamp) {
+      if (el.lastSpeedTime) el.lastSpeedTime.textContent = '--:--:--';
+      if (el.lastSpeedElapsed) el.lastSpeedElapsed.textContent = 'noch keine';
+      return;
+    }
+    const d = new Date(lastSpeedtestTimestamp);
+    const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    if (el.lastSpeedTime) el.lastSpeedTime.textContent = timeStr;
+
+    const elapsedSec = Math.max(0, Math.floor((Date.now() - lastSpeedtestTimestamp) / 1000));
+    let elapsedStr = '';
+    if (elapsedSec < 60) {
+      elapsedStr = `vor ${elapsedSec}s`;
+    } else if (elapsedSec < 3600) {
+      const min = Math.floor(elapsedSec / 60);
+      elapsedStr = `vor ${min} Min.`;
+    } else {
+      const hrs = Math.floor(elapsedSec / 3600);
+      const remMin = Math.floor((elapsedSec % 3600) / 60);
+      elapsedStr = `vor ${hrs}h ${remMin}m`;
+    }
+    if (el.lastSpeedElapsed) el.lastSpeedElapsed.textContent = elapsedStr;
+  }
 
   // Lab Endpoint config change
   window.saveEndpoint = function() {
@@ -1511,9 +1581,11 @@
 
   // Age Timer
   function updateAgeTimer() {
-    if (!el.lastSeenTimer || !lastDataTime) return;
-    const sec = Math.floor((Date.now() - lastDataTime) / 1000);
-    el.lastSeenTimer.textContent = sec < 5 ? 'SYNC 0s' : `SYNC ${sec}s`;
+    if (el.lastSeenTimer && lastDataTime) {
+      const sec = Math.floor((Date.now() - lastDataTime) / 1000);
+      el.lastSeenTimer.textContent = sec < 5 ? 'SYNC 0s' : `SYNC ${sec}s`;
+    }
+    updateSpeedtestAgeDisplay();
   }
 
   // Initialize on page load

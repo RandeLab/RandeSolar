@@ -142,6 +142,12 @@
             </div>
           </div>
 
+          <!-- Last Speedtest Time & Cadence Info -->
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.7rem; color:var(--crt-dim); margin-top:-6px; margin-bottom:12px; padding:5px 8px; background:rgba(0,0,0,0.3); border-radius:3px; border:1px solid rgba(255,255,255,0.08); font-family:var(--font-mono, 'JetBrains Mono', monospace);">
+            <span>⏱️ LETZTER TEST: <b id="lblLastSpeedTime" class="crt-glow-text">--:--:--</b> (<span id="lblLastSpeedElapsed">vor -- Min.</span>)</span>
+            <span>ZYKLUS: <b class="crt-glow-text">ALLE 6H + LIVE</b></span>
+          </div>
+
           <!-- Signal VU Meter RSRP -->
           <div style="margin-bottom:10px;">
             <div style="display:flex; justify-content:space-between; font-size:0.72rem;">
@@ -475,6 +481,6 @@
     </div>
   </div>
 
-  <script src="./network.js?v=3.6"></script>
+  <script src="./network.js?v=3.7"></script>
 </body>
 </html>

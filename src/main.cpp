@@ -325,6 +325,7 @@ static String   g_cellId = "";          // Cell ID e.g. "29858817"
 static float    g_cellDownMbps = 0.0f;  // Real 5G WAN Download from TRB500 Ookla test
 static float    g_cellUpMbps = 0.0f;    // Real 5G WAN Upload from TRB500 Ookla test
 static String   g_cellSpeedState = "FINISHED"; // "FINISHED", "TESTING_DOWNLOAD", "TESTING_UPLOAD"
+static uint32_t g_lastSpeedtestEpoch = 0;      // Epoch timestamp of last completed speedtest
 static uint32_t g_lastCellFetchMs = 0;
 static String   g_ubusToken = "";
 static uint32_t g_ubusTokenExpires = 0;
@@ -1241,7 +1242,7 @@ void handleLiveApi() {
         "\"net_ping_ms\":%u,\"gw_ping_ms\":%u,\"dns_ms\":%u,\"ttfb_ms\":%u,"
         "\"cell_has_data\":%s,\"cell_rsrp\":%d,\"cell_sinr\":%d,\"cell_rsrq\":%d,\"cell_qual\":%d,"
         "\"cell_mode\":\"%s\",\"cell_band\":\"%s\",\"cell_operator\":\"%s\",\"cell_id\":\"%s\",\"cell_temp\":%.1f,"
-        "\"cell_down_mbps\":%.2f,\"cell_up_mbps\":%.2f,\"cell_speed_state\":\"%s\","
+        "\"cell_down_mbps\":%.2f,\"cell_up_mbps\":%.2f,\"cell_speed_state\":\"%s\",\"cell_speed_epoch\":%lu,"
         "\"wx_temp\":%.1f,\"wx_solar_wm2\":%.1f,\"wx_cloud_pct\":%d,\"wx_rain_mm\":%.2f,\"wx_wind_kmh\":%.1f,\"wx_humidity\":%d,\"wx_pressure\":%.1f,"
         "\"buffered_records\":%u,\"ip\":\"%s\",\"gateway_ip\":\"%s\",\"age_sec\":%lu}",
         d.has_data ? "true" : "false",
@@ -1279,6 +1280,7 @@ void handleLiveApi() {
         g_cellDownMbps,
         g_cellUpMbps,
         g_cellSpeedState.c_str(),
+        (unsigned long)g_lastSpeedtestEpoch,
         g_wxTemp,
         g_wxSolarWm2,
         g_wxCloudPct,
@@ -1728,12 +1730,22 @@ void fetchTeltonika5GMetrics(bool force) {
             String dl = getVal(stResp, "avgDownloadSpeed");
             String ul = getVal(stResp, "avgUploadSpeed");
             String st = getVal(stResp, "state");
+            static float lastReadDl = 0.0f;
+            static float lastReadUl = 0.0f;
             if (dl.length() > 0 && dl != "0") g_cellDownMbps = (dl.toFloat() * 8.0f) / 1000000.0f;
             if (ul.length() > 0 && ul != "0") g_cellUpMbps = (ul.toFloat() * 8.0f) / 1000000.0f;
             if (st.length() > 0) g_cellSpeedState = st;
             if (g_cellDownMbps > 0.0f) {
-                Serial.printf("[TRB500 🚀] Router 5G Speedtest: ⬇️ %.2f Mbit/s | ⬆️ %.2f Mbit/s (%s)\n",
-                    g_cellDownMbps, g_cellUpMbps, g_cellSpeedState.c_str());
+                if (g_cellDownMbps != lastReadDl || g_cellUpMbps != lastReadUl || g_lastSpeedtestEpoch == 0) {
+                    lastReadDl = g_cellDownMbps;
+                    lastReadUl = g_cellUpMbps;
+                    time_t cur = time(nullptr);
+                    if (cur > 1700000000) {
+                        g_lastSpeedtestEpoch = (uint32_t)cur;
+                    }
+                }
+                Serial.printf("[TRB500 🚀] Router 5G Speedtest: ⬇️ %.2f Mbit/s | ⬆️ %.2f Mbit/s (%s) | Epoch: %lu\n",
+                    g_cellDownMbps, g_cellUpMbps, g_cellSpeedState.c_str(), (unsigned long)g_lastSpeedtestEpoch);
             }
         }
         http.end();
@@ -2532,7 +2544,7 @@ void loop() {
                 "\"net_ping_ms\":%u,\"gw_ping_ms\":%u,\"dns_ms\":%u,\"ttfb_ms\":%u,"
                 "\"cell_has_data\":%s,\"cell_rsrp\":%d,\"cell_sinr\":%d,\"cell_rsrq\":%d,\"cell_qual\":%d,"
                 "\"cell_mode\":\"%s\",\"cell_band\":\"%s\",\"cell_operator\":\"%s\",\"cell_id\":\"%s\",\"cell_temp\":%.1f,"
-                "\"cell_down_mbps\":%.2f,\"cell_up_mbps\":%.2f,\"buffered_records\":%u,\"age_sec\":0}",
+                "\"cell_down_mbps\":%.2f,\"cell_up_mbps\":%.2f,\"cell_speed_epoch\":%lu,\"buffered_records\":%u,\"age_sec\":0}",
                 d.solar_power,
                 d.panel_voltage,
                 d.battery_voltage,
@@ -2566,6 +2578,7 @@ void loop() {
                 g_cellTemp,
                 g_cellDownMbps,
                 g_cellUpMbps,
+                (unsigned long)g_lastSpeedtestEpoch,
                 (unsigned int)g_bufferedRecordCount
             );
             mqttClient.publish(MQTT_TOPIC, json);
