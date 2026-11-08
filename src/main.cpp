@@ -344,9 +344,15 @@ static uint32_t g_lastWxFetchMs = 0;
 void fetchMeteoSwissWeather(bool force = false);
 
 // HiveMQ Broker
-static const char* MQTT_BROKER   = "broker.hivemq.com";
-static const int   MQTT_PORT     = 1883;
-static const char* MQTT_TOPIC    = "randelab/solar/telemetry";
+static const char* MQTT_BROKER         = "broker.hivemq.com";
+static const int   MQTT_PORT           = 1883;
+static const char* MQTT_TOPIC          = "randelab/solar/telemetry";
+static const char* MQTT_TOPIC_WIFI     = "randelab/solar/wifi";
+static const char* MQTT_TOPIC_WIFI_CMD = "randelab/solar/wifi/cmd";
+
+void mqttCallback(char* topic, byte* payload, unsigned int length);
+String performWifiScanJson();
+void triggerWifiScanAndPublish();
 
 static const char* TARGET_MAC    = "cb:06:61:60:5a:c2";
 static const uint8_t ENCRYPTION_KEY[16] = {
@@ -1354,11 +1360,7 @@ void handleSpeedtestApi() {
     handleLiveApi();
 }
 
-void handleWifiScanApi() {
-    server.sendHeader("Access-Control-Allow-Origin", "*");
-    server.sendHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-    server.sendHeader("Access-Control-Allow-Headers", "*");
-
+String performWifiScanJson() {
     int n = WiFi.scanNetworks(false, true);
     String json = "{\"status\":\"ok\",\"timestamp\":" + String(millis()) + ",\"count\":" + String(n >= 0 ? n : 0) + ",\"networks\":[";
     if (n > 0) {
@@ -1388,6 +1390,26 @@ void handleWifiScanApi() {
     }
     json += "]}";
     WiFi.scanDelete();
+    return json;
+}
+
+void triggerWifiScanAndPublish() {
+    String json = performWifiScanJson();
+    if (mqttClient.connected()) {
+        mqttClient.publish(MQTT_TOPIC_WIFI, json.c_str(), true); // Retained for immediate delivery to GitHub Pages
+        Serial.println("[MQTT 📶] Published live Wi-Fi scan to randelab/solar/wifi (retained)");
+    }
+}
+
+void handleWifiScanApi() {
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    server.sendHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+    server.sendHeader("Access-Control-Allow-Headers", "*");
+
+    String json = performWifiScanJson();
+    if (mqttClient.connected()) {
+        mqttClient.publish(MQTT_TOPIC_WIFI, json.c_str(), true);
+    }
     server.send(200, "application/json", json);
 }
 
@@ -1658,6 +1680,19 @@ bool triggerRouterSpeedtest() {
     return ok;
 }
 
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+    String msg;
+    for (unsigned int i = 0; i < length; i++) {
+        msg += (char)payload[i];
+    }
+    Serial.printf("[MQTT RX] %s: %s\n", topic, msg.c_str());
+    if (String(topic) == MQTT_TOPIC_WIFI_CMD) {
+        if (msg.indexOf("scan") >= 0) {
+            triggerWifiScanAndPublish();
+        }
+    }
+}
+
 // Reconnect MQTT (non-blocking)
 void reconnectMQTT() {
     if (WiFi.status() != WL_CONNECTED) return;
@@ -1670,6 +1705,8 @@ void reconnectMQTT() {
         Serial.printf("[MQTT] Connecting to %s:%d...\n", MQTT_BROKER, MQTT_PORT);
         if (mqttClient.connect(clientId.c_str())) {
             Serial.println("[MQTT] Connected to HiveMQ Broker!");
+            mqttClient.subscribe(MQTT_TOPIC_WIFI_CMD);
+            triggerWifiScanAndPublish();
         } else {
             Serial.printf("[MQTT] Connect failed, rc=%d\n", mqttClient.state());
         }
@@ -2225,7 +2262,8 @@ void setup() {
 
     // Configure MQTT
     mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
-    mqttClient.setBufferSize(1024);
+    mqttClient.setBufferSize(2048);
+    mqttClient.setCallback(mqttCallback);
 
     // Setup Web Server
     server.on("/", handleRoot);
@@ -2321,6 +2359,13 @@ void loop() {
     if (now - lastTelegramCheck >= 3500) {
         lastTelegramCheck = now;
         checkTelegramUpdates();
+    }
+
+    // Periodic Wi-Fi scan publish (every 60 seconds) so retained message stays fresh for GitHub Pages
+    static uint32_t lastWifiScanPublish = 0;
+    if (now - lastWifiScanPublish >= 60000) {
+        lastWifiScanPublish = now;
+        triggerWifiScanAndPublish();
     }
 
     // Publish to MQTT every 5 seconds when BLE data is active

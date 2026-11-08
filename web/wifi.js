@@ -53,6 +53,7 @@
   let currentSoundscape = 'analog'; // 'analog', 'sid', 'fm', 'tube'
   let audioCtx = null;
   let geigerTimer = null;
+  let mqttClient = null;
 
   // --- Procedural Web Audio Engine ---
   function getAudioContext() {
@@ -756,7 +757,86 @@
     tty.scrollTop = tty.scrollHeight;
   }
 
-  // --- Hardware Wi-Fi Scan API Fetcher (Real Data Only) ---
+  // --- Shared Scanned Networks Processor ---
+  function applyScannedNetworks(foundData) {
+    if (!foundData || !Array.isArray(foundData)) return;
+
+    networks = foundData.map((ap, i) => {
+      const f = getChannelCenterFreq(ap.channel || 1);
+      const fspl = 27.55;
+      const d = Math.pow(10, (Math.abs(ap.rssi) - fspl - 20 * Math.log10(f)) / 20.0);
+      const estDist = Math.max(1.0, Math.round(d * 10) / 10);
+
+      return {
+        ssid: (ap.ssid && ap.ssid.trim()) ? ap.ssid : '<Verstecktes Netz>',
+        bssid: ap.bssid || `02:00:00:00:00:${i.toString(16).padStart(2, '0')}`,
+        rssi: ap.rssi || -70,
+        channel: ap.channel || 1,
+        auth: ap.auth || 'WPA2',
+        distM: estDist,
+        bearingDeg: (i * 53) % 360,
+        desc: `Echter Hardware-Scan via ESP32-S3 Antenne. Pegel: ${ap.rssi} dBm auf Kanal ${ap.channel}.`
+      };
+    });
+
+    if (!selectedNetwork || !networks.some(n => n.bssid === selectedNetwork.bssid)) {
+      selectedNetwork = networks[0] || null;
+    }
+
+    renderTable();
+    renderSpectrum();
+    updateGeigerRate();
+  }
+
+  // --- MQTT WebSockets Link (For GitHub Pages & Remote Clients) ---
+  function setupMQTT() {
+    if (typeof mqtt === 'undefined') return;
+
+    const clientId = 'RandeWifi_' + Math.random().toString(16).substr(2, 8);
+    const brokerUrl = 'wss://broker.hivemq.com:8884/mqtt';
+
+    try {
+      mqttClient = mqtt.connect(brokerUrl, {
+        clientId: clientId,
+        clean: true,
+        reconnectPeriod: 4000,
+        connectTimeout: 8000
+      });
+
+      mqttClient.on('connect', function() {
+        triggerLogFrame('[MQTT] Link aufgebaut: wss://broker.hivemq.com:8884');
+        triggerLogFrame('[MQTT] Subscribed zu Topic: randelab/solar/wifi');
+        mqttClient.subscribe('randelab/solar/wifi', { qos: 0 });
+
+        const statusEl = document.getElementById('scanStatus');
+        if (statusEl && networks.length === 0) statusEl.innerText = 'MQTT LINK';
+      });
+
+      mqttClient.on('message', function(topic, message) {
+        if (topic === 'randelab/solar/wifi') {
+          try {
+            const json = JSON.parse(message.toString());
+            if (json.networks && Array.isArray(json.networks)) {
+              triggerLogFrame(`[MQTT RX 📶] ${json.networks.length} reale Funknetze vom ESP32 empfangen!`);
+              applyScannedNetworks(json.networks);
+              const statusEl = document.getElementById('scanStatus');
+              if (statusEl) statusEl.innerText = `MQTT LIVE (${json.networks.length} APs)`;
+            }
+          } catch (e) {
+            console.error('MQTT JSON parse error:', e);
+          }
+        }
+      });
+
+      mqttClient.on('error', function(err) {
+        console.warn('MQTT error:', err);
+      });
+    } catch (e) {
+      console.warn('MQTT connect error:', e);
+    }
+  }
+
+  // --- Hardware Wi-Fi Scan API Fetcher (REST + MQTT) ---
   window.triggerWifiScan = async function () {
     if (isScanning) return;
     isScanning = true;
@@ -766,6 +846,12 @@
     const scanStatus = document.getElementById('scanStatus');
     if (scanBtn) scanBtn.classList.add('active');
     if (scanStatus) scanStatus.innerText = 'SCANNING...';
+
+    // 1. If MQTT is connected, publish scan command to ESP32 (works anywhere on GitHub Pages)
+    if (mqttClient && mqttClient.connected) {
+      mqttClient.publish('randelab/solar/wifi/cmd', JSON.stringify({ action: 'scan', t: Date.now() }));
+      triggerLogFrame('WIFI_SCAN_CMD // Scan-Befehl via MQTT an ESP32 gesendet...');
+    }
 
     triggerLogFrame('WIFI_SCAN_REQ // Sende Scan-Befehl an ESP32 /api/wifi/scan...');
 
@@ -802,43 +888,13 @@
     }
 
     if (foundData && foundData.length > 0) {
-      networks = foundData.map((ap, i) => {
-        const f = getChannelCenterFreq(ap.channel || 1);
-        const fspl = 27.55;
-        const d = Math.pow(10, (Math.abs(ap.rssi) - fspl - 20 * Math.log10(f)) / 20.0);
-        const estDist = Math.max(1.0, Math.round(d * 10) / 10);
-
-        return {
-          ssid: (ap.ssid && ap.ssid.trim()) ? ap.ssid : '<Verstecktes Netz>',
-          bssid: ap.bssid || `02:00:00:00:00:${i.toString(16).padStart(2, '0')}`,
-          rssi: ap.rssi || -70,
-          channel: ap.channel || 1,
-          auth: ap.auth || 'WPA2',
-          distM: estDist,
-          bearingDeg: (i * 53) % 360,
-          desc: `Echter Hardware-Scan via ESP32-S3 Antenne. Pegel: ${ap.rssi} dBm auf Kanal ${ap.channel}.`
-        };
-      });
-
-      if (!selectedNetwork || !networks.some(n => n.bssid === selectedNetwork.bssid)) {
-        selectedNetwork = networks[0];
-      }
-    } else {
-      triggerLogFrame('WIFI_SCAN_OFFLINE // ESP32 offline (192.168.1.100 nicht erreichbar). Keine erfundenen Signale.');
+      applyScannedNetworks(foundData);
+    } else if (!mqttClient || !mqttClient.connected) {
+      triggerLogFrame('WIFI_SCAN_OFFLINE // ESP32 offline (192.168.1.100 nicht erreichbar).');
     }
-
-    // Keep selected network updated if still present
-    if (selectedNetwork) {
-      const match = networks.find(n => n.bssid === selectedNetwork.bssid);
-      if (match) selectedNetwork = match;
-    }
-
-    renderTable();
-    renderSpectrum();
-    updateGeigerRate();
 
     if (scanBtn) scanBtn.classList.remove('active');
-    if (scanStatus) scanStatus.innerText = networks.length > 0 ? `LIVE (${networks.length} APs)` : 'OFFLINE (0 APs)';
+    if (scanStatus) scanStatus.innerText = networks.length > 0 ? `LIVE (${networks.length} APs)` : 'READY';
     isScanning = false;
   };
 
@@ -1001,6 +1057,9 @@
     renderSpectrum();
     renderTable();
     animateRadar();
+
+    // Connect to HiveMQ MQTT Broker (for remote / GitHub Pages access)
+    setupMQTT();
 
     // Trigger Initial Live Hardware Scan
     window.triggerWifiScan();
