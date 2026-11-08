@@ -1,24 +1,22 @@
 /**
- * RandeLab Coconut Research Lab Disco // Modern Hardware Controller (web/disco.js)
- * Dual HiveMQ MQTT (randelab/solar/cmd) + Local REST API (/api/led),
- * Procedural Web Audio Tropical Coconut Marimba Synth (~114 BPM),
- * Bioluminescent Coconut Resonator visualizer & live ACK roundtrip tracker.
+ * RandeLab Alternative Coconut Research // Area 51 UFO Disco Controller (web/disco.js)
+ * Dual HiveMQ MQTT (randelab/solar/cmd) + Local REST API (/api/led)
+ * Web Audio Sci-Fi UFO Theremin & Laser Sound Engine
+ * Real-time Tractor Beam simulation & ESP32-S3 GPIO 48 Hardware Controller
  */
 
 (function () {
   'use strict';
 
-  // --- State Variables ---
   let mqttClient = null;
   let audioCtx = null;
   let isSoundActive = false;
-  let cocoBeatTimer = null;
+  let thereminLoop = null;
   let strobeTimer = null;
   let currentDurationSec = 10;
   let lastCommandSentMs = 0;
-  let isConnectedMqtt = false;
 
-  // --- Web Audio Synthesizer (Tropical Coconut Marimba & Beat) ---
+  // --- Sci-Fi UFO Theremin & Laser Sound Engine ---
   function getAudioContext() {
     if (!audioCtx) {
       const AudioClass = window.AudioContext || window.webkitAudioContext;
@@ -30,7 +28,8 @@
     return audioCtx;
   }
 
-  function playSynthZap(freq, type, duration) {
+  // Laser beam zap sound
+  function playLaserZap(freqStart, freqEnd, duration) {
     if (!isSoundActive) return;
     try {
       const ctx = getAudioContext();
@@ -38,10 +37,10 @@
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
 
-      osc.type = type || 'sine';
+      osc.type = 'sawtooth';
       const now = ctx.currentTime;
-      osc.frequency.setValueAtTime(freq, now);
-      osc.frequency.exponentialRampToValueAtTime(freq * 0.35, now + duration);
+      osc.frequency.setValueAtTime(freqStart, now);
+      osc.frequency.exponentialRampToValueAtTime(freqEnd, now + duration);
 
       gain.gain.setValueAtTime(0.25, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
@@ -54,82 +53,35 @@
     } catch (e) {}
   }
 
-  function playCoconutClick(freq) {
+  // Weird Sci-Fi B-Movie Flying Saucer / Theremin Wobble
+  function startThereminSound() {
     if (!isSoundActive) return;
     try {
       const ctx = getAudioContext();
       if (!ctx) return;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
 
-      osc.type = 'triangle';
-      const now = ctx.currentTime;
-      osc.frequency.setValueAtTime(freq || 880, now);
-      osc.frequency.exponentialRampToValueAtTime(180, now + 0.04);
+      let step = 0;
+      thereminLoop = setInterval(() => {
+        if (!isSoundActive) return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
 
-      gain.gain.setValueAtTime(0.35, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+        const now = ctx.currentTime;
+        const baseFreq = 440 + Math.sin(step * 0.4) * 220;
+        osc.frequency.setValueAtTime(baseFreq, now);
+        osc.frequency.linearRampToValueAtTime(baseFreq + 50, now + 0.15);
 
-      osc.connect(gain);
-      gain.connect(ctx.destination);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
 
-      osc.start(now);
-      osc.stop(now + 0.04);
-    } catch (e) {}
-  }
+        osc.connect(gain);
+        gain.connect(ctx.destination);
 
-  // 114 BPM Tropical Disco Groove
-  let beatStep = 0;
-  const MARIMBA_SCALE = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25]; // C Major Pentatonic
-
-  function triggerCocoBeat() {
-    if (!isSoundActive) return;
-    try {
-      const ctx = getAudioContext();
-      if (!ctx) return;
-      const now = ctx.currentTime;
-
-      // 1. Kick Drum every 2 steps (4-on-the-floor)
-      if (beatStep % 2 === 0) {
-        const kickOsc = ctx.createOscillator();
-        const kickGain = ctx.createGain();
-        kickOsc.frequency.setValueAtTime(145, now);
-        kickOsc.frequency.exponentialRampToValueAtTime(32, now + 0.12);
-        kickGain.gain.setValueAtTime(0.3, now);
-        kickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-        kickOsc.connect(kickGain);
-        kickGain.connect(ctx.destination);
-        kickOsc.start(now);
-        kickOsc.stop(now + 0.12);
-      }
-
-      // 2. Coconut Woodblock on offbeats
-      if (beatStep % 2 === 1) {
-        playCoconutClick(beatStep % 4 === 1 ? 920 : 740);
-      }
-
-      // 3. Marimba note
-      const marimbaOsc = ctx.createOscillator();
-      const marimbaGain = ctx.createGain();
-      marimbaOsc.type = 'sine';
-      const noteFreq = MARIMBA_SCALE[(beatStep * 3 + 1) % MARIMBA_SCALE.length];
-      marimbaOsc.frequency.setValueAtTime(noteFreq, now);
-
-      marimbaGain.gain.setValueAtTime(0.12, now);
-      marimbaGain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
-
-      marimbaOsc.connect(marimbaGain);
-      marimbaGain.connect(ctx.destination);
-      marimbaOsc.start(now);
-      marimbaOsc.stop(now + 0.09);
-
-      // Bounce Bruce Lee dancer
-      const dancer = document.getElementById('bruceDancer');
-      if (dancer) {
-        dancer.style.transform = (beatStep % 2 === 0) ? 'translateY(-7px) scale(1.06)' : 'translateY(0) scale(1)';
-      }
-
-      beatStep = (beatStep + 1) % 16;
+        osc.start(now);
+        osc.stop(now + 0.18);
+        step++;
+      }, 180);
     } catch (e) {}
   }
 
@@ -138,50 +90,28 @@
     const btn = document.getElementById('btnToggleSound');
     if (isSoundActive) {
       getAudioContext();
-      if (!cocoBeatTimer) cocoBeatTimer = setInterval(triggerCocoBeat, 131); // ~114 BPM
+      startThereminSound();
       if (btn) {
         btn.classList.add('active');
-        btn.innerHTML = '🥥 Sound: ON';
+        btn.innerHTML = '🛸 UFO SOUND: ON';
       }
-      playSynthZap(800, 'triangle', 0.18);
-      logTerminal('[AUDIO 🥥] Tropical Coconut Marimba Synth (~114 BPM) gestartet.');
+      playLaserZap(900, 150, 0.25);
     } else {
-      if (cocoBeatTimer) {
-        clearInterval(cocoBeatTimer);
-        cocoBeatTimer = null;
+      if (thereminLoop) {
+        clearInterval(thereminLoop);
+        thereminLoop = null;
       }
       if (btn) {
         btn.classList.remove('active');
-        btn.innerHTML = '🥥 Sound: OFF';
+        btn.innerHTML = '🛸 UFO SOUND: OFF';
       }
-      logTerminal('[AUDIO 🔇] Sound stummgeschaltet.');
     }
   };
 
-  // --- Terminal Stream Logger ---
-  function logTerminal(msg, type) {
-    const stream = document.getElementById('telemetryStream');
-    if (!stream) return;
-    const row = document.createElement('div');
-    row.className = 'log-entry ' + (type ? 'log-entry-' + type : '');
-    const ts = new Date().toTimeString().split(' ')[0];
-    row.textContent = `[${ts}] ${msg}`;
-    stream.appendChild(row);
-    stream.scrollTop = stream.scrollHeight;
-
-    while (stream.children.length > 60) {
-      stream.removeChild(stream.firstChild);
-    }
-  }
-
-  // --- Coconut Resonator Visualizer ---
-  function renderResonator(r, g, b, isStrobe, customLabel) {
-    const sphereEl = document.getElementById('coconutSphere');
-    const chamberEl = document.getElementById('neopixelChamber');
-    const dieEl = document.getElementById('siliconDie');
-    const auraEl = document.getElementById('radianceAura');
-    const colorLabel = document.getElementById('activeColorLabel');
-    const detailLabel = document.getElementById('activeDetailLabel');
+  // --- Visual Tractor Beam Renderer ---
+  function updateTractorBeam(r, g, b, isStrobe, labelText) {
+    const beam = document.getElementById('tractorBeam');
+    const label = document.getElementById('beamLabel');
 
     if (strobeTimer) {
       clearInterval(strobeTimer);
@@ -189,85 +119,53 @@
     }
 
     if (isStrobe) {
-      if (sphereEl) sphereEl.style.transform = 'scale(1.08) rotate(2deg)';
-      const rainbowColors = [
-        [255, 0, 127],   // Pink
-        [0, 255, 136],   // Pine Green
-        [0, 240, 255],   // Glacier Cyan
-        [255, 183, 0],   // Solar Gold
-        [255, 16, 48],   // Wild Berry
-        [255, 255, 255]  // Coconut Pulp
+      const colors = [
+        [57, 255, 20],   // Alien Green
+        [255, 0, 127],   // Alien Pink
+        [0, 240, 255],   // UFO Cyan
+        [255, 234, 0],   // Plasma Gold
+        [157, 0, 255],   // Saucer Purple
+        [255, 255, 255]  // White
       ];
       let step = 0;
       strobeTimer = setInterval(() => {
-        const c = rainbowColors[step % rainbowColors.length];
-        const colStr = `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
-        if (chamberEl) {
-          chamberEl.style.borderColor = colStr;
-          chamberEl.style.boxShadow = `0 0 25px ${colStr}`;
+        const c = colors[step % colors.length];
+        const colStr = `rgba(${c[0]}, ${c[1]}, ${c[2]}, 0.85)`;
+        if (beam) {
+          beam.style.background = `linear-gradient(to bottom, ${colStr} 0%, rgba(${c[0]}, ${c[1]}, ${c[2]}, 0.15) 80%, transparent 100%)`;
+          beam.style.filter = `drop-shadow(0 0 20px rgb(${c[0]}, ${c[1]}, ${c[2]}))`;
         }
-        if (dieEl) {
-          dieEl.style.background = colStr;
-          dieEl.style.boxShadow = `0 0 20px ${colStr}`;
-        }
-        if (auraEl) {
-          auraEl.style.background = `radial-gradient(circle, ${colStr} 0%, rgba(${c[0]}, ${c[1]}, ${c[2]}, 0.35) 45%, transparent 75%)`;
-        }
-        if (colorLabel) colorLabel.textContent = `⚡ RANDEN COCO-STROBE ACTIVE`;
-        if (detailLabel) detailLabel.textContent = `70ms Pulsing Loop // ${colStr}`;
+        if (label) label.textContent = `⚡ UFO ABDUCTION STROBE ACTIVE // rgb(${c[0]}, ${c[1]}, ${c[2]})`;
         step++;
-      }, 70);
+      }, 70); // 70ms firmware cycle
       return;
     }
-
-    const colStr = `rgb(${r}, ${g}, ${b})`;
 
     if (r === 0 && g === 0 && b === 0) {
-      if (sphereEl) sphereEl.style.transform = 'scale(1) rotate(0deg)';
-      if (chamberEl) {
-        chamberEl.style.borderColor = '#2a1a35';
-        chamberEl.style.boxShadow = 'none';
+      if (beam) {
+        beam.style.opacity = '0.05';
+        beam.style.filter = 'none';
       }
-      if (dieEl) {
-        dieEl.style.background = '#1a0c24';
-        dieEl.style.boxShadow = 'none';
-      }
-      if (auraEl) auraEl.style.opacity = '0';
-      if (colorLabel) colorLabel.textContent = '🌙 DEEP FOREST BLACKOUT';
-      if (detailLabel) detailLabel.textContent = 'Hardware NeoPixel aus (Standby)';
+      if (label) label.textContent = '🌑 CLOAKING ACTIVE // LED OFF';
       return;
     }
 
-    if (sphereEl) sphereEl.style.transform = 'scale(1.04)';
-    if (chamberEl) {
-      chamberEl.style.borderColor = colStr;
-      chamberEl.style.boxShadow = `0 0 25px ${colStr}`;
+    if (beam) {
+      beam.style.opacity = '1';
+      beam.style.background = `linear-gradient(to bottom, rgba(${r}, ${g}, ${b}, 0.85) 0%, rgba(${r}, ${g}, ${b}, 0.15) 80%, transparent 100%)`;
+      beam.style.filter = `drop-shadow(0 0 20px rgb(${r}, ${g}, ${b}))`;
     }
-    if (dieEl) {
-      dieEl.style.background = colStr;
-      dieEl.style.boxShadow = `0 0 20px ${colStr}`;
-    }
-    if (auraEl) {
-      auraEl.style.opacity = '0.9';
-      auraEl.style.background = `radial-gradient(circle, ${colStr} 0%, rgba(${r}, ${g}, ${b}, 0.3) 45%, transparent 70%)`;
-    }
-    if (colorLabel) {
-      colorLabel.textContent = customLabel || `COCONUT BIO-GLOW`;
-    }
-    if (detailLabel) {
+    if (label) {
       const hex = '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1).toUpperCase();
-      detailLabel.textContent = `${hex} • RGB(${r}, ${g}, ${b}) • ${currentDurationSec}s Timer`;
+      label.textContent = labelText || `🛸 BEAM: ${hex} (RGB ${r}, ${g}, ${b})`;
     }
   }
 
-  // --- HiveMQ WebSockets Link ---
+  // --- MQTT Client Setup (HiveMQ WebSockets) ---
   function setupMQTT() {
-    if (typeof mqtt === 'undefined') {
-      logTerminal('MQTT.js Client nicht geladen.', 'err');
-      return;
-    }
+    if (typeof mqtt === 'undefined') return;
 
-    const clientId = 'RandeResonator_' + Math.random().toString(16).substr(2, 8);
+    const clientId = 'RandeUfo_' + Math.random().toString(16).substr(2, 8);
     const brokerUrl = 'wss://broker.hivemq.com:8884/mqtt';
 
     try {
@@ -279,17 +177,10 @@
       });
 
       mqttClient.on('connect', function () {
-        isConnectedMqtt = true;
-        logTerminal('[MQTT] Verbunden mit HiveMQ Broker (wss://broker.hivemq.com:8884)', 'ack');
-        logTerminal('[MQTT] Subscribed zu randelab/solar/ack & randelab/solar/cmd');
         mqttClient.subscribe('randelab/solar/ack', { qos: 0 });
         mqttClient.subscribe('randelab/solar/cmd', { qos: 0 });
-
-        const badge = document.getElementById('hardwareBadge');
-        if (badge) {
-          badge.innerHTML = '<span class="status-dot"></span> <span>ESP32-S3 ONLINE</span>';
-          badge.style.borderColor = 'rgba(0, 255, 136, 0.4)';
-        }
+        const log = document.getElementById('logMini');
+        if (log) log.textContent = '🟢 AREA 51 MQTT LINK ACTIVE';
       });
 
       mqttClient.on('message', function (topic, message) {
@@ -299,30 +190,23 @@
           try {
             const ack = JSON.parse(payloadStr);
             const rtt = lastCommandSentMs > 0 ? (Date.now() - lastCommandSentMs) : 0;
-            const rttStr = rtt > 0 ? ` (Ping: ${rtt} ms)` : '';
-            logTerminal(`[ESP32 ACK ⚡] ${ack.action || 'ok'} // R=${ack.r || 0} G=${ack.g || 0} B=${ack.b || 0} (${ack.duration_sec || 10}s)${rttStr}`, 'ack');
-
-            const latencyEl = document.getElementById('pingLatencyBadge');
-            if (latencyEl && rtt > 0) {
-              latencyEl.textContent = `⚡ ${rtt} ms`;
-              latencyEl.style.display = 'inline-block';
+            const log = document.getElementById('logMini');
+            if (log) {
+              log.textContent = `⚡ ACK FROM ESP32: ${ack.action} (${rtt} ms roundtrip)`;
             }
 
             if (ack.action === 'disco_strobe') {
-              renderResonator(0, 0, 0, true);
+              updateTractorBeam(0, 0, 0, true);
             } else if (ack.r !== undefined && ack.g !== undefined && ack.b !== undefined) {
-              renderResonator(ack.r, ack.g, ack.b, false);
+              updateTractorBeam(ack.r, ack.g, ack.b, false);
             }
-          } catch (e) {
-            logTerminal(`[ESP32 ACK ⚡] ${payloadStr}`, 'ack');
-          }
+          } catch (e) {}
         } else if (topic === 'randelab/solar/cmd') {
           try {
             const cmd = JSON.parse(payloadStr);
             if (cmd.action === 'led' && cmd.color) {
-              logTerminal(`[REMOTE 📡] Externer Befehl: ${cmd.color}`, 'tx');
               if (cmd.color === 'disco' || cmd.color === 'strobe' || cmd.color === 'party') {
-                renderResonator(0, 0, 0, true);
+                updateTractorBeam(0, 0, 0, true);
               }
             }
           } catch (e) {}
@@ -330,36 +214,28 @@
       });
 
       mqttClient.on('offline', function () {
-        isConnectedMqtt = false;
-        const badge = document.getElementById('hardwareBadge');
-        if (badge) {
-          badge.innerHTML = '<span class="status-dot" style="background:#ff3860; box-shadow:0 0 8px #ff3860;"></span> <span>MQTT RECONNECTING</span>';
-        }
+        const log = document.getElementById('logMini');
+        if (log) log.textContent = '🔴 MQTT RECONNECTING...';
       });
-
-      mqttClient.on('error', function (err) {
-        logTerminal(`[MQTT ⚠️] Fehler: ${err}`, 'err');
-      });
-    } catch (e) {
-      logTerminal(`[MQTT ⚠️] ${e}`, 'err');
-    }
+    } catch (e) {}
   }
 
   // --- Dispatch Command (MQTT + Local REST) ---
-  window.triggerCocoColor = async function (colorName, rgbPreset, labelText) {
+  window.triggerUfoColor = async function (colorName, rgbPreset, labelText) {
     lastCommandSentMs = Date.now();
-    playSynthZap(540, 'sine', 0.12);
+    playLaserZap(800, 200, 0.15);
 
-    // 1. Immediate visual feedback
+    // 1. Immediate visual update
     if (colorName === 'disco' || colorName === 'strobe' || colorName === 'party') {
-      renderResonator(0, 0, 0, true);
+      updateTractorBeam(0, 0, 0, true);
     } else if (rgbPreset && rgbPreset.length === 3) {
-      renderResonator(rgbPreset[0], rgbPreset[1], rgbPreset[2], false, labelText);
+      updateTractorBeam(rgbPreset[0], rgbPreset[1], rgbPreset[2], false, labelText);
     }
 
-    logTerminal(`[DISPATCH 🚀] Sende "${colorName.toUpperCase()}" (${currentDurationSec}s)...`, 'tx');
+    const log = document.getElementById('logMini');
+    if (log) log.textContent = `🚀 FIRING BEAM: "${colorName.toUpperCase()}" (${currentDurationSec}s)...`;
 
-    // 2. Publish to MQTT (reaches ESP32 anywhere via 5G)
+    // 2. Publish to HiveMQ MQTT
     if (mqttClient && mqttClient.connected) {
       const payload = {
         action: 'led',
@@ -368,9 +244,6 @@
         t: Date.now()
       };
       mqttClient.publish('randelab/solar/cmd', JSON.stringify(payload));
-      logTerminal(`[MQTT 🥥] randelab/solar/cmd -> ${colorName}`);
-    } else {
-      logTerminal('[MQTT ⚠️] Broker nicht verbunden, nutze lokalen REST-Kanal...', 'err');
     }
 
     // 3. Parallel REST Fallback if on local lab network
@@ -383,9 +256,8 @@
         try {
           const res = await fetch(ep, { method: 'GET', mode: 'cors', cache: 'no-store' });
           if (res.ok) {
-            const data = await res.json();
             const rtt = Date.now() - lastCommandSentMs;
-            logTerminal(`[REST ⚡] 192.168.1.100 antwortet OK in ${rtt} ms`, 'ack');
+            if (log) log.textContent = `⚡ 192.168.1.100 ACK: OK (${rtt} ms)`;
             break;
           }
         } catch (e) {}
@@ -393,23 +265,18 @@
     } catch (e) {}
   };
 
-  // Duration Selection
-  window.setDuration = function (sec, pillEl) {
+  // Duration selection
+  window.setDuration = function (sec, btnEl) {
     currentDurationSec = sec;
-    document.querySelectorAll('.dur-pill').forEach(p => p.classList.remove('active'));
-    if (pillEl) pillEl.classList.add('active');
-    playCoconutClick(820);
-    logTerminal(`[TIMER ⏱️] Leuchtdauer auf ${sec} Sekunden eingestellt.`);
+    document.querySelectorAll('.dur-btn').forEach(b => b.classList.remove('active'));
+    if (btnEl) btnEl.classList.add('active');
+    playLaserZap(600, 300, 0.08);
   };
 
-  // Init
   document.addEventListener('DOMContentLoaded', () => {
-    logTerminal('🥥 RandeLab Coconut Research Lab Disco initialisiert (857 m ü. M.)');
-    logTerminal('Verbinde mit ESP32-S3 Hardware NeoPixel (GPIO 48)...');
     setupMQTT();
-
-    // Default Bio-Pink State
-    renderResonator(255, 0, 127, false, '🌺 ÄTZISLOO COCO-PINK');
+    // Default Alien Green tractor beam
+    updateTractorBeam(57, 255, 20, false, '👽 TRACTOR BEAM: ALIEN GREEN');
   });
 
 })();
