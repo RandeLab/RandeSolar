@@ -1228,7 +1228,8 @@ async function fetchLiveTelemetry(explicit = false) {
   if (!isHttps) {
     endpointsToTry.push('/api/live');
     if (activeEndpoint) endpointsToTry.push(`${activeEndpoint}/api/live`);
-    endpointsToTry.push('http://192.168.1.101/api/live');
+    endpointsToTry.push('http://randesolar.local/api/live');
+    endpointsToTry.push('http://192.168.1.100/api/live');
   } else if (explicit && activeEndpoint) {
     endpointsToTry.push(activeEndpoint.endsWith('/api/live') ? activeEndpoint : `${activeEndpoint}/api/live`);
   }

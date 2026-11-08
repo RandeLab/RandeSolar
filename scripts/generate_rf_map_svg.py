@@ -1,8 +1,12 @@
-import base64, math, os
+import base64, math, os, json
 
 # 1. Read base64 OSM background
 with open('docs/maps/osm_randen_bg.png', 'rb') as f:
     b64_bg = base64.b64encode(f.read()).decode('utf-8')
+
+# 2. Read real border ways from Overpass
+with open('docs/maps/real_border.json', 'rb') as f:
+    border_ways = json.load(f)
 
 # Canvas Dimensions
 CANVAS_W = 1440
@@ -28,7 +32,7 @@ def latlon2pixel(lat, lon):
     gy = (1.0 - math.asinh(math.tan(lat_rad)) / math.pi) / 2.0 * n
     px = MAP_X + (gx - x_min) * 256
     py = MAP_Y + (gy - y_min) * 256
-    return px, py
+    return round(px, 1), round(py, 1)
 
 rl_x, rl_y = latlon2pixel(47.7701, 8.5738)
 
@@ -38,7 +42,7 @@ PX_PER_KM = 77.8
 svg = []
 svg.append(f'<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 {CANVAS_W} {CANVAS_H}" width="100%" height="100%" style="background:#0b0f19; font-family:system-ui, -apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, sans-serif;">')
 
-# Definitions &amp; Filters
+# Definitions & Filters
 svg.append('''
   <defs>
     <!-- Glow Filters -->
@@ -51,6 +55,10 @@ svg.append('''
       <feComposite in="SourceGraphic" in2="blur" operator="over" />
     </filter>
     <filter id="glow-gold" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <filter id="glow-border" x="-30%" y="-30%" width="160%" height="160%">
       <feGaussianBlur stdDeviation="4" result="blur" />
       <feComposite in="SourceGraphic" in2="blur" operator="over" />
     </filter>
@@ -78,9 +86,6 @@ svg.append('''
       <stop offset="50%" stop-color="#f59e0b" stop-opacity="0.6"/>
       <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.2"/>
     </linearGradient>
-    <pattern id="grid-dots" width="20" height="20" patternUnits="userSpaceOnUse">
-      <circle cx="2" cy="2" r="1" fill="#334155" opacity="0.3"/>
-    </pattern>
   </defs>
 ''')
 
@@ -97,8 +102,8 @@ svg.append(f'<g clip-path="url(#map-clip)">')
 # 1. Stitched OSM Background
 svg.append(f'  <image href="data:image/png;base64,{b64_bg}" x="{MAP_X}" y="{MAP_Y}" width="{MAP_W}" height="{MAP_H}"/>')
 
-# 2. Subtle Darkening/Styling Overlay so vector elements pop cleanly
-svg.append(f'  <rect x="{MAP_X}" y="{MAP_Y}" width="{MAP_W}" height="{MAP_H}" fill="#0f172a" fill-opacity="0.32"/>')
+# 2. Subtle Darkening Overlay
+svg.append(f'  <rect x="{MAP_X}" y="{MAP_Y}" width="{MAP_W}" height="{MAP_H}" fill="#0f172a" fill-opacity="0.28"/>')
 
 # 3. Distance Circles from RandeLab (1km, 2km, 3km, 5km)
 for km in [1, 2, 3, 5]:
@@ -106,133 +111,125 @@ for km in [1, 2, 3, 5]:
     svg.append(f'  <circle cx="{rl_x:.1f}" cy="{rl_y:.1f}" r="{r:.1f}" fill="none" stroke="#38bdf8" stroke-width="1" stroke-dasharray="4 4" stroke-opacity="0.45"/>')
     svg.append(f'  <text x="{rl_x + r + 4:.1f}" y="{rl_y - 4:.1f}" fill="#38bdf8" font-size="10" font-weight="bold" opacity="0.8">{km} km</text>')
 
-# 4. Swiss / German Border Line Accent
-# Approximate border coordinates from west to east
-border_pts = [
-    (47.8130, 8.4900), (47.8080, 8.5200), (47.8050, 8.5450),
-    (47.8020, 8.5700), (47.7980, 8.5850), (47.7940, 8.6050),
-    (47.7900, 8.6300), (47.7850, 8.6500)
-]
-b_path_d = []
-for i, (b_lat, b_lon) in enumerate(border_pts):
-    bx, by = latlon2pixel(b_lat, b_lon)
-    b_path_d.append(f'{"M" if i==0 else "L"} {bx:.1f} {by:.1f}')
-b_path_str = " ".join(b_path_d)
+# 4. EXACT REAL SWISS-GERMAN BORDER from OpenStreetMap Relation Data
+svg.append('  <!-- Exact Real National Border Switzerland / Germany from OSM -->')
+for i, w in enumerate(border_ways):
+    pts = [latlon2pixel(pt['lat'], pt['lon']) for pt in w]
+    d_str = " ".join([f'{"M" if j==0 else "L"} {px} {py}' for j, (px, py) in enumerate(pts)])
+    # Red background glow
+    svg.append(f'  <path d="{d_str}" fill="none" stroke="#ef4444" stroke-width="4.5" stroke-opacity="0.5" filter="url(#glow-border)"/>')
+    # Crisp dashed national border
+    svg.append(f'  <path d="{d_str}" fill="none" stroke="#ef4444" stroke-width="2.8" stroke-dasharray="10 5" stroke-linecap="round"/>')
+    svg.append(f'  <path d="{d_str}" fill="none" stroke="#ffffff" stroke-width="1.2" stroke-dasharray="3 12" stroke-linecap="round"/>')
 
-svg.append(f'  <!-- Swiss-German Border Line -->')
-svg.append(f'  <path d="{b_path_str}" fill="none" stroke="#ef4444" stroke-width="3.5" stroke-dasharray="8 6" opacity="0.85"/>')
-svg.append(f'  <path d="{b_path_str}" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="2 12" opacity="0.9"/>')
-svg.append(f'  <rect x="520" y="380" width="220" height="22" rx="4" fill="#0f172a" fill-opacity="0.8" stroke="#ef4444" stroke-width="1"/>')
-svg.append(f'  <text x="630" y="395" text-anchor="middle" fill="#f87171" font-size="11" font-weight="bold" letter-spacing="1">🇨🇭 SCHWEIZ  |  DEUTSCHLAND 🇩🇪</text>')
+# Border Label Badge along the border
+svg.append('''
+  <g transform="translate(680, 310)" filter="url(#card-shadow)">
+    <rect x="-110" y="-12" width="220" height="24" rx="5" fill="#0f172a" fill-opacity="0.92" stroke="#ef4444" stroke-width="1.5"/>
+    <text x="0" y="4" text-anchor="middle" fill="#f87171" font-size="11" font-weight="bold" letter-spacing="1">🇨🇭 SCHWEIZ  |  DEUTSCHLAND 🇩🇪</text>
+  </g>
+''')
 
-# 5. Radio Beams from RandeLab to Towers
+# 5. Correct Masts with exact coordinates
 masts = [
+    {
+        'id': 'hagenturm',
+        'name': 'Hagenturm (912 m ü. M.)',
+        'sub': 'Swisscom (228 01) &amp; Sunrise (228 02)',
+        'lat': 47.77404, 'lon': 8.56757,
+        'badge': '🏔️ Höchster Punkt Kanton SH • 640 m NW vom RandeLab!',
+        'stroke': '#f59e0b', 'beam': 'url(#beam-gold)',
+        'flag': '🇨🇭', 'rat': '4G LTE &amp; 5G NR Sichtverbindung',
+        'dist': '0.64 km • 313° (NW)',
+        'card_x': 180, 'card_y': 520, 'card_w': 310, 'card_h': 62
+    },
+    {
+        'id': 'randen_b8',
+        'name': 'Zelle Randen (900 MHz)',
+        'sub': 'Salt / GoMo • LTE Band 8',
+        'lat': 47.7640, 'lon': 8.5790,
+        'badge': '🔋 Ruhe-Anker: -81 dBm (10 MHz) • 9.7 / 14.9 Mbit/s',
+        'stroke': '#10b981', 'beam': 'url(#beam-green)',
+        'flag': '🇨🇭', 'rat': '4G LTE Grundversorgung',
+        'dist': '0.78 km • 150° (SSE)',
+        'card_x': 600, 'card_y': 675, 'card_w': 285, 'card_h': 62
+    },
     {
         'id': 'merishausen',
         'name': 'Mast Merishausen Südhang',
-        'sub': 'Salt / GoMo • LTE B3 + 5G N1',
+        'sub': 'Salt / GoMo • LTE B3 (20 MHz) + 5G N1/N78',
         'lat': 47.7585, 'lon': 8.5910,
-        'badge': '🏆 44.8 Mbit/s | RSRP -93 dBm | SINR 11 dB',
+        'badge': '🏆 High-Speed Sieger: 44.8 Mbit/s | -93 dBm | SINR 11 dB',
         'stroke': '#06b6d4', 'beam': 'url(#beam-cyan)',
-        'flag': '🇨🇭', 'rat': '5G-NSA High-Speed',
-        'dist': '1.82 km • 135°'
+        'flag': '🇨🇭', 'rat': '5G-NSA High-Speed Aggregation',
+        'dist': '1.82 km • 135° (SE)',
+        'card_x': 675, 'card_y': 755, 'card_w': 315, 'card_h': 62
     },
     {
         'id': 'bargen',
         'name': 'Mast Bargen (A4-Korridor)',
         'sub': 'Salt / GoMo • LTE Band 20 (800 MHz)',
         'lat': 47.7890, 'lon': 8.6045,
-        'badge': '🌲 Reichweiten-König: 14.3 / 54.8 Mbit/s • -88 dBm',
+        'badge': '🌲 Reichweiten-König: 14.3 / 54.8 Mbit/s • -88 dBm durch Wald',
         'stroke': '#ec4899', 'beam': 'url(#beam-pink)',
         'flag': '🇨🇭', 'rat': '4G LTE Wald-Durchdringung',
-        'dist': '3.11 km • 48°'
-    },
-    {
-        'id': 'randen_b8',
-        'name': 'Lokale Zelle Randen',
-        'sub': 'Salt / GoMo • LTE Band 8 (900 MHz)',
-        'lat': 47.7640, 'lon': 8.5790,
-        'badge': '🔋 Ruhe-Anker: -81 dBm (10 MHz) • 9.7 / 14.9 Mbit/s',
-        'stroke': '#10b981', 'beam': 'url(#beam-green)',
-        'flag': '🇨🇭', 'rat': '4G LTE Grundversorgung',
-        'dist': '0.78 km • 150°'
-    },
-    {
-        'id': 'hagenturm',
-        'name': 'Hagenturm / Randenturm (912 m)',
-        'sub': 'Swisscom (228 01) &amp; Sunrise (228 02)',
-        'lat': 47.7785, 'lon': 8.5290,
-        'badge': '🏔️ Höchster Punkt SH • 4G LTE &amp; 5G NR Sichtlinie',
-        'stroke': '#f59e0b', 'beam': 'url(#beam-gold)',
-        'flag': '🇨🇭', 'rat': 'Swisscom / Sunrise 5G',
-        'dist': '3.48 km • 286°'
+        'dist': '3.11 km • 48° (NE)',
+        'card_x': 750, 'card_y': 445, 'card_w': 280, 'card_h': 62
     },
     {
         'id': 'wiechs',
         'name': 'Wiechs am Randen (Baden-Württ.)',
         'sub': 'Telekom.de (262 01) &amp; Vodafone (262 02)',
         'lat': 47.8050, 'lon': 8.5860,
-        'badge': '🇩🇪 DE Grenz-Overspill: 5G NR Empfang am Randen!',
+        'badge': '🇩🇪 DE Grenz-Overspill: 5G NR direkt empfangen!',
         'stroke': '#ef4444', 'beam': 'url(#beam-de)',
         'flag': '🇩🇪', 'rat': 'Telekom / Vodafone 5G',
-        'dist': '3.99 km • 13°'
+        'dist': '3.99 km • 13° (NNE)',
+        'card_x': 640, 'card_y': 250, 'card_w': 285, 'card_h': 62
     },
     {
         'id': 'tengen',
         'name': 'Tengen / Kommingen (Hegau)',
-        'sub': '1+1 (262 23) &amp; O2-de (262 03)',
+        'sub': '1+1 (262 23) &amp; o2 - de (262 03)',
         'lat': 47.8180, 'lon': 8.5520,
-        'badge': '🇩🇪 Neues 1+1 5G Kernnetz &amp; O2 LTE direkt empfangen',
+        'badge': '🇩🇪 Neues 1+1 5G Kernnetz &amp; o2 LTE über Hegau-Kamm',
         'stroke': '#8b5cf6', 'beam': 'url(#beam-de)',
-        'flag': '🇩🇪', 'rat': '1+1 / O2 5G',
-        'dist': '5.57 km • 343°'
+        'flag': '🇩🇪', 'rat': '1+1 / o2 5G NR',
+        'dist': '5.57 km • 343° (NNW)',
+        'card_x': 140, 'card_y': 195, 'card_w': 285, 'card_h': 62
     }
 ]
 
-# Draw Beams
+# Draw Radio Rays / Beams
 for m in masts:
     mx, my = latlon2pixel(m['lat'], m['lon'])
     svg.append(f'  <line x1="{rl_x:.1f}" y1="{rl_y:.1f}" x2="{mx:.1f}" y2="{my:.1f}" stroke="{m["stroke"]}" stroke-width="2.5" stroke-dasharray="6 3" stroke-opacity="0.85"/>')
 
-# Draw Mast Markers &amp; Badges
+# Draw Mast Markers & Cards
 for m in masts:
     mx, my = latlon2pixel(m['lat'], m['lon'])
     col = m['stroke']
     
     # Pulsing halo
-    svg.append(f'  <circle cx="{mx:.1f}" cy="{my:.1f}" r="14" fill="{col}" fill-opacity="0.25" stroke="{col}" stroke-width="1.5"/>')
+    svg.append(f'  <circle cx="{mx:.1f}" cy="{my:.1f}" r="15" fill="{col}" fill-opacity="0.25" stroke="{col}" stroke-width="1.5"/>')
     svg.append(f'  <circle cx="{mx:.1f}" cy="{my:.1f}" r="6" fill="{col}" stroke="#ffffff" stroke-width="1.5"/>')
 
-    # Card positioning (smart offsets based on direction from RandeLab)
-    dx = mx - rl_x
-    dy = my - rl_y
-    card_w = 230
-    card_h = 58
-    
-    # Offset positioning
-    if dx >= 0 and dy >= 0: # SE
-        cx = mx + 16
-        cy = my - 10
-    elif dx >= 0 and dy < 0: # NE
-        cx = mx + 16
-        cy = my - 30
-    elif dx < 0 and dy >= 0: # SW
-        cx = mx - card_w - 16
-        cy = my - 10
-    else: # NW
-        cx = mx - card_w - 16
-        cy = my - 25
+    # Connecting line from marker to card
+    cx = m['card_x']
+    cy = m['card_y']
+    cw = m['card_w']
+    ch = m['card_h']
+    card_center_x = cx + cw / 2
+    card_center_y = cy + ch / 2
+    svg.append(f'  <line x1="{mx:.1f}" y1="{my:.1f}" x2="{card_center_x:.1f}" y2="{card_center_y:.1f}" stroke="{col}" stroke-width="1" stroke-opacity="0.5"/>')
 
-    # Boundary protection
-    cx = max(MAP_X + 10, min(MAP_X + MAP_W - card_w - 10, cx))
-    cy = max(MAP_Y + 10, min(MAP_Y + MAP_H - card_h - 10, cy))
-
+    # Card
     svg.append(f'  <!-- Card for {m["id"]} -->')
     svg.append(f'  <g filter="url(#card-shadow)">')
-    svg.append(f'    <rect x="{cx:.1f}" y="{cy:.1f}" width="{card_w}" height="{card_h}" rx="6" fill="#0f172a" fill-opacity="0.92" stroke="{col}" stroke-width="1.5"/>')
-    svg.append(f'    <text x="{cx + 10:.1f}" y="{cy + 17:.1f}" fill="#ffffff" font-size="11.5" font-weight="bold">{m["flag"]} {m["name"]}</text>')
-    svg.append(f'    <text x="{cx + 10:.1f}" y="{cy + 33:.1f}" fill="{col}" font-size="9.5" font-weight="600">{m["sub"]}</text>')
-    svg.append(f'    <text x="{cx + 10:.1f}" y="{cy + 48:.1f}" fill="#94a3b8" font-size="8.8">{m["dist"]} • {m["badge"]}</text>')
+    svg.append(f'    <rect x="{cx:.1f}" y="{cy:.1f}" width="{cw}" height="{ch}" rx="6" fill="#0f172a" fill-opacity="0.94" stroke="{col}" stroke-width="1.5"/>')
+    svg.append(f'    <text x="{cx + 10:.1f}" y="{cy + 18:.1f}" fill="#ffffff" font-size="12" font-weight="bold">{m["flag"]} {m["name"]}</text>')
+    svg.append(f'    <text x="{cx + 10:.1f}" y="{cy + 35:.1f}" fill="{col}" font-size="10" font-weight="600">{m["sub"]}</text>')
+    svg.append(f'    <text x="{cx + 10:.1f}" y="{cy + 51:.1f}" fill="#94a3b8" font-size="9">{m["dist"]} • {m["badge"]}</text>')
     svg.append(f'  </g>')
 
 # 6. RandeLab Central Hub (📍 857 m)
@@ -242,15 +239,16 @@ svg.append(f'  <circle cx="{rl_x:.1f}" cy="{rl_y:.1f}" r="18" fill="#ec4899" fil
 svg.append(f'  <circle cx="{rl_x:.1f}" cy="{rl_y:.1f}" r="7" fill="#fbbf24" stroke="#ffffff" stroke-width="2"/>')
 
 # RandeLab Badge
-rl_cw, rl_ch = 270, 72
-rl_cx = rl_x - rl_cw / 2
-rl_cy = rl_y + 24
+rl_cw, rl_ch = 290, 78
+rl_cx = rl_x - 310
+rl_cy = rl_y + 35
+svg.append(f'  <line x1="{rl_x:.1f}" y1="{rl_y:.1f}" x2="{rl_cx + rl_cw/2:.1f}" y2="{rl_cy:.1f}" stroke="#38bdf8" stroke-width="1.5" stroke-opacity="0.6"/>')
 svg.append(f'  <g filter="url(#card-shadow)">')
-svg.append(f'    <rect x="{rl_cx:.1f}" y="{rl_cy:.1f}" width="{rl_cw}" height="{rl_ch}" rx="8" fill="#0f172a" fill-opacity="0.95" stroke="#38bdf8" stroke-width="2"/>')
-svg.append(f'    <text x="{rl_cx + 12:.1f}" y="{rl_cy + 20:.1f}" fill="#38bdf8" font-size="13" font-weight="bold">📍 RANDELAB OBSERVATORIUM</text>')
-svg.append(f'    <text x="{rl_cx + 12:.1f}" y="{rl_cy + 37:.1f}" fill="#facc15" font-size="10.5" font-weight="bold">Höhe: 857 m ü. M. • Underes Ätzisloo 189</text>')
-svg.append(f'    <text x="{rl_cx + 12:.1f}" y="{rl_cy + 52:.1f}" fill="#e2e8f0" font-size="9.5">📡 Teltonika TRB500 (Snapdragon X55)</text>')
-svg.append(f'    <text x="{rl_cx + 12:.1f}" y="{rl_cy + 65:.1f}" fill="#94a3b8" font-size="9">⚡ ESP32-S3 (24/7 Direkt an 12V Batterie)</text>')
+svg.append(f'    <rect x="{rl_cx:.1f}" y="{rl_cy:.1f}" width="{rl_cw}" height="{rl_ch}" rx="8" fill="#0f172a" fill-opacity="0.96" stroke="#38bdf8" stroke-width="2"/>')
+svg.append(f'    <text x="{rl_cx + 12:.1f}" y="{rl_cy + 22:.1f}" fill="#38bdf8" font-size="13.5" font-weight="bold">📍 RANDELAB OBSERVATORIUM</text>')
+svg.append(f'    <text x="{rl_cx + 12:.1f}" y="{rl_cy + 40:.1f}" fill="#facc15" font-size="11" font-weight="bold">Höhe: 857 m ü. M. • Underes Ätzisloo 189</text>')
+svg.append(f'    <text x="{rl_cx + 12:.1f}" y="{rl_cy + 56:.1f}" fill="#e2e8f0" font-size="9.5">📡 Teltonika TRB500 (Qualcomm Snapdragon X55)</text>')
+svg.append(f'    <text x="{rl_cx + 12:.1f}" y="{rl_cy + 70:.1f}" fill="#94a3b8" font-size="9">⚡ ESP32-S3 (24/7 Autark direkt an 12V Batterie)</text>')
 svg.append(f'  </g>')
 
 # 7. Compass Rose in Top-Right of Map
@@ -285,7 +283,7 @@ svg.append(f'    <line x1="{km2_px}" y1="-5" x2="{km2_px}" y2="5" stroke="#fffff
 svg.append(f'    <text x="0" y="-8" fill="#ffffff" font-size="9" text-anchor="middle">0</text>')
 svg.append(f'    <text x="{km2_px/2}" y="-8" fill="#ffffff" font-size="9" text-anchor="middle">1 km</text>')
 svg.append(f'    <text x="{km2_px}" y="-8" fill="#ffffff" font-size="9" text-anchor="middle">2 km</text>')
-svg.append(f'    <text x="{km2_px/2}" y="10" fill="#94a3b8" font-size="8" text-anchor="middle">OpenStreetMap Cartography</text>')
+svg.append(f'    <text x="{km2_px/2}" y="10" fill="#94a3b8" font-size="8" text-anchor="middle">OpenStreetMap Cartography &amp; Swisstopo Border</text>')
 svg.append(f'  </g>')
 
 svg.append('</g>') # End of Map Clip Group
@@ -294,7 +292,7 @@ svg.append('</g>') # End of Map Clip Group
 svg.append(f'<rect x="{MAP_X}" y="{MAP_Y}" width="{MAP_W}" height="{MAP_H}" rx="12" fill="none" stroke="#334155" stroke-width="2"/>')
 
 # =========================================================================
-# RIGHT SIDEBAR: Comprehensive Telemetry &amp; RF Engineering Panel
+# RIGHT SIDEBAR: Comprehensive Telemetry & RF Engineering Panel
 # =========================================================================
 svg.append(f'<g transform="translate({SIDEBAR_X}, {SIDEBAR_Y})">')
 
@@ -345,14 +343,14 @@ svg.append('''
     <text x="18" y="96" fill="#ec4899" font-size="11" font-weight="bold">Band 20 (800 MHz) - Bargen A4</text>
     <text x="18" y="112" fill="#e2e8f0" font-size="9.5">⬇️ 14.33 Mbit/s | ⬆️ 54.84 Mbit/s | -88 dBm (Wald-Sieger)</text>
 
-    <!-- Table Row 3: Band 8 -->
-    <rect x="10" y="128" width="312" height="42" rx="4" fill="#0f172a" stroke="#10b981" stroke-width="1"/>
-    <text x="18" y="144" fill="#10b981" font-size="11" font-weight="bold">Band 8 (900 MHz) - Randen Lokal</text>
-    <text x="18" y="160" fill="#e2e8f0" font-size="9.5">⬇️ 9.65 Mbit/s | ⬆️ 14.92 Mbit/s | RSRP -81 dBm (Idle)</text>
+    <!-- Table Row 3: Hagenturm -->
+    <rect x="10" y="128" width="312" height="42" rx="4" fill="#0f172a" stroke="#f59e0b" stroke-width="1"/>
+    <text x="18" y="144" fill="#f59e0b" font-size="11" font-weight="bold">Hagenturm (912 m ü. M.) - 640 m NW</text>
+    <text x="18" y="160" fill="#e2e8f0" font-size="9.5">Swisscom &amp; Sunrise 4G/5G | Direkte Sichtlinie</text>
 
-    <!-- Table Row 4: Band 78 -->
-    <rect x="10" y="176" width="312" height="32" rx="4" fill="#0f172a" stroke="#f59e0b" stroke-dasharray="3 2"/>
-    <text x="18" y="196" fill="#f59e0b" font-size="9.5">🚀 5G N78 (3.5 GHz) schaltet dynamisch bei Volllast zu!</text>
+    <!-- Table Row 4: Band 8 & 78 -->
+    <rect x="10" y="176" width="312" height="32" rx="4" fill="#0f172a" stroke="#10b981" stroke-dasharray="3 2"/>
+    <text x="18" y="196" fill="#10b981" font-size="9.5">Band 8 (-81 dBm) im Idle • 5G N78 schaltet bei Last zu!</text>
   </g>
 ''')
 
@@ -379,7 +377,7 @@ svg.append('''
   </g>
 ''')
 
-# Card 4: Power Architecture &amp; German SIM Option
+# Card 4: Power Architecture & German SIM Option
 svg.append('''
   <g transform="translate(18, 730)">
     <rect x="0" y="0" width="332" height="270" rx="8" fill="#1e293b" fill-opacity="0.65" stroke="#334155" stroke-width="1"/>
@@ -428,6 +426,5 @@ with open('docs/maps/randen_rf_map.svg', 'w') as f:
 with open('web/randen_rf_map.svg', 'w') as f:
     f.write(svg_content)
 
-print(f'✅ SVG Map successfully generated!')
+print(f'✅ Corrected SVG Map generated!')
 print(f'   Size: {len(svg_content):,} bytes')
-print(f'   Saved to: docs/maps/randen_rf_map.svg &amp; web/randen_rf_map.svg')
