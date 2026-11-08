@@ -32,7 +32,7 @@
 ██║███╗██║██║██╔══╝  ██║    ╚════██║██║     ██╔══██║██║╚██╗██║██║╚██╗██║██╔══╝  ██╔══██╗
 ╚███╔███╔╝██║██║     ██║    ███████║╚██████╗██║  ██║██║ ╚████║██║ ╚████║███████╗██║  ██║
  ╚══╝╚══╝ ╚═╝╚═╝     ╚═╝    ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝
-[ 802.11 B/G/N SPECTRUM ANALYZER // RANDELAB ÄTZISLOO // ESP32-S3 WARDIVING RADAR ]</pre>
+[ 802.11 B/G/N SPECTRUM ANALYZER // RANDELAB // ESP32-S3 HARDWARE-SCAN ]</pre>
 
       <!-- Bezel Top Bar & Terminal Controls -->
       <div class="crt-bezel-bar" style="margin-top:10px;">
@@ -98,21 +98,21 @@
         <div style="background:rgba(0,0,0,0.6); border:1px solid var(--crt-border); border-radius:4px; padding:8px 12px;">
           <div style="font-size:0.68rem; color:var(--crt-dim);">📡 DETECTED ACCESS POINTS</div>
           <div class="crt-glow-text" style="font-size:1.5rem; font-weight:800; margin-top:2px;">
-            <span id="totalApsCount">8</span> <small style="font-size:0.75rem;">SSIDs IN RANGE</small>
+            <span id="totalApsCount">0</span> <small style="font-size:0.75rem;">SSIDs IN RANGE</small>
           </div>
         </div>
 
         <div style="background:rgba(0,0,0,0.6); border:1px solid var(--crt-border); border-radius:4px; padding:8px 12px;">
           <div style="font-size:0.68rem; color:var(--crt-dim);">🎯 PEAK SIGNAL LEVEL</div>
           <div class="crt-glow-text" style="font-size:1.15rem; font-weight:700; margin-top:4px;">
-            <span id="peakSignalDisplay">RandeLab (<b class="crt-glow-text">-41 dBm</b>)</span>
+            <span id="peakSignalDisplay">--</span>
           </div>
         </div>
 
         <div style="background:rgba(0,0,0,0.6); border:1px solid var(--crt-border); border-radius:4px; padding:8px 12px;">
           <div style="font-size:0.68rem; color:var(--crt-dim);">🔓 OPEN / UNENCRYPTED NETS</div>
           <div style="font-size:1.15rem; font-weight:700; margin-top:4px;">
-            <span id="openApsCount">0 (SECURE)</span>
+            <span id="openApsCount">0</span>
           </div>
         </div>
 
@@ -223,34 +223,34 @@
             <div style="background:rgba(0,0,0,0.5); border:1px solid var(--crt-border); border-radius:4px; padding:10px; font-size:0.78rem;">
               <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
                 <span style="color:var(--crt-dim);">SSID:</span>
-                <b class="crt-glow-text" id="hudSsid">RandeLab</b>
+                <b class="crt-glow-text" id="hudSsid">--</b>
               </div>
               <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
                 <span style="color:var(--crt-dim);">BSSID:</span>
-                <span id="hudBssid" style="font-family:'JetBrains Mono';">00:1E:42:A8:12:34</span>
+                <span id="hudBssid" style="font-family:'JetBrains Mono';">--:--:--:--:--:--</span>
               </div>
               <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
                 <span style="color:var(--crt-dim);">SIGNAL / RSSI:</span>
-                <b class="crt-glow-text" id="hudRssi">-41 dBm</b>
+                <b class="crt-glow-text" id="hudRssi">-- dBm</b>
               </div>
               <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
                 <span style="color:var(--crt-dim);">EST. DISTANZ:</span>
-                <span id="hudDist">~2.5m (AZ 0°)</span>
+                <span id="hudDist">--</span>
               </div>
               <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
                 <span style="color:var(--crt-dim);">HERSTELLER / OUI:</span>
-                <span id="hudVendor" style="color:#60a5fa;">Teltonika Networks</span>
+                <span id="hudVendor" style="color:#60a5fa;">--</span>
               </div>
               <div style="margin-top:6px; padding-top:6px; border-top:1px dashed var(--crt-border); font-size:0.72rem; color:var(--crt-dim);" id="hudDesc">
-                Lokales RandeLab Labor-Netzwerk (Teltonika Gateway TRB500 / AP).
+                Warte auf echten Wi-Fi Scan vom ESP32-S3 im RandeLab...
               </div>
             </div>
           </div>
 
-          <!-- Panel 5: Raw 802.11 TTY Packet & Frame Stream -->
+          <!-- Panel 5: Hardware 802.11 Scan TTY Log -->
           <div class="crt-panel">
             <div class="crt-panel-header crt-glow-text">
-              <span>📟 RAW 802.11 PACKET &amp; BEACON STREAM</span>
+              <span>📟 HARDWARE 802.11 SCAN TTY LOG</span>
               <button class="crt-btn" onclick="clearTtyLog()" style="padding:1px 6px; font-size:0.65rem;">CLEAR</button>
             </div>
 
@@ -295,6 +295,6 @@
   </div>
 
   <!-- Script with Cache Busting -->
-  <script src="./wifi.js?v=1.1"></script>
+  <script src="./wifi.js?v=1.2"></script>
 </body>
 </html>

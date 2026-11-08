@@ -39,101 +39,9 @@
     return 'Generic 802.11';
   }
 
-  // --- Authentic Randen Corridor Mock Wi-Fi Networks ---
-  const MOCK_NETWORKS = [
-    {
-      ssid: 'RandeLab',
-      bssid: '00:1E:42:A8:12:34',
-      rssi: -41,
-      channel: 11,
-      auth: 'WPA2',
-      distM: 2.5,
-      bearingDeg: 0,
-      active: true,
-      desc: 'Lokales RandeLab Labor-Netzwerk (Teltonika Gateway TRB500 / AP).'
-    },
-    {
-      ssid: 'RandeSolar-ESP32-S3',
-      bssid: '34:85:18:92:4B:C1',
-      rssi: -35,
-      channel: 1,
-      auth: 'WPA2',
-      distM: 1.2,
-      bearingDeg: 90,
-      active: false,
-      desc: 'ESP32-S3 Telemetrie & BLE Gateway (Victron MPPT + Solar Monitor).'
-    },
-    {
-      ssid: 'Ätzisloo-Guest',
-      bssid: 'DC:39:6F:11:8A:90',
-      rssi: -62,
-      channel: 1,
-      auth: 'WPA2',
-      distM: 18.0,
-      bearingDeg: 140,
-      active: false,
-      desc: 'Fritz!Box Gastzugang Talstation Ätzisloo / Landwirtschaft.'
-    },
-    {
-      ssid: 'Hagenturm-Meteo-Link',
-      bssid: '48:8F:5A:CC:02:11',
-      rssi: -68,
-      channel: 6,
-      auth: 'WPA3',
-      distM: 45.0,
-      bearingDeg: 313,
-      active: false,
-      desc: 'PTP Richtfunk-Link Richtung Wetterstation Hagenturm (912 m ü. M.).'
-    },
-    {
-      ssid: 'Swisscom_WLAN_Booster',
-      bssid: '7C:26:34:44:E1:92',
-      rssi: -73,
-      channel: 11,
-      auth: 'WPA2',
-      distM: 65.0,
-      bearingDeg: 210,
-      active: false,
-      desc: 'Swisscom 5G/LTE Home Booster Empfangsanlage Randen Süd.'
-    },
-    {
-      ssid: 'Freifunk-Schaffhausen',
-      bssid: '24:A4:3C:99:FF:01',
-      rssi: -79,
-      channel: 6,
-      auth: 'OPEN',
-      distM: 92.0,
-      bearingDeg: 45,
-      active: false,
-      desc: 'Offener Freifunk Mesh-Knoten Bargen/Merishausen Korridor.'
-    },
-    {
-      ssid: 'Jagdhuette-Cam-04',
-      bssid: '10:D0:7A:55:12:88',
-      rssi: -84,
-      channel: 1,
-      auth: 'WPA2',
-      distM: 120.0,
-      bearingDeg: 280,
-      active: false,
-      desc: 'Wildtier- und Jagdüberwachungskamera Hochwald Randen.'
-    },
-    {
-      ssid: 'LoRaWAN-GW-Randen',
-      bssid: 'AC:1F:0F:77:43:21',
-      rssi: -88,
-      channel: 13,
-      auth: 'WPA2',
-      distM: 145.0,
-      bearingDeg: 170,
-      active: false,
-      desc: 'TTN / The Things Network 868MHz Gateway Backhaul.'
-    }
-  ];
-
-  // --- State Variables ---
-  let networks = JSON.parse(JSON.stringify(MOCK_NETWORKS));
-  let selectedNetwork = networks[0];
+  // --- Wi-Fi State (Real Scanned Hardware Data Only) ---
+  let networks = [];
+  let selectedNetwork = null;
   let isScanning = false;
   let autoScanTimer = null;
   let autoScanIntervalSec = 5;
@@ -452,6 +360,17 @@
     ctx.textAlign = 'left';
     ctx.fillText('★ NON-OVERLAPPING: CH 1 (2412) • CH 6 (2437) • CH 11 (2462)', 55, 12);
 
+    if (networks.length === 0) {
+      ctx.fillStyle = 'rgba(57, 255, 20, 0.6)';
+      ctx.font = '10px "JetBrains Mono", monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('[ KEINE WI-FI NETZWERKE • WARTE AUF ECHTEN ESP32 SCAN ]', w / 2, h / 2 - 8);
+      ctx.font = '8.5px "JetBrains Mono", monospace';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.fillText('Klicke auf [ 📡 RESCAN ] um /api/wifi/scan am ESP32 abzufragen', w / 2, h / 2 + 10);
+      return;
+    }
+
     // Render AP Parabolic Curves
     // Sort networks so weaker ones are drawn behind stronger ones
     const sorted = [...networks].sort((a, b) => a.rssi - b.rssi);
@@ -692,6 +611,30 @@
 
     tbody.innerHTML = '';
 
+    if (networks.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="8" style="text-align:center; padding:28px 10px; color:var(--crt-dim);">
+            <div style="font-size:0.85rem; margin-bottom:6px; color:var(--crt-main);">⚠️ KEINE WI-FI NETZWERKE IM SPEICHER</div>
+            <div style="font-size:0.72rem; color:var(--crt-dim);">Keine erfundenen Signale. Warte auf echten Hardware-Scan vom ESP32-S3 im RandeLab...</div>
+            <div style="margin-top:10px;">
+              <button class="crt-btn" onclick="triggerWifiScan()" style="padding:4px 12px; font-weight:700;">📡 JETZT SCANNEN</button>
+            </div>
+          </td>
+        </tr>
+      `;
+      const totalCountEl = document.getElementById('totalApsCount');
+      if (totalCountEl) totalCountEl.innerText = '0';
+      const peakSignalEl = document.getElementById('peakSignalDisplay');
+      if (peakSignalEl) peakSignalEl.innerText = '--';
+      const openApsEl = document.getElementById('openApsCount');
+      if (openApsEl) {
+        openApsEl.innerText = '0';
+        openApsEl.style.color = 'var(--crt-main)';
+      }
+      return;
+    }
+
     networks.forEach((net, idx) => {
       const tr = document.createElement('tr');
       if (selectedNetwork && selectedNetwork.bssid === net.bssid) {
@@ -813,21 +756,7 @@
     tty.scrollTop = tty.scrollHeight;
   }
 
-  // Periodic Raw 802.11 Frame Injector
-  function injectRawFrames() {
-    if (!networks || networks.length === 0) return;
-    const randomNet = networks[Math.floor(Math.random() * networks.length)];
-    const frameTypes = [
-      `BEACON [SSID: "${randomNet.ssid}" BSSID: ${randomNet.bssid} CH: ${randomNet.channel} RSSI: ${randomNet.rssi}dBm]`,
-      `PROBE_REQ [DA: ff:ff:ff:ff:ff:ff SA: ${randomNet.bssid} CH: ${randomNet.channel}]`,
-      `PROBE_RESP [SA: ${randomNet.bssid} RATES: 1.0, 2.0, 5.5, 11.0, 54.0 Mbps]`,
-      `QoS DATA [Seq: ${Math.floor(Math.random() * 4096)} BSSID: ${randomNet.bssid} PWR: -${Math.floor(Math.random() * 20 + 60)}dBm]`
-    ];
-    const frame = frameTypes[Math.floor(Math.random() * frameTypes.length)];
-    triggerLogFrame(`802.11 RX // ${frame}`);
-  }
-
-  // --- Hardware Wi-Fi Scan API Fetcher ---
+  // --- Hardware Wi-Fi Scan API Fetcher (Real Data Only) ---
   window.triggerWifiScan = async function () {
     if (isScanning) return;
     isScanning = true;
@@ -838,7 +767,7 @@
     if (scanBtn) scanBtn.classList.add('active');
     if (scanStatus) scanStatus.innerText = 'SCANNING...';
 
-    triggerLogFrame('WIFI_SCAN_REQ // Invoking ESP32-S3 WiFi.scanNetworks()...');
+    triggerLogFrame('WIFI_SCAN_REQ // Sende Scan-Befehl an ESP32 /api/wifi/scan...');
 
     const endpoints = [
       '/api/wifi/scan',
@@ -855,9 +784,9 @@
         clearTimeout(timeoutId);
         if (res.ok) {
           const json = await res.json();
-          if (json.networks && json.networks.length > 0) {
+          if (json.networks && Array.isArray(json.networks)) {
             foundData = json.networks;
-            triggerLogFrame(`WIFI_SCAN_OK // Received ${foundData.length} live APs from hardware endpoint: ${ep}`);
+            triggerLogFrame(`WIFI_SCAN_OK // ${foundData.length} reale Funknetze von ${ep} empfangen.`);
             break;
           }
         }
@@ -867,9 +796,7 @@
     }
 
     if (foundData && foundData.length > 0) {
-      // Map live networks into our data model
       networks = foundData.map((ap, i) => {
-        // Log-distance path loss approximation for distance in meters
         const f = getChannelCenterFreq(ap.channel || 1);
         const fspl = 27.55;
         const d = Math.pow(10, (Math.abs(ap.rssi) - fspl - 20 * Math.log10(f)) / 20.0);
@@ -882,20 +809,19 @@
           channel: ap.channel || 1,
           auth: ap.auth || 'WPA2',
           distM: estDist,
-          bearingDeg: (i * 47) % 360,
-          desc: `ESP32 Live Scan AP. Signal: ${ap.rssi} dBm auf Kanal ${ap.channel}.`
+          bearingDeg: (i * 53) % 360,
+          desc: `Echter Hardware-Scan via ESP32-S3 Antenne. Pegel: ${ap.rssi} dBm auf Kanal ${ap.channel}.`
         };
       });
+
+      if (!selectedNetwork || !networks.some(n => n.bssid === selectedNetwork.bssid)) {
+        selectedNetwork = networks[0];
+      }
     } else {
-      // Fallback: Slight RSSI fluctuation to keep mock live
-      networks.forEach(n => {
-        const delta = Math.floor(Math.random() * 5) - 2;
-        n.rssi = Math.max(-95, Math.min(-30, n.rssi + delta));
-      });
-      triggerLogFrame('WIFI_SCAN_OFFLINE // Hardware unreachable. Serving calibrated Randen RF corridor beacons.');
+      triggerLogFrame('WIFI_SCAN_OFFLINE // ESP32 offline (192.168.1.100 nicht erreichbar). Keine erfundenen Signale.');
     }
 
-    // Keep selected network updated
+    // Keep selected network updated if still present
     if (selectedNetwork) {
       const match = networks.find(n => n.bssid === selectedNetwork.bssid);
       if (match) selectedNetwork = match;
@@ -906,7 +832,7 @@
     updateGeigerRate();
 
     if (scanBtn) scanBtn.classList.remove('active');
-    if (scanStatus) scanStatus.innerText = 'IDLE (READY)';
+    if (scanStatus) scanStatus.innerText = networks.length > 0 ? `LIVE (${networks.length} APs)` : 'OFFLINE (0 APs)';
     isScanning = false;
   };
 
@@ -1068,16 +994,15 @@
     // Start Loops
     renderSpectrum();
     renderTable();
-    window.selectWifiNetwork(networks[0].bssid);
     animateRadar();
+
+    // Trigger Initial Live Hardware Scan
+    window.triggerWifiScan();
 
     // Auto scan timer (default 5s)
     window.setAutoScanInterval(5);
 
-    // Frame stream injector interval
-    setInterval(injectRawFrames, 1800);
-
-    triggerLogFrame('SYSTEM_BOOT // RandeLab 802.11 SIGINT Analyzer ready.');
+    triggerLogFrame('SYSTEM_BOOT // RandeLab 802.11 Analyzer ready (Live-Only Mode).');
     triggerLogFrame('SPECTRUM // Initialized 2.4 GHz channel bounds (2400 - 2495 MHz).');
   });
 
