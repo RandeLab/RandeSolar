@@ -1062,25 +1062,106 @@ gsmctl -A AT+COPS=0
         console.print(f"[dim]{raw_cops}[/dim]")
         return
 
-    t_ops = Table(title="[bold green]📡 Empfangene Mobilfunk-Betreiber an der Grenze (857 m Randen)[/bold green]", box=box.ROUNDED)
-    t_ops.add_column("Land", style="bold white", width=16)
-    t_ops.add_column("Netzbetreiber", style="bold chartreuse3", width=22)
-    t_ops.add_column("MCC / MNC", style="cyan", width=12)
-    t_ops.add_column("Funktechnik (RAT)", style="bold yellow", width=16)
-    t_ops.add_column("Status am Randen", style="white", width=24)
+    # Detail-Datenbank für Mobilfunk-Topologie an der Grenze
+    META_OPS = {
+        "26201": {
+            "name": "Telekom Deutschland",
+            "region": "Baden-Württemberg (Tengen / Wannenberg)",
+            "bands": "B20 (800) / B8 (900) / B3 (1800) / n28 / n78",
+            "status": "🇩🇪 Grenznetz (EU-Roaming)",
+            "note": "Stärkster deutscher Weitbereichs-Mast"
+        },
+        "26202": {
+            "name": "Vodafone Deutschland",
+            "region": "Baden-Württemberg (Hegau / Watterdingen)",
+            "bands": "B20 (800) / B3 (1800) / n78 (3.5 GHz)",
+            "status": "🇩🇪 Grenznetz (EU-Roaming)",
+            "note": "Deutsches Kernnetz; dringt über Kamm 857 m ein"
+        },
+        "26203": {
+            "name": "O2 Telefónica",
+            "region": "Baden-Württemberg (Blumberg / Riedöschingen)",
+            "bands": "B20 (800) / B1 (2100) / B7 (2600) / n78",
+            "status": "🇩🇪 Grenznetz (EU-Roaming)",
+            "note": "Deutsches Flachland-Netz; stark bei Nord-Sicht"
+        },
+        "26223": {
+            "name": "1&1 Mobilfunk",
+            "region": "Baden-Württemberg (Hegau Open-RAN)",
+            "bands": "B7 (2600 MHz) / n78 (5G C-Band)",
+            "status": "🇩🇪 Grenznetz (EU-Roaming)",
+            "note": "Neuestes 4. deutsches 5G-Netz (Open-RAN)"
+        },
+        "22803": {
+            "name": "Salt (inkl. GoMo)",
+            "region": "Merishausen Südhang / Bargen (eNB 116636)",
+            "bands": "B3 (1800 MHz 20MHz) + B20 (800) + 5G n1",
+            "status": "🟢 Aktives Heimnetz (RandeLab)",
+            "note": "Primärmast: -93 dBm, 80 Mbit/s Up, 20 Mbit/s Down"
+        },
+        "22801": {
+            "name": "Swisscom",
+            "region": "Bargen / Randenblick (eNB Korridor)",
+            "bands": "B20 (800) / B3 (1800) / B1 (2100) / n78",
+            "status": "🇨🇭 Schweizer Fremdnetz",
+            "note": "Schweizer Marktführer; hohe Dichte im A4-Tal"
+        },
+        "22802": {
+            "name": "Sunrise",
+            "region": "Merishausen Tal / Bargen",
+            "bands": "B20 (800) / B3 (1800) / n78 (5G)",
+            "status": "🇨🇭 Schweizer Fremdnetz",
+            "note": "5G-Flächenausbau; Mast im Talraum"
+        }
+    }
 
-    stat_map = {"0": "Sichtbar / Broadcast", "1": "Verfügbar", "2": "Aktuell verbunden 🟢", "3": "Gesperrt / Roaming-Regel"}
-    rat_map = {0: "2G GSM", 2: "3G UTRAN / UMTS", 7: "4G LTE", 11: "5G NSA", 12: "5G NR"}
+    rat_map = {0: "2G GSM", 2: "3G UMTS", 7: "4G LTE", 11: "5G NSA", 12: "5G NR"}
+
+    # Gruppierung nach Ländern
+    t_de = Table(title="[bold yellow]🇩🇪 Deutsche Grenznetze aus Baden-Württemberg (Empfang auf 857 m Randen)[/bold yellow]", box=box.ROUNDED)
+    t_de.add_column("Betreiber", style="bold chartreuse2", width=22)
+    t_de.add_column("MCC/MNC", style="cyan", width=10)
+    t_de.add_column("Funktechnik", style="bold white", width=12)
+    t_de.add_column("Typische Bänder & Frequenzen", style="magenta", width=34)
+    t_de.add_column("Sender-Region / Herkunft", style="dim", width=38)
+
+    t_ch = Table(title="[bold green]🇨🇭 Schweizer Mobilfunknetze (Kanton Schaffhausen / Randen)[/bold green]", box=box.ROUNDED)
+    t_ch.add_column("Betreiber", style="bold white", width=22)
+    t_ch.add_column("MCC/MNC", style="cyan", width=10)
+    t_ch.add_column("Funktechnik", style="bold yellow", width=12)
+    t_ch.add_column("Rolle am RandeLab", style="bold chartreuse3", width=30)
+    t_ch.add_column("Standort & Mast-Charakteristik", style="dim", width=42)
+
+    found_de = 0
+    found_ch = 0
 
     for stat, long_name, short_name, mccmnc, rat in matches:
-        country = "🇩🇪 Deutschland" if mccmnc.startswith("262") else "🇨🇭 Schweiz"
         rat_label = rat_map.get(int(rat), f"RAT {rat}")
-        status_label = stat_map.get(stat, "Erfasst")
-        t_ops.add_row(country, long_name, mccmnc, rat_label, status_label)
+        meta = META_OPS.get(mccmnc, {
+            "name": long_name, "region": "Grenzraum", "bands": "Standard 3GPP",
+            "status": "Sichtbar", "note": ""
+        })
+        name_display = meta.get("name", long_name)
+        if long_name and long_name not in name_display:
+            name_display = f"{name_display} ({long_name})"
+
+        if mccmnc.startswith("262"):
+            found_de += 1
+            t_de.add_row(name_display, mccmnc, rat_label, meta.get("bands", "-"), meta.get("region", "-"))
+        else:
+            found_ch += 1
+            t_ch.add_row(name_display, mccmnc, rat_label, meta.get("status", "-"), meta.get("note", "-"))
 
     console.print("\n")
-    console.print(t_ops)
-    dash.log(f"Grenznetz-Scan erfolgreich abgeschlossen: {len(matches)} Betreiber-Carrier erfasst")
+    if found_de > 0:
+        console.print(t_de)
+        console.print()
+    if found_ch > 0:
+        console.print(t_ch)
+
+    console.print("\n[dim]💡 Hinweis: Der 3GPP-Standard-Broadcast (AT+COPS=?) listet alle im Äther sichtbaren Betreiber-IDs.[/dim]")
+    console.print("[dim]   Exakte Signalpegel (dBm RSRP & SINR) für einzelne Frequenzen misst du in Option [bold white][4][/bold white] (Masten-Olympiade).[/dim]")
+    dash.log(f"Grenznetz-Scan erfolgreich: {found_de} DE-Carrier & {found_ch} CH-Carrier erfasst")
     console.print(f"\n[bold green]✓ Funkverbindung zu Salt/GoMo ist wieder voll hergestellt.[/bold green]")
 
 # --- Hauptmenü-Schleife ---
