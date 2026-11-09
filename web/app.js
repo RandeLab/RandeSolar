@@ -1400,21 +1400,34 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 async function loadSupabaseHistory(limit = 240, hours = 1) {
   try {
     currentHours = hours || 1;
-    let url = `${SUPABASE_URL}/rest/v1/solar_telemetry?select=*&order=created_at.desc&limit=${limit}`;
-    if (hours && hours > 0) {
-      const since = new Date(Date.now() - hours * 3600 * 1000).toISOString();
-      url = `${SUPABASE_URL}/rest/v1/solar_telemetry?select=*&created_at=gte.${since}&order=created_at.desc&limit=${limit}`;
+    let rows = [];
+    const targetLimit = limit || 240;
+    const pageSize = 1000;
+    let offset = 0;
+
+    while (offset < targetLimit) {
+      const fetchCount = Math.min(pageSize, targetLimit - offset);
+      let url = `${SUPABASE_URL}/rest/v1/solar_telemetry?select=*&order=created_at.desc&limit=${fetchCount}&offset=${offset}`;
+      if (hours && hours > 0) {
+        const since = new Date(Date.now() - hours * 3600 * 1000).toISOString();
+        url = `${SUPABASE_URL}/rest/v1/solar_telemetry?select=*&created_at=gte.${since}&order=created_at.desc&limit=${fetchCount}&offset=${offset}`;
+      }
+
+      const res = await fetch(url, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+
+      if (!res.ok) break;
+      const pageRows = await res.json();
+      if (!Array.isArray(pageRows) || pageRows.length === 0) break;
+      rows = rows.concat(pageRows);
+      if (pageRows.length < fetchCount) break;
+      offset += pageRows.length;
     }
 
-    const res = await fetch(url, {
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`
-      }
-    });
-
-    if (!res.ok) return;
-    const rows = await res.json();
     if (!Array.isArray(rows) || rows.length === 0) return;
 
     // Sort chronologically (oldest to newest)
