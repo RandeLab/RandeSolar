@@ -15,16 +15,22 @@ The **RandeSolar Power System** at **RandeLab (857 m ü. M., Underes Ätzisloo 1
 
 ---
 
-## ⚡ Non-Negotiable Operational Rules
+## ⚡ Non-Negotiable Operational & Data Realism Rules
 
 1. **Zero Standby for the 6000W Inverter in Winter**:
-   * The RDDSPON 6000W inverter draws **~22 to 28 Watts in pure no-load idle** (~1.8–2.4 A @ 12V).
-   * Over 24 hours, this consumes **~600 Wh/day (~50 Ah/day)**, which depletes the 380 Ah bank in < 2 days during cloudy/foggy weather.
+   * The RDDSPON 6000W inverter draws estimated **~15 to 30 Watts in no-load idle** (~1.5–2.5 A @ 12V).
+   * Over 24 hours, this drains **~400 to 700 Wh/day (~35–55 Ah/day)**, which depletes the 380 Ah bank in < 2 days during cloudy/foggy weather.
    * **Rule:** The inverter must be **hard-switched off** whenever 230V AC is not actively utilized.
-2. **50% DoD Hard Floor (Do Not Discharge Below 12.2 V Resting)**:
+   * **Hardware Mod:** An external tubular key switch (`Schlüsselschalter`) has been soldered to the internal power switch logic and run upstairs to the "Amtlich OK" junction box for remote cut-off.
+2. **Anti-Bias Rule: Respect Shitty Prototype Data (No Fake Precision)**:
+   * **No Shunt:** Current and power draw are *unmeasured estimates* from generic datasheets, not ground truth.
+   * **ESP32 ADC Noise Floor:** A 20 mV delta corresponds to ~2–3 raw ADC counts. Treat small voltage steps with caution (could be contact resistance, Wi-Fi RF burst ripple, or thermal drift).
+   * **Never Infer SoC % Under Load:** Voltage readings under dynamic load or right after charging do not equal resting open-circuit state of charge (SoC).
+   * **Kill the Cheerleading:** Do not synthesize smooth textbook curves or declare "optimal health" from single-point uncalibrated telemetry.
+3. **50% DoD Hard Floor (Do Not Discharge Below 12.2 V Resting)**:
    * 12V Lead/AGM batteries sulfate rapidly when discharged below **11.8 V**.
    * Any dip below **11.5 V** constitutes acute cell collapse and irreversible capacity degradation.
-3. **No Series PV Modules on Victron 75|15**:
+4. **No Series PV Modules on Victron 75|15**:
    * Two Energetica 380 Wp panels in series have $V_{oc} > 84\text{ V}$ ($> 92\text{ V}$ at $-15^\circ\text{C}$), destroying the MPPT controller ($75\text{ V}$ max).
    * Panels must remain **strictly parallel (1S2P)**.
 
