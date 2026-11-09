@@ -218,11 +218,15 @@ Dadurch wird der gefürchtete **Peukert-Effekt massiv abgemildert**! Die Akkus e
 
 ## 6. Der RDDSPON 230V Inverter im Inselbetrieb
 
-### 6.1 Die Leerlaufstrom-Falle (Quiescent Current)
-Ein Wechselrichter dieser Leistungsklasse (4000W Surge) benötigt zur Bereitstellung der 230V-Sinuswelle im Leerlauf (ohne dass ein Stecker aktiv Strom zieht) ca. **$1.0\text{ A} - 1.4\text{ A}$**.
-* Über eine **14-stündige Herbst-/Winternacht** verbraucht der Inverter im Leerlauf bereits:
-  $$14\text{ h} \times 1.2\text{ A} \approx \mathbf{16.8\text{ Ah (ca. 200 Wh)}}$$
-* **Praxisregel:** Den Inverter bei Nichtbenutzung immer am roten Gehäuseschalter ausschalten. Nur für aktive 230V-Arbeitseinsätze einschalten!
+### 6.1 Die Leerlaufstrom-Falle & Automatischer Re-Boot (StamPLC Relais 1)
+Ein Wechselrichter dieser Leistungsklasse benötigt zur Bereitstellung der 230V-Sinuswelle im Leerlauf **empirisch gemessen ca. $1.8\text{ A} - 2.2\text{ A}$ (~25 Watt)**.
+* **Das Problem im Dauerbetrieb:** Werden Router und 5G-Modem über 230V-Netzteile betrieben, summiert sich die Dauerlast auf **$\sim 45\text{ Watt}$ ($3.6\text{ A}$ @ 12V = $\approx 1.080\text{ Wh/Tag}$)**!
+* **Die Latch-Fault-Falle:** Fällt die Batteriespannung unter ca. $10.7\text{ V}$, schaltet der Inverter ab und verharrt im Dauer-Piepsen (Fehler-Latch). Er läuft bei Sonnenaufgang **nicht** automatisch wieder an.
+* **Die Lösung (Automatisierter Power-Cycle via StamPLC / ESP32):**
+  * Das Frontschalter-Kabel des Inverters wird über **StamPLC Relais 1** geschleift.
+  * **Unterspannungsschutz ($V_{batt} < 11.5\text{ V}$):** Relais 1 öffnet $\rightarrow$ Inverter wird sauber abgeschaltet, *bevor* er in die Pieps-Blockade rennt.
+  * **Automatischer Kaltstart ($V_{batt} \ge 12.8\text{ V}$):** Sobald die Sonne den Akku lädt, schliesst Relais 1 $\rightarrow$ Inverter bootet automatisch, 230V startet, Internet verbindet sich selbstständig.
+* **Langfristiges Ziel:** Router & 5G-PoE direkt an den 12V **LOAD-Ausgang** des Victron MPPT anschliessen (schaltet bei $11.8\text{ V}$ ab und bei $12.5\text{ V}$ vollautomatisch wieder ein).
 
 ### 6.2 Netzform & Personenschutz im Inselnetz (IT-Netz)
 Ein einfacher Inverter erzeugt ein **ungeerdetes Inselnetz (IT-System)**. Beide Pole der Schuko-Steckdose führen Potenzial gegeneinander, aber keiner ist mit Erde verbunden.

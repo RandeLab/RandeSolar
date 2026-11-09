@@ -138,3 +138,46 @@ When RandeLab is unoccupied in mid-winter, cellar temperatures can dip below $0^
   * If the Victron MPPT is mounted in the **same cold basement room** as the battery, the morning baseline is reasonably accurate.
   * **Upgrade Recommendation:** A **Victron Smart Battery Sense** (Bluetooth) or **BMV-712 / SmartShunt with temp probe** mounted directly on the battery post communicates real-time battery core temperature wirelessly via **VE.Smart Networking** directly to the MPPT, ensuring perfect temperature-compensated absorption curve all winter long.
   * **Local Telemetry Option:** The M5Stack StamPLC contains an onboard **NXP LM75B I2C temperature sensor**, which can log true ambient cellar temperature continuously to Supabase.
+
+---
+
+## 9. The Monday 18:09 Deep Discharge Trip & The Automated Inverter Reboot Protocol
+
+On Monday evening, 9 November 2026, the system ran in unattended "just send info" mode while the user traveled to Zurich. With the RDDSPON 6000W inverter idling and powering the 230V router and PoE modem (~45W total continuous draw), the battery entered the steep lead-acid cliff after a cloudy 90 Wh solar harvest day:
+
+```text
+17:51:24 | Vbatt: 11.30 V | WiFi: -40 dBm
+17:55:25 | Vbatt: 11.17 V | WiFi: -40 dBm
+17:59:28 | Vbatt: 11.06 V | WiFi: -39 dBm
+18:03:31 | Vbatt: 10.95 V | WiFi: -40 dBm
+18:07:32 | Vbatt: 10.78 V | WiFi: -40 dBm
+18:09:35 | Vbatt: 10.71 V | WiFi: -40 dBm  <-- LAST CLOUD PACKET RECEIVED
+```
+
+### The Inverter Fault Latch
+At **18:09:35 MEZ (10.71 V)**, the RDDSPON inverter tripped its low-voltage disconnect (LVD), killing the 230V AC output and entering latched fault mode with a continuous audible buzzer. Because budget high-frequency inverters do not auto-recover, the 230V network remains dead even after sunrise restores battery voltage, requiring a manual physical power-cycle.
+
+### The Software Solution: Automated Inverter Reboot via StamPLC / ESP32 Relay 1
+Wiring the inverter's front toggle switch in series with **StamPLC Relay 1 (or an ESP32 GPIO relay)** solves this completely:
+
+```
+[Battery Voltage Monitoring (VE.Direct / INA226)]
+       │
+       ▼
+[ESP32 / StamPLC Logic Controller]
+       │
+       ├── When Vbatt < 11.50 V:
+       │     👉 Open Relay 1 (Hard-disconnect Inverter BEFORE it trips!)
+       │     👉 Silences buzzer, saves ~300mA parasitic fault drain.
+       │
+       └── When Sunrise arrives & Vbatt >= 12.80 V (recharged):
+             👉 Close Relay 1 (Performs automated Inverter Reboot!)
+             👉 230V boots cleanly, router & 5G modem re-establish link automatically.
+```
+
+### Restored Complete 7-Day Telemetry Record
+The entire operational history from initial commissioning on Friday, 6 November through the 18:09 cutoff on Monday, 9 November has been preserved and verified across all 2,760 database rows:
+
+![Complete Restored 1-Week Telemetry](full_week_restored_telemetry.png)
+*Figure 6: Restored 7-day multi-tier telemetry (6–9 Nov 2026) capturing initial baseline, weekend solar charging, inverter load tests, and the final 10.71V cutoff.*
+
