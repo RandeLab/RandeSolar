@@ -25,11 +25,11 @@ flowchart TD
     end
 
     subgraph OUTDOOR_CPE["🏔️ Outdoor-Telekommunikation (Wetterfest unter Holzvordach)"]
-        TRB500["Teltonika TRB500 Industrial 5G Gateway<br/>IP: 192.168.2.1 • Hostname: Randen5G<br/>RutOS R_00.07.24.7 • Quectel RG501Q-EU (Snapdragon X55)<br/>• Nativer Ookla Speedtest-Daemon<br/>• ubus JSON-RPC Server (/ubus)<br/>• 230V AC Netzteil an Inverter"]
+        TRB500["Teltonika TRB500 Industrial 5G Gateway (im wetterfesten CPE-Gehäuse)<br/>IP: 192.168.2.1 • Hostname: Randen5G<br/>RutOS R_00.07.24.7 • Quectel RG501Q-EU (Snapdragon X55)<br/>• Nativer Ookla Speedtest-Daemon<br/>• ubus JSON-RPC Server (/ubus)<br/>• ⚡ Vollständig über PoE (Power-over-Ethernet) von innen versorgt!"]
     end
 
     subgraph INDOOR_LAN["🏠 Indoor RandeLab Netzwerk (857 m ü. M.)"]
-        POE["PoE-Injektor (230V AC an Inverter)"]
+        POE["Zentraler PoE-Injektor & Netzteil<br/>(Aktuell: 230V AC am Inverter)"]
         AP["TP-Link Omada WLAN Access Point<br/>IP: 192.168.1.1 • SSID: RandeLab<br/>2.4 GHz + 5 GHz Dual-Band"]
     end
 
@@ -45,12 +45,11 @@ flowchart TD
         GH["GitHub Pages Dashboard<br/>(randelab.github.io/RandeSolar)"]
     end
 
-    INV_AC ==>|230V AC Netzkabel| TRB500
     INV_AC ==>|230V AC Netzkabel| POE
     BAT_DC ==>|12V DC Direktabgriff| USB_STEPDOWN ==>|5V DC USB| ESP32
     TOWER <-->|5G-NSA Funkfeld RSRP -81 bis -93 dBm| TRB500
-    TRB500 -->|Gigabit Ethernet| POE
-    POE -->|PoE Link| AP
+    POE ==>|Einziges wetterfestes Kabel: PoE Power + Gigabit Ethernet| TRB500
+    POE -->|Ethernet LAN Link| AP
     AP -.->|2.4 GHz Wi-Fi Ch 10| ESP32
     AP -.->|Wi-Fi 5 GHz / 2.4 GHz| LAPTOP
     ESP32 -->|HTTPS REST API| SUBA
@@ -411,12 +410,17 @@ Momentan werden das Outdoor 5G-Gateway (Teltonika TRB500) und der Indoor WLAN-Ac
 
 ---
 
-### 8.2 Die Lösung: Direkter 12V DC Abgriff an der Batteriebank
+### 8.2 Die Lösung: Zentraler 12V DC Abgriff im Innenraum (Dank PoE!)
 
-Sowohl das **Teltonika TRB500** als auch gängige WLAN-Router/PoE-Injektoren sind industriell oder nativ für Niedervolt-Gleichstrom ausgelegt:
+**Der entscheidende Installationsvorteil:**  
+Das Outdoor-5G-Gateway unter dem Holzvordach besitzt **kein eigenes 230V-Netzkabel**. Wie die Vor-Ort-Begutachtung zeigt, führt nach draussen ausschliesslich **ein einziges wetterfestes Ethernet-Kabel**, über welches das Modem per **PoE (Power over Ethernet)** vom Innenraum gespeist wird!
 
-* **Teltonika TRB500:** Besitzt einen Weitbereichs-Gleichstromeingang von **9 V bis 30 V DC** über den 4-Pin-Industriestecker (oder DC-Hohlstecker). Es verfügt über ein internes Schaltnetzteil und kann **ohne jeden Zwischenwandler direkt an die 12V-Batteriebank** geklemmt werden (abgesichert mit einer 2A-Schmelzsicherung).
-* **WLAN Access Point:** Kann entweder über einen 12V-Direktanschluss oder einen kompakten DC-DC-Schrittwandler (z.B. 12V auf 24V/48V Passive-PoE-Injektor) betrieben werden.
+Das bedeutet: **Draussen an der Fassade oder am Dach muss absolut nichts umgebaut oder verlegt werden.**  
+Die gesamte Stromversorgung für das 5G-Modem und den WLAN-Access-Point hängt an einem **einzigen zentralen Punkt im Gebäude** (beim TP-Link Router / PoE-Injektor):
+
+1. **Teltonika 5G Outdoor-CPE:** Wird über das bestehende Ethernet-Kabel via PoE versorgt.
+2. **TP-Link Omada WLAN-Router:** Wird im Gebäude direkt neben dem PoE-Injektor betrieben.
+3. **12V-Umrüstung:** Es muss lediglich das 230V-Steckernetzteil des internen PoE-Injektors durch einen **12V DC PoE-Injektor** (z.B. Standard 12V-zu-24V/48V Step-Up Passive-PoE-Injektor aus dem Marine-/Vanlife-/Solar-Telekom-Bereich) ersetzt werden.
 
 ```mermaid
 flowchart TD
@@ -426,10 +430,14 @@ flowchart TD
 
     subgraph DC_BUS["⚡ 24/7 Autarker 12V DC Schwachstrom-Pfad (< 15 W)"]
         FUSE["2A / 5A DC Kfz-Sicherungsblock"]
-        TRB["Teltonika TRB500 5G Gateway<br/>(Nativ 9-30V DC • ~3-5W)"]
-        AP_DC["WLAN Access Point / PoE<br/>(12V DC Direkt / Step-Up • ~5W)"]
+        POE_12V["Zentraler 12V DC PoE-Injektor (im Innenraum)<br/>(12V DC Speisung • versorgt Router & 5G CPE)"]
+        AP_DC["TP-Link WLAN Access Point (Indoor)<br/>(12V DC Speisung • ~5W)"]
         ESP_DC["ESP32-S3 Cellar Station<br/>(12V ➔ 5V DC-DC • < 1W)"]
         PLC_DC["M5Stack StamPLC Controller<br/>(Nativ 9-36V DC Terminal • < 1.5W)"]
+    end
+
+    subgraph OUTDOOR["🏔️ Outdoor-Antennenbox (Unverändert!)"]
+        TRB["Teltonika TRB500 5G Gateway (Outdoor)<br/>(Kein Stromkabel nach draussen nötig!)"]
     end
 
     subgraph AC_HIGH["🛑 Bedarfsgesteuertes 230V AC Grosslastnetz"]
@@ -437,11 +445,14 @@ flowchart TD
         LOADS["230V Steckdosen:<br/>Werkzeuge, Kaffeemaschine, Laborgeräte"]
     end
 
-    B ==>|Dauerstrom| FUSE
-    FUSE --> TRB
+    B ==>|12V Dauerstrom| FUSE
+    FUSE --> POE_12V
     FUSE --> AP_DC
     FUSE --> ESP_DC
     FUSE --> PLC_DC
+
+    POE_12V ==>|Bestehendes Ethernet-Kabel: PoE Power + 5G Gigabit Data| TRB
+    POE_12V -->|LAN Link| AP_DC
 
     B ==>|Über StamPLC Relais 1 geschaltet| INV
     INV -.-> LOADS
