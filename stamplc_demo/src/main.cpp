@@ -6,6 +6,8 @@
 #include <ArduinoJson.h>
 #include <M5StamPLC.h>
 #include <math.h>
+#include <ArduinoOTA.h>
+#include <Update.h>
 
 // Wi-Fi Credentials & Hostnames
 static const char* WIFI_SSID     = "RandeLab";
@@ -205,6 +207,142 @@ void drawPlasmaWaves() {
         canvas.drawLine(x, (int)y1, x, (int)y2, canvas.color565(120 + 120 * sin(t + x * 0.02f), 200, 255));
         canvas.drawPixel(x, (int)y3, TFT_YELLOW);
     }
+}
+
+void drawCoconut(int cx, int cy, float sway = 0.0f, bool sunglasses = true) {
+    // Palm leaves curving left and right
+    for (int i = 0; i < 14; i++) {
+        float t = i / 13.0f;
+        int lx = (int)(cx - 5 - (1.0f - t) * 72.0f + sin(sway + t * 2.0f) * 5.0f);
+        int ly = (int)(cy - 22 - sin(t * 3.14159f) * 20.0f + cos(sway) * 2.0f);
+        canvas.drawLine(cx - 5, cy - 20, lx, ly, canvas.color565(30, 160, 40));
+        canvas.drawLine(lx, ly, lx - 5, ly + 7, TFT_GREEN);
+
+        int rx = (int)(cx + 5 + (1.0f - t) * 72.0f - sin(sway + t * 2.0f) * 5.0f);
+        int ry = (int)(cy - 22 - sin(t * 3.14159f) * 20.0f - cos(sway) * 2.0f);
+        canvas.drawLine(cx + 5, cy - 20, rx, ry, canvas.color565(30, 160, 40));
+        canvas.drawLine(rx, ry, rx + 5, ry + 7, TFT_GREEN);
+    }
+
+    // Cocktail straw
+    canvas.drawLine(cx - 10, cy - 18, cx - 22, cy - 36, TFT_MAGENTA);
+    canvas.drawLine(cx - 9, cy - 18, cx - 21, cy - 36, TFT_MAGENTA);
+    canvas.drawLine(cx - 14, cy - 24, cx - 18, cy - 29, TFT_WHITE);
+
+    // Coconut body (outer shell)
+    canvas.fillEllipse(cx, cy, 27, 23, canvas.color565(130, 70, 25));
+    canvas.drawEllipse(cx, cy, 27, 23, canvas.color565(210, 140, 60));
+
+    // Fibrous texture lines
+    for (int a = -16; a <= 16; a += 8) {
+        canvas.drawEllipse(cx + a/2, cy, 21, 18, canvas.color565(90, 45, 15));
+    }
+
+    if (sunglasses) {
+        // Cool 80s Sunglasses
+        canvas.fillRoundRect(cx - 21, cy - 6, 18, 12, 2, TFT_BLACK);
+        canvas.fillRoundRect(cx + 3, cy - 6, 18, 12, 2, TFT_BLACK);
+        canvas.drawRoundRect(cx - 21, cy - 6, 18, 12, 2, TFT_CYAN);
+        canvas.drawRoundRect(cx + 3, cy - 6, 18, 12, 2, TFT_CYAN);
+        canvas.drawFastHLine(cx - 3, cy - 2, 6, TFT_CYAN);
+
+        // Glare dots
+        canvas.drawPixel(cx - 17, cy - 3, TFT_WHITE);
+        canvas.drawPixel(cx - 16, cy - 3, TFT_WHITE);
+        canvas.drawPixel(cx + 7, cy - 3, TFT_WHITE);
+        canvas.drawPixel(cx + 8, cy - 3, TFT_WHITE);
+    } else {
+        // 3 coconut eyes
+        canvas.fillCircle(cx - 8, cy - 4, 3, TFT_BLACK);
+        canvas.fillCircle(cx + 8, cy - 4, 3, TFT_BLACK);
+        canvas.fillCircle(cx, cy + 6, 3, TFT_BLACK);
+    }
+
+    // Smirk / smile
+    canvas.drawEllipse(cx, cy + 9, 8, 4, canvas.color565(255, 200, 120));
+}
+
+void playCoconutBootSequence() {
+    // Scanline CRT power-on flash
+    canvas.fillScreen(TFT_WHITE);
+    canvas.pushSprite(0, 0);
+    delay(30);
+    canvas.fillScreen(TFT_BLACK);
+    canvas.pushSprite(0, 0);
+    delay(50);
+
+    // Coconut drops in with rising tone
+    for (int y = -25; y <= 50; y += 6) {
+        canvas.fillScreen(TFT_BLACK);
+        drawCoconut(SCREEN_W / 2, y, 0.0f, false);
+        canvas.setTextSize(1);
+        canvas.setTextColor(TFT_GREEN);
+        canvas.setCursor(20, 8);
+        canvas.print(">> COCONUT PHOSPHOR OS <<");
+        canvas.pushSprite(0, 0);
+        delay(12);
+    }
+    M5StamPLC.tone(523, 70); // C5
+    delay(80);
+
+    // Sunglasses drop down
+    canvas.fillScreen(TFT_BLACK);
+    drawCoconut(SCREEN_W / 2, 50, 0.0f, true);
+    canvas.setTextSize(1);
+    canvas.setTextColor(TFT_GREEN);
+    canvas.setCursor(20, 8);
+    canvas.print(">> COCONUT PHOSPHOR OS <<");
+    canvas.setTextColor(TFT_CYAN);
+    canvas.setCursor(28, 88);
+    canvas.print("RANDELAB PLC // 857m");
+    canvas.setTextColor(TFT_YELLOW);
+    canvas.setCursor(24, 102);
+    canvas.print("OTA: stamplc.local:3232");
+    canvas.pushSprite(0, 0);
+    M5StamPLC.tone(659, 70); // E5
+    delay(80);
+
+    // Loading bar fills with G5 and C6
+    for (int p = 0; p <= 100; p += 5) {
+        int bar_w = (p * 200) / 100;
+        canvas.drawRect(20, 118, 204, 8, TFT_DARKGREEN);
+        canvas.fillRect(22, 120, bar_w, 4, TFT_GREEN);
+        canvas.pushSprite(0, 0);
+        delay(10);
+    }
+    M5StamPLC.tone(784, 80); // G5
+    delay(80);
+    M5StamPLC.tone(1046, 180); // C6
+    delay(250);
+    M5StamPLC.noTone();
+    delay(600);
+}
+
+void drawCoconutDisco() {
+    float t = millis() * 0.003f;
+    float sway = sin(t) * 0.35f;
+    int bob_y = (SCREEN_H / 2) - 8 + (int)(sin(t * 2.0f) * 6.0f);
+
+    // Tropical disco scanlines
+    for (int y = 0; y < SCREEN_H; y += 4) {
+        uint16_t scan_col = canvas.color565(0, 15 + (int)(sin(t + y * 0.05f) * 12.0f), 0);
+        canvas.drawFastHLine(0, y, SCREEN_W, scan_col);
+    }
+
+    drawCoconut(SCREEN_W / 2, bob_y, sway, true);
+
+    canvas.setTextSize(1);
+    canvas.setTextColor(TFT_GREENYELLOW);
+    canvas.setCursor(18, 6);
+    canvas.printf(">> COCONUT PHOSPHOR OS <<");
+
+    canvas.setTextColor(TFT_CYAN);
+    canvas.setCursor(22, SCREEN_H - 26);
+    canvas.printf("BAT: %.2fV | ALT: 857m", live_telemetry.battery_voltage);
+
+    canvas.setTextColor(TFT_YELLOW);
+    canvas.setCursor(28, SCREEN_H - 12);
+    canvas.printf("OTA: stamplc.local");
 }
 
 inline uint8_t calcBytebeat(uint32_t t, int f) {
@@ -579,6 +717,13 @@ const char INDEX_HTML[] PROGMEM = R"rawliteral(
     </div>
   </div>
 
+  <!-- Wireless OTA Entry -->
+  <div style="text-align:center; margin-top:0.8rem; margin-bottom:1.5rem;">
+    <a href="/update" style="color:var(--crt-dim); font-size:0.75rem; text-decoration:none; letter-spacing:0.1em;" onmouseover="this.style.color='var(--crt-green)'" onmouseout="this.style.color='var(--crt-dim)'">
+      ⚡ [ ENTER WIRELESS OTA FLASH INTERFACE ]
+    </a>
+  </div>
+
 </div>
 
 <script>
@@ -749,6 +894,269 @@ updateUI();
 </html>
 )rawliteral";
 
+// ==================== RETRO CRT WEB OTA UPDATE PAGE ====================
+const char OTA_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>StamPLC // Retro OTA Firmware Flash</title>
+<style>
+  :root {
+    --crt-green: #39ff14;
+    --crt-dim: #1a7a08;
+    --crt-bg: #030804;
+    --crt-panel: rgba(4, 18, 7, 0.95);
+    --crt-border: #1a5712;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--crt-bg);
+    color: var(--crt-green);
+    font-family: "JetBrains Mono", monospace;
+    padding: 1.5rem;
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 90vh;
+  }
+  .card {
+    background: var(--crt-panel);
+    border: 1px solid var(--crt-green);
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 0 20px rgba(57,255,20,0.3);
+    padding: 1.5rem;
+    max-width: 480px;
+    width: 100%;
+  }
+  h2 { margin: 0 0 0.5rem 0; font-size: 1.2rem; text-shadow: 0 0 6px var(--crt-green); }
+  p { font-size: 0.8rem; color: var(--crt-dim); line-height: 1.4; margin-bottom: 1.2rem; }
+  input[type=file] {
+    width: 100%;
+    padding: 0.8rem;
+    background: #000;
+    color: var(--crt-green);
+    border: 1px dashed var(--crt-green);
+    font-family: inherit;
+    margin-bottom: 1rem;
+    cursor: pointer;
+  }
+  button {
+    width: 100%;
+    padding: 0.8rem;
+    background: var(--crt-green);
+    color: #000;
+    border: none;
+    font-family: inherit;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 0.9rem;
+    box-shadow: 0 0 10px rgba(57,255,20,0.5);
+  }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .bar {
+    height: 12px;
+    background: #000;
+    border: 1px solid var(--crt-green);
+    margin-top: 1rem;
+    display: none;
+  }
+  .fill {
+    height: 100%;
+    width: 0%;
+    background: var(--crt-green);
+    box-shadow: 0 0 10px var(--crt-green);
+    transition: width 0.15s;
+  }
+  #status { margin-top: 0.8rem; font-size: 0.8rem; text-align: center; }
+  a.back { display: inline-block; margin-top: 1.2rem; color: var(--crt-dim); text-decoration: none; font-size: 0.8rem; }
+  a.back:hover { color: var(--crt-green); text-shadow: 0 0 4px var(--crt-green); }
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>⚡ WIRELESS OTA FLASH</h2>
+  <p>[ ESP32-S3FN8 // RandeLab StamPLC // 8MB Flash ]<br>Select a compiled <code>firmware.bin</code> to flash wirelessly over Wi-Fi.</p>
+  <form id="uploadForm">
+    <input type="file" id="firmwareFile" accept=".bin" required>
+    <button type="submit" id="btnSubmit">[ > TRANSMIT FIRMWARE < ]</button>
+  </form>
+  <div class="bar" id="bar"><div class="fill" id="fill"></div></div>
+  <div id="status">READY FOR UPLOAD</div>
+  <a class="back" href="/">&lt;&lt; [ RETURN TO CRT DASHBOARD ]</a>
+</div>
+<script>
+const form = document.getElementById('uploadForm');
+const fileInput = document.getElementById('firmwareFile');
+const btn = document.getElementById('btnSubmit');
+const bar = document.getElementById('bar');
+const fill = document.getElementById('fill');
+const status = document.getElementById('status');
+
+form.onsubmit = function(e) {
+  e.preventDefault();
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  btn.disabled = true;
+  bar.style.display = 'block';
+  status.textContent = 'TRANSMITTING FIRMWARE...';
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/update', true);
+  xhr.upload.onprogress = function(ev) {
+    if (ev.lengthComputable) {
+      const pct = Math.round((ev.loaded / ev.total) * 100);
+      fill.style.width = pct + '%';
+      status.textContent = 'FLASHING: ' + pct + '% (' + Math.round(ev.loaded / 1024) + ' KB)';
+    }
+  };
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      fill.style.width = '100%';
+      status.style.color = '#39ff14';
+      status.textContent = 'FLASH SUCCESS! REBOOTING STAMPLC (5s)...';
+      setTimeout(() => { window.location.href = '/'; }, 5500);
+    } else {
+      status.style.color = '#ef4444';
+      status.textContent = 'FLASH FAILED: ' + xhr.responseText;
+      btn.disabled = false;
+    }
+  };
+  xhr.onerror = function() {
+    status.style.color = '#ef4444';
+    status.textContent = 'COMMUNICATION ERROR.';
+    btn.disabled = false;
+  };
+  const data = new FormData();
+  data.append('update', file);
+  xhr.send(data);
+};
+</script>
+</body>
+</html>
+)rawliteral";
+
+void handleOtaPage() {
+    server.send_P(200, "text/html", OTA_HTML);
+}
+
+void handleOtaUploadDone() {
+    server.sendHeader("Connection", "close");
+    if (Update.hasError()) {
+        server.send(500, "text/plain", Update.errorString());
+    } else {
+        server.send(200, "text/plain", "OK");
+        delay(400);
+        ESP.restart();
+    }
+}
+
+void handleOtaUploadChunk() {
+    HTTPUpload& upload = server.upload();
+    if (upload.status == UPLOAD_FILE_START) {
+        bytebeat_hw_playing = false;
+        M5StamPLC.noTone();
+        M5StamPLC.setStatusLight(255, 0, 255);
+        if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
+            Update.printError(Serial);
+        }
+        canvas.fillScreen(TFT_BLACK);
+        canvas.setTextColor(TFT_MAGENTA);
+        canvas.setTextSize(1);
+        canvas.setCursor(10, 20);
+        canvas.println(">> WEB OTA FLASHING <<");
+        canvas.setTextColor(TFT_WHITE);
+        canvas.setCursor(10, 45);
+        canvas.printf("File: %s\n", upload.filename.c_str());
+        canvas.pushSprite(0, 0);
+    } else if (upload.status == UPLOAD_FILE_WRITE) {
+        if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
+            Update.printError(Serial);
+        }
+    } else if (upload.status == UPLOAD_FILE_END) {
+        if (Update.end(true)) {
+            M5StamPLC.setStatusLight(0, 255, 0);
+            canvas.fillScreen(TFT_BLACK);
+            canvas.setTextColor(TFT_GREEN);
+            canvas.setTextSize(1);
+            canvas.setCursor(10, 30);
+            canvas.println(">> OTA COMPLETE! <<");
+            canvas.setTextColor(TFT_WHITE);
+            canvas.setCursor(10, 55);
+            canvas.println("Rebooting StamPLC...");
+            canvas.pushSprite(0, 0);
+        } else {
+            M5StamPLC.setStatusLight(255, 0, 0);
+            Update.printError(Serial);
+        }
+    }
+}
+
+void setupOTA() {
+    ArduinoOTA.setHostname(MDNS_HOST);
+
+    ArduinoOTA.onStart([]() {
+        bytebeat_hw_playing = false;
+        M5StamPLC.noTone();
+        M5StamPLC.setStatusLight(255, 0, 255); // Magenta
+        canvas.fillScreen(TFT_BLACK);
+        canvas.setTextColor(TFT_MAGENTA);
+        canvas.setTextSize(1);
+        canvas.setCursor(10, 20);
+        canvas.println(">> WIRELESS OTA UPDATE <<");
+        canvas.setTextColor(TFT_WHITE);
+        canvas.setCursor(10, 45);
+        canvas.println("Receiving new firmware...");
+        canvas.pushSprite(0, 0);
+    });
+
+    ArduinoOTA.onEnd([]() {
+        M5StamPLC.setStatusLight(0, 255, 0); // Green
+        canvas.fillScreen(TFT_BLACK);
+        canvas.setTextColor(TFT_GREEN);
+        canvas.setTextSize(1);
+        canvas.setCursor(10, 30);
+        canvas.println(">> OTA COMPLETE! <<");
+        canvas.setTextColor(TFT_WHITE);
+        canvas.setCursor(10, 55);
+        canvas.println("Rebooting StamPLC...");
+        canvas.pushSprite(0, 0);
+        playClickBeep(2400, 150);
+    });
+
+    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+        int pct = (progress * 100) / (total ? total : 1);
+        canvas.fillScreen(TFT_BLACK);
+        canvas.setTextColor(TFT_CYAN);
+        canvas.setTextSize(1);
+        canvas.setCursor(10, 15);
+        canvas.printf("OTA FLASHING: %d%%\n", pct);
+        
+        int bar_w = constrain((pct * 210) / 100, 2, 210);
+        canvas.drawRect(10, 35, 214, 18, TFT_DARKCYAN);
+        canvas.fillRect(12, 37, bar_w, 14, TFT_MAGENTA);
+        
+        canvas.setTextColor(TFT_YELLOW);
+        canvas.setCursor(10, 65);
+        canvas.printf("%u / %u KB", progress / 1024, total / 1024);
+        canvas.pushSprite(0, 0);
+    });
+
+    ArduinoOTA.onError([](ota_error_t error) {
+        M5StamPLC.setStatusLight(255, 0, 0); // Red
+        canvas.fillScreen(TFT_BLACK);
+        canvas.setTextColor(TFT_RED);
+        canvas.setTextSize(1);
+        canvas.setCursor(10, 30);
+        canvas.printf("OTA ERROR: %u\n", error);
+        canvas.pushSprite(0, 0);
+    });
+
+    ArduinoOTA.begin();
+}
+
 void handleRoot() {
     server.send_P(200, "text/html", INDEX_HTML);
 }
@@ -819,7 +1227,7 @@ void handleBytebeatApi() {
 }
 
 void handleModeApi() {
-    anim_mode = (anim_mode + 1) % 4;
+    anim_mode = (anim_mode + 1) % 5;
     playClickBeep(1500, 40);
     server.send(200, "application/json", "{\"status\":\"ok\"}");
 }
@@ -843,12 +1251,14 @@ void setup() {
     M5StamPLC.writePlcRelay(1, false);
     M5StamPLC.setStatusLight(255, 0, 0);
 
-    playBootJingle();
+    playCoconutBootSequence();
 
     WiFi.mode(WIFI_STA);
     WiFi.begin(WIFI_SSID, WIFI_PASS);
 
     server.on("/", handleRoot);
+    server.on("/update", HTTP_GET, handleOtaPage);
+    server.on("/update", HTTP_POST, handleOtaUploadDone, handleOtaUploadChunk);
     server.on("/api/status", handleStatusApi);
     server.on("/api/relay", handleRelayApi);
     server.on("/api/bytebeat", handleBytebeatApi);
@@ -858,11 +1268,13 @@ void setup() {
     if (MDNS.begin(MDNS_HOST)) {
         MDNS.addService("http", "tcp", 80);
     }
+    setupOTA();
 }
 
 void loop() {
     M5StamPLC.update();
     server.handleClient();
+    ArduinoOTA.handle();
 
     // Button A: Toggle Relay 1
     if (M5StamPLC.BtnA().wasClicked()) {
@@ -900,7 +1312,7 @@ void loop() {
             bytebeat_t = 2048;
         }
     } else if (M5StamPLC.BtnC().wasClicked()) {
-        anim_mode = (anim_mode + 1) % 4;
+        anim_mode = (anim_mode + 1) % 5;
         playClickBeep(1500, 40);
     }
 
@@ -936,8 +1348,10 @@ void loop() {
         drawPlasmaWaves();
     } else if (anim_mode == 2) {
         drawRandeSolarHUD();
-    } else {
+    } else if (anim_mode == 3) {
         drawBytebeatScope();
+    } else {
+        drawCoconutDisco();
     }
 
     // Top/Bottom HUD overlays (Mode 0 & 1)
