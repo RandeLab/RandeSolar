@@ -93,7 +93,7 @@ Die Anbindung an das Internet und das lokale WLAN-Netzwerk des RandeLabs erfolgt
 | Outdoor 4G/5G Teltonika Gateway | Indoor TP-Link Omada WLAN-Router |
 | :---: | :---: |
 | ![Aussenantenne / 4G-5G Outdoor-CPE](./system_docu/router_outside.jpg) | ![TP-Link Omada WLAN Access Point im Gebäude](./system_docu/router_inside.jpg) |
-| *Wetterfeste Teltonika TRB500 Station (`192.168.2.1`) unter dem Holzvordach* | *TP-Link Access Point (`192.168.1.1`) mit PoE-Speisung im RandeLab-Innenraum* |
+| *Wetterfeste Teltonika TRB500 Station (`192.168.2.1`) unter dem Holzvordach* | *TP-Link Access Point (`192.168.1.1`) an der Wand (12V DC Speisung links, gelbes LAN-Kabel rechts; das ovale schwarze Gehäuse rechts ist ein Lampenschalter)* |
 
 > [!NOTE]
 > **Ausführliche Mobilfunk- & HF-Dokumentation im Schwesterdokument:**  
