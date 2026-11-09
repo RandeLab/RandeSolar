@@ -390,10 +390,10 @@ Sollte die 5G-Verbindung bei extremem Unwetter oder Netzausfall abreissen, verli
 
 ---
 
-## 8. Mögliche & geplante Optimierung: 12V DC Direktversorgung für 5G-Gateway & WLAN-Router
+## 8. Geplante Optimierung: Reines 12V DC Direktnetz für WLAN & 5G-Gateway
 
 ### 8.1 Das aktuelle Dilemma (230V AC Abhängigkeit)
-Momentan werden das Outdoor 5G-Gateway (Teltonika TRB500) und der Indoor WLAN-Access-Point (TP-Link Omada) über standardmässige 230V-Steckdosen-Netzteile betrieben, welche am **RDDSPON 6000W Inverter** hängen:
+Momentan werden das Outdoor 5G-Gateway und der Indoor WLAN-Access-Point über standardmässige 230V-Steckdosen-Netzteile betrieben, welche am **RDDSPON 6000W Inverter** hängen:
 
 ```
 [12V Batteriebank] ➔ [6000W Inverter (25-40W Idle)] ➔ [230V AC Netz] ➔ [Steckernetzteile] ➔ [12V Router]
@@ -410,66 +410,100 @@ Momentan werden das Outdoor 5G-Gateway (Teltonika TRB500) und der Indoor WLAN-Ac
 
 ---
 
-### 8.2 Die Lösung: Zentraler 12V DC Abgriff im Innenraum (Dank PoE!)
+### 8.2 Vor-Ort-Befundung der Netzteile: Es ist bereits ein reines 12V-System!
 
-**Der entscheidende Installationsvorteil:**  
-Das Outdoor-5G-Gateway unter dem Holzvordach besitzt **kein eigenes 230V-Netzkabel**. Wie die Vor-Ort-Begutachtung zeigt, führt nach draussen ausschliesslich **ein einziges wetterfestes Ethernet-Kabel**, über welches das Modem per **PoE (Power over Ethernet)** vom Innenraum gespeist wird!
+Die fotografische Inspektion der bestehenden Installation vor Ort hat zwei entscheidende Fakten bestätigt:
 
-Das bedeutet: **Draussen an der Fassade oder am Dach muss absolut nichts umgebaut oder verlegt werden.**  
-Die gesamte Stromversorgung für das 5G-Modem und den WLAN-Access-Point hängt an einem **einzigen zentralen Punkt im Gebäude** (beim TP-Link Router / PoE-Injektor):
+1. **Indoor TP-Link Omada WLAN Access Point:**
+   * **Typenschild des Netzteils:** Modell `ICP48C-120-4000`
+   * **Ausgangsspannung:** **$\mathbf{12.0\text{V DC} \pm 0\text{V} \cdot 4.0\text{A}}$ (Hohlstecker 5.5 × 2.1 mm, Center Positive)**
+   * *Ergebnis:* Der WLAN-Router benötigt keinerlei Wandler, sondern läuft **nativ und direkt auf 12V Gleichstrom**!
+2. **Outdoor 5G CPE-Gehäuse:**
+   * Führt nach draussen ausschliesslich **ein einziges wetterfestes Ethernet-Kabel** über eine IP67-Kabelverschraubung. Es gibt draussen kein 230V-Kabel.
+   * Das Modem im Gehäuse (**Teltonika TRB500**) besitzt eine interne Weitbereichs-Stromversorgung für **9 V bis 30 V DC**!
+   * *Ergebnis:* Draussen muss nichts verändert oder verlegt werden. Die 12V-Einspeisung erfolgt vollständig im Innenraum über das bestehende Ethernet-Kabel!
 
-1. **Teltonika 5G Outdoor-CPE:** Wird über das bestehende Ethernet-Kabel via PoE versorgt.
-2. **TP-Link Omada WLAN-Router:** Wird im Gebäude direkt neben dem PoE-Injektor betrieben.
-3. **12V-Umrüstung:** Es muss lediglich das 230V-Steckernetzteil des internen PoE-Injektors durch einen **12V DC PoE-Injektor** (z.B. Standard 12V-zu-24V/48V Step-Up Passive-PoE-Injektor aus dem Marine-/Vanlife-/Solar-Telekom-Bereich) ersetzt werden.
+---
+
+### 8.3 Warum an den Victron MPPT 75|15 «LOAD»-Ausgang anschliessen?
+
+Anstatt die 12V direkt ungesichert an die massiven Batteriepole zu klemmen, ist der Anschluss an den **LOAD-Ausgang des Victron MPPT 75|15** die mechatronisch perfekte Lösung:
+
+1. **Automatischer Tiefentladeschutz (BatteryLife LVD):**
+   * Der Victron-Lastausgang schaltet bis zu **15 A Dauerstrom (180 W)**.
+   * In der **VictronConnect App** kann der Abschaltpunkt exakt definiert werden (z.B. Abschaltung bei $11.8\,\text{V}$, Wiedereinschaltung bei $12.5\,\text{V}$). Bei langanhaltendem Winternebel schützt der Victron die Batterien vor Sulfatierung und startet das Netzwerk vollautomatisch neu, sobald die Sonne scheint.
+2. **Echte Live-Telemetrie des Router-Stromverbrauchs (`external_load`):**
+   * Die Firmware der Cellar-Station ([`src/main.cpp`](./src/main.cpp)) liest das Bluetooth-Register **`external_load`** des Victron bereits heute lückenlos aus und streamt es in die Supabase-Datenbank sowie das Web-Dashboard.
+   * Bisher steht dort `0.0 A`. Sobald Router und 5G-Modem am LOAD-Ausgang hängen, wird ihr **exakter Live-Verbrauch (z.B. `0.9 A • 11.2 W`) auf allen Dashboards und im Telegram-Bot sichtbar**!
+3. **Integrierte elektronische Sicherung:**
+   * Der Lastausgang verfügt über Kurzschluss-, Überlast- und Übertemperaturschutz.
+
+---
+
+### 8.4 Ziel-Topologie des 12V DC Direktnetzwerks
 
 ```mermaid
 flowchart TD
-    subgraph BAT["🔋 12V DC Batteriebank (380 Ah)"]
-        B["12V DC Sammelschiene"]
+    subgraph SOLAR_SYS["☀️ PV-Kraftwerk & Victron MPPT 75|15"]
+        PV["2x Energetica 380Wp Module"] --> MPPT["Victron MPPT 75|15"]
+        MPPT <==>|BATT Terminals| BATT["12V Batteriebank (4x VOLTIC = 380 Ah)"]
     end
 
-    subgraph DC_BUS["⚡ 24/7 Autarker 12V DC Schwachstrom-Pfad (< 15 W)"]
-        FUSE["2A / 5A DC Kfz-Sicherungsblock"]
-        POE_12V["Zentraler 12V DC PoE-Injektor (im Innenraum)<br/>(12V DC Speisung • versorgt Router & 5G CPE)"]
-        AP_DC["TP-Link WLAN Access Point (Indoor)<br/>(12V DC Speisung • ~5W)"]
-        ESP_DC["ESP32-S3 Cellar Station<br/>(12V ➔ 5V DC-DC • < 1W)"]
-        PLC_DC["M5Stack StamPLC Controller<br/>(Nativ 9-36V DC Terminal • < 1.5W)"]
+    subgraph VICTRON_LOAD["⚡ 12V DC Lastausgang (15A Max • Batterielife LVD)"]
+        MPPT ==>|LOAD Terminals (12V DC geschützt)| DC_SPLIT["12V DC Y-Verteilerkabel (5.5 x 2.1 mm)"]
     end
 
-    subgraph OUTDOOR["🏔️ Outdoor-Antennenbox (Unverändert!)"]
-        TRB["Teltonika TRB500 5G Gateway (Outdoor)<br/>(Kein Stromkabel nach draussen nötig!)"]
+    subgraph INDOOR_12V["🏠 24/7 Autarke Innenraum-Netzwerktechnik (< 12 W)"]
+        AP["TP-Link WLAN Access Point<br/>(12V DC Hohlstecker • ~5-6 W)"]
+        POE["MikroTik RBGPOE Gigabit Injektor<br/>(12V DC Eingang • ~CHF 8)"]
+        ESP["ESP32-S3 Cellar Station<br/>(12V ➔ 5V USB • < 1 W)"]
+        PLC["M5Stack StamPLC<br/>(Nativ 9-36V DC Terminal • < 1.5 W)"]
     end
 
-    subgraph AC_HIGH["🛑 Bedarfsgesteuertes 230V AC Grosslastnetz"]
-        INV["RDDSPON 6000W Inverter<br/>(Wird über StamPLC Relay 1 gesteuert)"]
-        LOADS["230V Steckdosen:<br/>Werkzeuge, Kaffeemaschine, Laborgeräte"]
+    subgraph OUTDOOR_5G["🏔️ Outdoor 5G-CPE (Unverändert!)"]
+        CPE["Teltonika TRB500 im QuMax-Gehäuse<br/>(Erhält 12V PoE über das bestehende Ethernet-Kabel)"]
     end
 
-    B ==>|12V Dauerstrom| FUSE
-    FUSE --> POE_12V
-    FUSE --> AP_DC
-    FUSE --> ESP_DC
-    FUSE --> PLC_DC
+    subgraph AC_GRID["🛑 230V AC Grosslastnetz (Schläft 95% der Zeit!)"]
+        INV["RDDSPON 6000W Inverter<br/>(Wird über StamPLC Relais 1 bedarfsgesteuert)"]
+        LOADS["230V Steckdosen (Werkzeuge, Laborgeräte)"]
+        BATT -.->|Nur bei Bedarf aktiv| INV -.-> LOADS
+    end
 
-    POE_12V ==>|Bestehendes Ethernet-Kabel: PoE Power + 5G Gigabit Data| TRB
-    POE_12V -->|LAN Link| AP_DC
+    DC_SPLIT -->|Zweig 1: 12V DC| AP
+    DC_SPLIT -->|Zweig 2: 12V DC| POE
+    DC_SPLIT -->|Zweig 3: 12V DC| ESP
+    DC_SPLIT -->|Zweig 4: 12V DC| PLC
 
-    B ==>|Über StamPLC Relais 1 geschaltet| INV
-    INV -.-> LOADS
+    POE ==>|Bestehendes graues Kabel: 12V PoE Power + Gigabit LAN| CPE
+    POE <-->|Gelbes Ethernet-Kabel: LAN Link| AP
 ```
 
 ---
 
-### 8.3 Quantitativer Energie- & Autarkievergleich
+### 8.5 Einkaufsliste & Beschaffung in der Schweiz (Digitec / Galaxus)
+
+Die Umrüstung erfordert keine teuren Spezialgeräte; das gesamte Setup kostet **unter CHF 20**:
+
+| Bauteil | Typ / Modell | Bezugsquelle (CH) | Ca.-Preis | Funktion |
+| :--- | :--- | :--- | :--- | :--- |
+| **1× Gigabit Passive PoE Injektor** | **MikroTik RBGPOE** | [Digitec.ch](https://www.digitec.ch/de/search?q=MikroTik+RBGPOE) | **~CHF 7.90** | Ersetzt den 230V Ubiquiti-Block. Hat 5.5×2.1 mm DC-Eingang und speist 12V ins graue Kabel ein. |
+| **1× DC Y-Verteilerkabel** | **5.5 × 2.1 mm DC Splitter (1 Buchse auf 2 Stecker)** | Digitec / Galaxus / Brack | **~CHF 4.50** | Verteilt die 12V vom Victron auf TP-Link und MikroTik PoE-Injektor. |
+| **1× DC-Kabel mit offenen Enden** | **5.5 × 2.1 mm Pigtail (offene Litzen)** | Galaxus / Distrelec / Bastelkiste | **~CHF 3.00** | Verbindet die Victron LOAD Schraubklemmen (+ / -) mit dem DC-Verteiler. |
+
+---
+
+### 8.6 Quantitativer Autarkie- & Energievergleich
 
 | Kennwert | Status Quo (230V über Inverter) | 12V DC Direktversorgung (Ziel) | Einsparung / Vorteil |
 | :--- | :--- | :--- | :--- |
-| **Inverter-Status** | Muss **24/7/365** laufen | Läuft **nur bei echtem 230V-Bedarf** | Schont Elektronik & Batterien |
+| **6000W Inverter Status** | Muss **24/7/365** durchlaufen | Läuft **nur bei echtem 230V-Bedarf** | Schont Elektronik & Batterien |
 | **Standby-Dauerleistung** | **35 W – 50 W** (Inverter + Netzteile) | **8 W – 12 W** (TRB500 + AP + ESPs) | **$\mathbf{\approx 75\%}$ weniger Dauerlast!** |
 | **Täglicher Grundverbrauch** | **$\approx 850 - 1'200\text{ Wh/Tag}$** | **$\approx 200 - 280\text{ Wh/Tag}$** | **$\mathbf{650 - 900\text{ Wh/Tag}}$ gespart!** |
 | **Winter-Autarkie (November)** | 1.5 bis 2.5 Tage bis Tiefentladung | **8 bis 14 Tage autark** ohne Solar! | Faktor $5\times$ höhere Überlebenszeit |
 | **Netzwerk bei Inverter-Aus** | ❌ **Totalausfall** (kein WLAN, kein 5G) | ✅ **100% Online** (WLAN, 5G, Telemetrie laufen) | Kein Deadlock, volle Kontrolle |
 | **Remote-Reaktivierung** | ❌ Unmöglich (Router tot) | ✅ Jederzeit per Handy/Web/StamPLC schaltbar | Inverter kann remote geweckt werden |
+| **Verbrauchs-Transparenz** | Versteckt im Inverter-Eigenstrom | Live im Dashboard (`external_load`) | Exakte Messung in Watt & Ah |
 
 ---
 
