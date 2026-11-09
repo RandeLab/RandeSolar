@@ -88,6 +88,7 @@ Die Anbindung an das Internet und das lokale WLAN-Netzwerk des RandeLabs erfolgt
 * **Outdoor 5G Gateway (`192.168.2.1`):** **Teltonika TRB500** Industrie-Gateway, wetterfest unter dem Holzvordach montiert, stellt über das Mobilfunknetz den WAN-Uplink her.
 * **Indoor WLAN Access Point (`192.168.1.1`):** **TP-Link Omada**, per PoE-Injektor versorgt, spannt das lokale RandeLab-WLAN auf.
 * **230V-Speisung:** Beide Netzwerkkomponenten sind über Steckernetzteile an das **230V AC Hausnetz** angeschlossen und laufen somit, wenn der Hauptumschalter auf Inverter (1) oder Generator (2) steht. Bei ausgeschaltetem 230V-Netz bleibt der ESP32-S3 autark über seine direkte 12V-Leitung aktiv und puffert alle Solardaten im internen Flash (siehe Abschnitt 2.4).
+* **Geplante Optimierung (12V DC Direktversorgung):** Da das Teltonika TRB500 nativ 9–30V DC unterstützt, ist eine direkte 12V-Batterieversorgung geplant. Dadurch kann der 6000W-Wechselrichter bei Abwesenheit/Nacht komplett abgeschaltet werden (spart 25–40W Idle = ~700 Wh/Tag!), während WLAN, 5G-Internet und Telemetrie 24/7 online bleiben (siehe [**`NETWORK_5G_INFRASTRUCTURE.md` Abschnitt 8**](./NETWORK_5G_INFRASTRUCTURE.md#8-mögliche--geplante-optimierung-12v-dc-direktversorgung-für-5g-gateway--wlan-router)).
 
 | Outdoor 4G/5G Teltonika Gateway | Indoor TP-Link Omada WLAN-Router |
 | :---: | :---: |

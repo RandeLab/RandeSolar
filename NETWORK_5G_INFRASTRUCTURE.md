@@ -391,7 +391,85 @@ Sollte die 5G-Verbindung bei extremem Unwetter oder Netzausfall abreissen, verli
 
 ---
 
-## 8. Verlinkung & Referenzen
+## 8. Mögliche & geplante Optimierung: 12V DC Direktversorgung für 5G-Gateway & WLAN-Router
+
+### 8.1 Das aktuelle Dilemma (230V AC Abhängigkeit)
+Momentan werden das Outdoor 5G-Gateway (Teltonika TRB500) und der Indoor WLAN-Access-Point (TP-Link Omada) über standardmässige 230V-Steckdosen-Netzteile betrieben, welche am **RDDSPON 6000W Inverter** hängen:
+
+```
+[12V Batteriebank] ➔ [6000W Inverter (25-40W Idle)] ➔ [230V AC Netz] ➔ [Steckernetzteile] ➔ [12V Router]
+```
+
+**Problematik im aktuellen Inselbetrieb:**
+1. **Der 6000W-Wechselrichter muss 24/7 durchlaufen:**
+   Nur um das 5G-Modem (~3–5 W) und den WLAN-AP (~5–7 W) zu versorgen, verbraucht der Wechselrichter im puren Leerlauf **25 W bis 40 W Dauerlast**. Das entspricht **600 Wh bis 960 Wh pro Tag**, rein für die Bereitstellung der 230V-Netzspannung!
+2. **Die «WLAN-Blindheits-Falle» (Deadlock bei Inverter-Abschaltung):**
+   Wird der Inverter zum Schutz der Batterie (z.B. bei drohender Tiefentladung $<11.8\,\text{V}$ oder nachts per StamPLC-Relais) abgeschaltet, bricht sofort die 230V-Versorgung zusammen. **Das gesamte RandeLab-WLAN und der 5G-Internet-Uplink sterben augenblicklich ab**.
+   * Die StamPLC kann die Cellar-Station (`randesolar.local`) nicht mehr abfragen.
+   * Das Web-Dashboard (`stamplc.local`) kann vom Smartphone/Laptop nicht mehr geöffnet werden, um den Inverter wieder einzuschalten.
+   * Telemetrie, Supabase und Telegram-Warnungen fallen aus.
+
+---
+
+### 8.2 Die Lösung: Direkter 12V DC Abgriff an der Batteriebank
+
+Sowohl das **Teltonika TRB500** als auch gängige WLAN-Router/PoE-Injektoren sind industriell oder nativ für Niedervolt-Gleichstrom ausgelegt:
+
+* **Teltonika TRB500:** Besitzt einen Weitbereichs-Gleichstromeingang von **9 V bis 30 V DC** über den 4-Pin-Industriestecker (oder DC-Hohlstecker). Es verfügt über ein internes Schaltnetzteil und kann **ohne jeden Zwischenwandler direkt an die 12V-Batteriebank** geklemmt werden (abgesichert mit einer 2A-Schmelzsicherung).
+* **WLAN Access Point:** Kann entweder über einen 12V-Direktanschluss oder einen kompakten DC-DC-Schrittwandler (z.B. 12V auf 24V/48V Passive-PoE-Injektor) betrieben werden.
+
+```mermaid
+flowchart TD
+    subgraph BAT["🔋 12V DC Batteriebank (380 Ah)"]
+        B["12V DC Sammelschiene"]
+    end
+
+    subgraph DC_BUS["⚡ 24/7 Autarker 12V DC Schwachstrom-Pfad (< 15 W)"]
+        FUSE["2A / 5A DC Kfz-Sicherungsblock"]
+        TRB["Teltonika TRB500 5G Gateway<br/>(Nativ 9-30V DC • ~3-5W)"]
+        AP_DC["WLAN Access Point / PoE<br/>(12V DC Direkt / Step-Up • ~5W)"]
+        ESP_DC["ESP32-S3 Cellar Station<br/>(12V ➔ 5V DC-DC • < 1W)"]
+        PLC_DC["M5Stack StamPLC Controller<br/>(Nativ 9-36V DC Terminal • < 1.5W)"]
+    end
+
+    subgraph AC_HIGH["🛑 Bedarfsgesteuertes 230V AC Grosslastnetz"]
+        INV["RDDSPON 6000W Inverter<br/>(Wird über StamPLC Relay 1 gesteuert)"]
+        LOADS["230V Steckdosen:<br/>Werkzeuge, Kaffeemaschine, Laborgeräte"]
+    end
+
+    B ==>|Dauerstrom| FUSE
+    FUSE --> TRB
+    FUSE --> AP_DC
+    FUSE --> ESP_DC
+    FUSE --> PLC_DC
+
+    B ==>|Über StamPLC Relais 1 geschaltet| INV
+    INV -.-> LOADS
+```
+
+---
+
+### 8.3 Quantitativer Energie- & Autarkievergleich
+
+| Kennwert | Status Quo (230V über Inverter) | 12V DC Direktversorgung (Ziel) | Einsparung / Vorteil |
+| :--- | :--- | :--- | :--- |
+| **Inverter-Status** | Muss **24/7/365** laufen | Läuft **nur bei echtem 230V-Bedarf** | Schont Elektronik & Batterien |
+| **Standby-Dauerleistung** | **35 W – 50 W** (Inverter + Netzteile) | **8 W – 12 W** (TRB500 + AP + ESPs) | **$\mathbf{\approx 75\%}$ weniger Dauerlast!** |
+| **Täglicher Grundverbrauch** | **$\approx 850 - 1'200\text{ Wh/Tag}$** | **$\approx 200 - 280\text{ Wh/Tag}$** | **$\mathbf{650 - 900\text{ Wh/Tag}}$ gespart!** |
+| **Winter-Autarkie (November)** | 1.5 bis 2.5 Tage bis Tiefentladung | **8 bis 14 Tage autark** ohne Solar! | Faktor $5\times$ höhere Überlebenszeit |
+| **Netzwerk bei Inverter-Aus** | ❌ **Totalausfall** (kein WLAN, kein 5G) | ✅ **100% Online** (WLAN, 5G, Telemetrie laufen) | Kein Deadlock, volle Kontrolle |
+| **Remote-Reaktivierung** | ❌ Unmöglich (Router tot) | ✅ Jederzeit per Handy/Web/StamPLC schaltbar | Inverter kann remote geweckt werden |
+
+---
+
+### 8.4 Umsetzungsschritte für RandeLab
+1. **Material:** 1× Kfz-Flachsicherungshalter (z.B. 4-fach Block mit 2A/3A Sicherungen), 1× Teltonika 4-Pin-Stromkabel (oder 5.5×2.1 mm DC-Hohlstecker), 1× 12V Passive-PoE-Injektorkabel.
+2. **Anschluss:** Abgriff direkt am 12V-DC-Verteilerblock der Batteriebank hinter der Hauptsicherung.
+3. **Ergebnis:** Der 6000W-Wechselrichter kann den ganzen Winter über nachts oder bei Abwesenheit schlafen. Das RandeLab bleibt über 5G und WLAN permanent erreichbar, sendet lückenlose Telemetrie und kann bei Bedarf über das StamPLC-Relais jederzeit aufgeweckt werden.
+
+---
+
+## 9. Verlinkung & Referenzen
 
 * 👉 **Solar-Kraftwerk, Batteriespeicher & 230V-Inverter:** [**`SOLAR_SYSTEM_ARCHITECTURE.md`**](./SOLAR_SYSTEM_ARCHITECTURE.md)
 * 👉 **Projekt-Hauptseite & Flash-Anleitung:** [**`README.md`**](./README.md)
