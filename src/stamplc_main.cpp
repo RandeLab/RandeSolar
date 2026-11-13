@@ -1398,61 +1398,114 @@ void drawLcdHeader(const char* title, const char* pageStr) {
 void drawNeonCoconutLogo(int cx, int cy, float battVolts, uint8_t chargeState) {
     auto& dsp = M5StamPLC.Display();
 
-    // 1. Outside Gear Color = Battery Status
-    uint16_t gearGlow, gearCore;
-    if (battVolts >= 12.80f) {
-        gearGlow = dsp.color565(0, 80, 20);       // Neon Green glow
-        gearCore = dsp.color565(57, 255, 20);     // Bright neon green
-    } else if (battVolts >= 12.30f) {
-        gearGlow = dsp.color565(120, 100, 0);     // Yellow/Gold glow
-        gearCore = dsp.color565(255, 212, 0);     // Bright neon yellow
-    } else if (battVolts >= 11.80f) {
-        gearGlow = dsp.color565(130, 40, 0);      // Orange glow
-        gearCore = dsp.color565(255, 120, 0);     // Neon orange
+    // 1. Outside Gear: Always in iconic Hackteria Neon Pink style!
+    // Shows charge stage along the 7 teeth: active teeth in bright radiant pink, others in dim pink.
+    int activeTeeth = 1;
+    if (chargeState == 5) {
+        // FLOAT: 100% full maintenance -> ALL 7 teeth radiant bright pink!
+        activeTeeth = 7;
+    } else if (chargeState == 4) {
+        // ABSORPTION: topping off -> 6 teeth bright pink!
+        activeTeeth = 6;
+    } else if (chargeState == 3) {
+        // BULK: charging up -> 2 to 5 teeth based on voltage progress
+        if (battVolts >= 13.0f) activeTeeth = 5;
+        else if (battVolts >= 12.50f) activeTeeth = 4; // e.g. 12.63V -> 4 teeth (up to 12 o'clock)!
+        else if (battVolts >= 12.10f) activeTeeth = 3;
+        else activeTeeth = 2;
     } else {
-        gearGlow = dsp.color565(140, 0, 60);      // Pink/Red glow (Low Battery)
-        gearCore = dsp.color565(255, 20, 147);    // Bright neon pink
+        // OFF / Night / Standby
+        if (battVolts >= 12.60f) activeTeeth = 3;
+        else if (battVolts >= 12.20f) activeTeeth = 2;
+        else activeTeeth = 1;
     }
+
+    // Bright Neon Pink (powered glowing neon tube)
+    uint16_t brightGlow  = dsp.color565(140, 0, 70);
+    uint16_t brightCore  = dsp.color565(255, 30, 150);
+    uint16_t brightHot   = dsp.color565(255, 210, 235);
+
+    // Dim Neon Pink (subdued unlit/resting neon tube)
+    uint16_t dimGlow     = dsp.color565(35, 0, 18);
+    uint16_t dimCore     = dsp.color565(95, 15, 55);
 
     // OSHW Pinion Wheel: 7 Teeth, bottom open throat (curving inward into coconut)
     const float R_OUT = 47.0f;
     const float R_IN  = 36.0f;
     const float teethDeg[7] = { 135.0f, 180.0f, 225.0f, 270.0f, 315.0f, 360.0f, 405.0f };
 
-    int16_t gearX[36];
-    int16_t gearY[36];
-    int gIdx = 0;
+    // Throat bottom-left (starts at cx - 14, cy + 38 to cx - 22, cy + 30)
+    bool throatL_bright = (activeTeeth > 0);
+    uint16_t tg = throatL_bright ? brightGlow : dimGlow;
+    uint16_t tc = throatL_bright ? brightCore : dimCore;
+    dsp.drawLine(cx - 15, cy + 38, cx - 23, cy + 30, tg);
+    dsp.drawLine(cx - 13, cy + 38, cx - 21, cy + 30, tg);
+    dsp.drawLine(cx - 14, cy + 37, cx - 22, cy + 29, tg);
+    dsp.drawLine(cx - 14, cy + 39, cx - 22, cy + 31, tg);
+    dsp.drawLine(cx - 14, cy + 38, cx - 22, cy + 30, tc);
+    if (throatL_bright) {
+        dsp.drawLine(cx - 14, cy + 38, cx - 22, cy + 30, brightHot);
+    }
 
-    // Throat bottom-left
-    gearX[gIdx] = cx - 14; gearY[gIdx++] = cy + 38;
-    gearX[gIdx] = cx - 22; gearY[gIdx++] = cy + 30;
+    int16_t prevX = cx - 22;
+    int16_t prevY = cy + 30;
 
     for (int i = 0; i < 7; i++) {
         float tRad = teethDeg[i] * DEG_TO_RAD;
         float hw = 9.0f * DEG_TO_RAD;
         float rw = 14.0f * DEG_TO_RAD;
 
-        gearX[gIdx] = cx + (int16_t)(R_IN  * cosf(tRad - rw)); gearY[gIdx++] = cy + (int16_t)(R_IN  * sinf(tRad - rw));
-        gearX[gIdx] = cx + (int16_t)(R_OUT * cosf(tRad - hw)); gearY[gIdx++] = cy + (int16_t)(R_OUT * sinf(tRad - hw));
-        gearX[gIdx] = cx + (int16_t)(R_OUT * cosf(tRad + hw)); gearY[gIdx++] = cy + (int16_t)(R_OUT * sinf(tRad + hw));
-        gearX[gIdx] = cx + (int16_t)(R_IN  * cosf(tRad + rw)); gearY[gIdx++] = cy + (int16_t)(R_IN  * sinf(tRad + rw));
+        int16_t pValley1_X = cx + (int16_t)(R_IN  * cosf(tRad - rw));
+        int16_t pValley1_Y = cy + (int16_t)(R_IN  * sinf(tRad - rw));
+        int16_t pCrest1_X  = cx + (int16_t)(R_OUT * cosf(tRad - hw));
+        int16_t pCrest1_Y  = cy + (int16_t)(R_OUT * sinf(tRad - hw));
+        int16_t pCrest2_X  = cx + (int16_t)(R_OUT * cosf(tRad + hw));
+        int16_t pCrest2_Y  = cy + (int16_t)(R_OUT * sinf(tRad + hw));
+        int16_t pValley2_X = cx + (int16_t)(R_IN  * cosf(tRad + rw));
+        int16_t pValley2_Y = cy + (int16_t)(R_IN  * sinf(tRad + rw));
+
+        bool isBright = (i < activeTeeth);
+        uint16_t gCol = isBright ? brightGlow : dimGlow;
+        uint16_t cCol = isBright ? brightCore : dimCore;
+
+        int16_t segX[5] = { prevX, pValley1_X, pCrest1_X, pCrest2_X, pValley2_X };
+        int16_t segY[5] = { prevY, pValley1_Y, pCrest1_Y, pCrest2_Y, pValley2_Y };
+
+        for (int s = 0; s < 4; s++) {
+            int x0 = segX[s],   y0 = segY[s];
+            int x1 = segX[s+1], y1 = segY[s+1];
+            // Outer halo glow
+            dsp.drawLine(x0 - 1, y0, x1 - 1, y1, gCol);
+            dsp.drawLine(x0 + 1, y0, x1 + 1, y1, gCol);
+            dsp.drawLine(x0, y0 - 1, x1, y1 - 1, gCol);
+            dsp.drawLine(x0, y0 + 1, x1, y1 + 1, gCol);
+            // Core tube
+            dsp.drawLine(x0, y0, x1, y1, cCol);
+            // White-hot center highlight for bright active teeth
+            if (isBright) {
+                dsp.drawLine(x0, y0, x1, y1, brightHot);
+            }
+        }
+        prevX = pValley2_X;
+        prevY = pValley2_Y;
     }
 
-    // Throat bottom-right
-    gearX[gIdx] = cx + 22; gearY[gIdx++] = cy + 30;
-    gearX[gIdx] = cx + 14; gearY[gIdx++] = cy + 38;
+    // Throat bottom-right (curves back inward to meet coconut)
+    bool throatR_bright = (activeTeeth >= 7);
+    uint16_t tr_g = throatR_bright ? brightGlow : dimGlow;
+    uint16_t tr_c = throatR_bright ? brightCore : dimCore;
 
-    // Draw Gear with Neon Glow Tube effect
-    for (int i = 0; i < gIdx - 1; i++) {
-        int x0 = gearX[i], y0 = gearY[i];
-        int x1 = gearX[i+1], y1 = gearY[i+1];
-        // Outer halo glow
-        dsp.drawLine(x0 - 1, y0, x1 - 1, y1, gearGlow);
-        dsp.drawLine(x0 + 1, y0, x1 + 1, y1, gearGlow);
-        dsp.drawLine(x0, y0 - 1, x1, y1 - 1, gearGlow);
-        dsp.drawLine(x0, y0 + 1, x1, y1 + 1, gearGlow);
-        // Bright core tube
-        dsp.drawLine(x0, y0, x1, y1, gearCore);
+    dsp.drawLine(prevX - 1, prevY, cx + 21, cy + 30, tr_g);
+    dsp.drawLine(prevX + 1, prevY, cx + 23, cy + 30, tr_g);
+    dsp.drawLine(prevX, prevY, cx + 22, cy + 30, tr_c);
+
+    dsp.drawLine(cx + 21, cy + 30, cx + 13, cy + 38, tr_g);
+    dsp.drawLine(cx + 23, cy + 30, cx + 15, cy + 38, tr_g);
+    dsp.drawLine(cx + 22, cy + 30, cx + 14, cy + 38, tr_c);
+
+    if (throatR_bright) {
+        dsp.drawLine(prevX, prevY, cx + 22, cy + 30, brightHot);
+        dsp.drawLine(cx + 22, cy + 30, cx + 14, cy + 38, brightHot);
     }
 
     // 2. Inside Coconut Color = Charge State
