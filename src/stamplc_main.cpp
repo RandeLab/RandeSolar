@@ -1356,13 +1356,176 @@ void drawLcdHeader(const char* title, const char* pageStr) {
     dsp.drawFastHLine(0, 18, 240, TFT_DARKGREY);
 }
 
+void drawNeonCoconutLogo(int cx, int cy, float battVolts, uint8_t chargeState) {
+    auto& dsp = M5StamPLC.Display();
+
+    // 1. Outside Gear Color = Battery Status
+    uint16_t gearGlow, gearCore;
+    if (battVolts >= 12.80f) {
+        gearGlow = dsp.color565(0, 80, 20);       // Neon Green glow
+        gearCore = dsp.color565(57, 255, 20);     // Bright neon green
+    } else if (battVolts >= 12.30f) {
+        gearGlow = dsp.color565(120, 100, 0);     // Yellow/Gold glow
+        gearCore = dsp.color565(255, 212, 0);     // Bright neon yellow
+    } else if (battVolts >= 11.80f) {
+        gearGlow = dsp.color565(130, 40, 0);      // Orange glow
+        gearCore = dsp.color565(255, 120, 0);     // Neon orange
+    } else {
+        gearGlow = dsp.color565(140, 0, 60);      // Pink/Red glow (Low Battery)
+        gearCore = dsp.color565(255, 20, 147);    // Bright neon pink
+    }
+
+    // OSHW Pinion Wheel: 7 Teeth, bottom open throat (curving inward into coconut)
+    const float R_OUT = 47.0f;
+    const float R_IN  = 36.0f;
+    const float teethDeg[7] = { 135.0f, 180.0f, 225.0f, 270.0f, 315.0f, 360.0f, 405.0f };
+
+    int16_t gearX[36];
+    int16_t gearY[36];
+    int gIdx = 0;
+
+    // Throat bottom-left
+    gearX[gIdx] = cx - 14; gearY[gIdx++] = cy + 38;
+    gearX[gIdx] = cx - 22; gearY[gIdx++] = cy + 30;
+
+    for (int i = 0; i < 7; i++) {
+        float tRad = teethDeg[i] * DEG_TO_RAD;
+        float hw = 9.0f * DEG_TO_RAD;
+        float rw = 14.0f * DEG_TO_RAD;
+
+        gearX[gIdx] = cx + (int16_t)(R_IN  * cosf(tRad - rw)); gearY[gIdx++] = cy + (int16_t)(R_IN  * sinf(tRad - rw));
+        gearX[gIdx] = cx + (int16_t)(R_OUT * cosf(tRad - hw)); gearY[gIdx++] = cy + (int16_t)(R_OUT * sinf(tRad - hw));
+        gearX[gIdx] = cx + (int16_t)(R_OUT * cosf(tRad + hw)); gearY[gIdx++] = cy + (int16_t)(R_OUT * sinf(tRad + hw));
+        gearX[gIdx] = cx + (int16_t)(R_IN  * cosf(tRad + rw)); gearY[gIdx++] = cy + (int16_t)(R_IN  * sinf(tRad + rw));
+    }
+
+    // Throat bottom-right
+    gearX[gIdx] = cx + 22; gearY[gIdx++] = cy + 30;
+    gearX[gIdx] = cx + 14; gearY[gIdx++] = cy + 38;
+
+    // Draw Gear with Neon Glow Tube effect
+    for (int i = 0; i < gIdx - 1; i++) {
+        int x0 = gearX[i], y0 = gearY[i];
+        int x1 = gearX[i+1], y1 = gearY[i+1];
+        // Outer halo glow
+        dsp.drawLine(x0 - 1, y0, x1 - 1, y1, gearGlow);
+        dsp.drawLine(x0 + 1, y0, x1 + 1, y1, gearGlow);
+        dsp.drawLine(x0, y0 - 1, x1, y1 - 1, gearGlow);
+        dsp.drawLine(x0, y0 + 1, x1, y1 + 1, gearGlow);
+        // Bright core tube
+        dsp.drawLine(x0, y0, x1, y1, gearCore);
+    }
+
+    // 2. Inside Coconut Color = Charge State
+    uint16_t cocoGlow, cocoCore;
+    switch (chargeState) {
+        case 3: // BULK (Maximum solar power harvest)
+            cocoGlow = dsp.color565(120, 100, 0);
+            cocoCore = dsp.color565(255, 220, 0); // Bright Neon Gold
+            break;
+        case 4: // ABSORPTION (Gentle topping off)
+            cocoGlow = dsp.color565(0, 120, 50);
+            cocoCore = dsp.color565(0, 255, 128); // Bright Neon Spring Green
+            break;
+        case 5: // FLOAT (Fully charged maintain)
+            cocoGlow = dsp.color565(0, 80, 130);
+            cocoCore = dsp.color565(0, 230, 255); // Bright Neon Cyan
+            break;
+        default: // OFF / Night
+            cocoGlow = dsp.color565(25, 25, 30);
+            cocoCore = dsp.color565(80, 95, 115); // Dim Slate
+            break;
+    }
+
+    // Coconut Arc & Wavy Bite Cutout Points
+    const float R_COCO = 24.0f;
+    int16_t cX[45];
+    int16_t cY[45];
+    int cIdx = 0;
+
+    // Left bottom opening
+    cX[cIdx] = cx - 8; cY[cIdx++] = cy + 32;
+
+    // Outer arc up left side (105 deg -> 275 deg)
+    for (int deg = 105; deg <= 275; deg += 10) {
+        float a = deg * DEG_TO_RAD;
+        cX[cIdx] = cx + (int16_t)(R_COCO * cosf(a));
+        cY[cIdx++] = cy + (int16_t)(R_COCO * sinf(a));
+    }
+
+    // Wavy bite around straw opening
+    cX[cIdx] = cx + 7;  cY[cIdx++] = cy - 23;
+    cX[cIdx] = cx + 2;  cY[cIdx++] = cy - 11;
+    cX[cIdx] = cx + 13; cY[cIdx++] = cy - 7;
+    cX[cIdx] = cx + 19; cY[cIdx++] = cy - 14;
+
+    // Outer arc down right side (15 deg -> 75 deg)
+    for (int deg = 15; deg <= 75; deg += 10) {
+        float a = deg * DEG_TO_RAD;
+        cX[cIdx] = cx + (int16_t)(R_COCO * cosf(a));
+        cY[cIdx++] = cy + (int16_t)(R_COCO * sinf(a));
+    }
+
+    // Right bottom opening
+    cX[cIdx] = cx + 8; cY[cIdx++] = cy + 32;
+
+    // Draw Coconut with Neon Glow Tube effect
+    for (int i = 0; i < cIdx - 1; i++) {
+        int x0 = cX[i], y0 = cY[i];
+        int x1 = cX[i+1], y1 = cY[i+1];
+        dsp.drawLine(x0 - 1, y0, x1 - 1, y1, cocoGlow);
+        dsp.drawLine(x0 + 1, y0, x1 + 1, y1, cocoGlow);
+        dsp.drawLine(x0, y0 - 1, x1, y1 - 1, cocoGlow);
+        dsp.drawLine(x0, y0 + 1, x1, y1 + 1, cocoGlow);
+        dsp.drawLine(x0, y0, x1, y1, cocoCore);
+    }
+
+    // 3. Straw: 3rd Distinct Neon Color (Electric Yellow / Amber)
+    uint16_t strawGlow  = dsp.color565(180, 110, 0);
+    uint16_t strawCore  = dsp.color565(255, 255, 50);
+    uint16_t strawWhite = dsp.color565(255, 255, 220);
+
+    int sx0 = cx + 8,  sy0 = cy - 7;
+    int sx1 = cx + 31, sy1 = cy - 31;
+
+    // Thick neon straw with radiant core
+    dsp.drawLine(sx0 - 2, sy0, sx1 - 2, sy1, strawGlow);
+    dsp.drawLine(sx0 + 2, sy0, sx1 + 2, sy1, strawGlow);
+    dsp.drawLine(sx0, sy0 - 2, sx1, sy1 - 2, strawGlow);
+    dsp.drawLine(sx0, sy0 + 2, sx1, sy1 + 2, strawGlow);
+    dsp.drawLine(sx0 - 1, sy0, sx1 - 1, sy1, strawCore);
+    dsp.drawLine(sx0 + 1, sy0, sx1 + 1, sy1, strawCore);
+    dsp.drawLine(sx0, sy0 - 1, sx1, sy1 - 1, strawCore);
+    dsp.drawLine(sx0, sy0 + 1, sx1, sy1 + 1, strawCore);
+    dsp.drawLine(sx0, sy0, sx1, sy1, strawWhite);
+}
+
 void renderLcdDashboard() {
     auto& dsp = M5StamPLC.Display();
     dsp.setBrightness(180);
     dsp.startWrite();
 
     if (g_lcd_page == 0) {
-        // ==================== PAGE 0: HERO SOLAR & BATTERY [P1/4] ====================
+        // ==================== PAGE 0: ICONIC NEON COCONUT EMBLEM ====================
+        // Pure minimalist ambient screen: NO header, NO numbers
+        dsp.fillScreen(TFT_BLACK);
+
+        // Giant Neon Hackteria OSHW Coconut Logo filling the display
+        drawNeonCoconutLogo(120, 56, g_data.battery_voltage, g_data.charge_state);
+
+        // Minimal single bottom line for button descriptions
+        dsp.drawFastHLine(0, 118, 240, TFT_DARKGREY);
+        dsp.setTextSize(1);
+        dsp.setTextColor(g_relay1_inverter ? TFT_GREEN : TFT_RED, TFT_BLACK);
+        dsp.setCursor(6, 122);
+        dsp.printf("[A] INV: %s", g_relay1_inverter ? "ON " : "OFF");
+
+        dsp.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+        dsp.setCursor(136, 122);
+        dsp.print("[B] Details (1/4)");
+
+    } else if (g_lcd_page == 1) {
+        // ==================== PAGE 1: HERO SOLAR & BATTERY [P1/4] ====================
         drawLcdHeader("RANDESOLAR", "[P1/4]");
 
         // Row 1: Solar Power (BIG Size 3) & Daily Yield (Size 2)
@@ -1414,8 +1577,8 @@ void renderLcdDashboard() {
         dsp.setCursor(130, 120);
         dsp.print("[B] Next P2/4");
 
-    } else if (g_lcd_page == 1) {
-        // ==================== PAGE 1: NETWORK & CLOUD SYNC [P2/4] ====================
+    } else if (g_lcd_page == 2) {
+        // ==================== PAGE 2: NETWORK & CLOUD SYNC [P2/4] ====================
         drawLcdHeader("NETWORK & SYNC", "[P2/4]");
 
         // Wi-Fi SSID
@@ -1448,8 +1611,8 @@ void renderLcdDashboard() {
         dsp.setCursor(4, 116);
         dsp.print("[A] Wi-Fi Menu   [B] Next P3/4");
 
-    } else if (g_lcd_page == 2) {
-        // ==================== PAGE 2: TELTONIKA 5G GATEWAY [P3/4] ====================
+    } else if (g_lcd_page == 3) {
+        // ==================== PAGE 3: TELTONIKA 5G GATEWAY [P3/4] ====================
         drawLcdHeader("TELTONIKA 5G", "[P3/4]");
 
         // 5G Operator & Mode
@@ -1487,8 +1650,8 @@ void renderLcdDashboard() {
         dsp.setCursor(4, 116);
         dsp.print("[A] Test Ping    [B] Next P4/4");
 
-    } else if (g_lcd_page == 3) {
-        // ==================== PAGE 3: WEATHER & MICROCLIMATE [P4/4] ====================
+    } else if (g_lcd_page == 4) {
+        // ==================== PAGE 4: WEATHER & MICROCLIMATE [P4/4] ====================
         drawLcdHeader("METEO • 857m", "[P4/4]");
 
         // Temperature & Solar Irradiance
@@ -1524,7 +1687,7 @@ void renderLcdDashboard() {
         dsp.setTextSize(1);
         dsp.setTextColor(TFT_YELLOW, TFT_BLACK);
         dsp.setCursor(4, 116);
-        dsp.print("[A] Sync Weather [B] Back P1/4");
+        dsp.print("[A] Sync Weather [B] Back to Coconut");
     }
 
     dsp.endWrite();
@@ -3038,25 +3201,25 @@ void loop() {
     // Button A: Context-sensitive action per active page!
     if (M5StamPLC.BtnA().wasClicked()) {
         setLcdActivity("BTN [A]", TFT_WHITE);
-        if (g_lcd_page == 0) {
-            // Page 1: Toggle Inverter Relay 1
+        if (g_lcd_page == 0 || g_lcd_page == 1) {
+            // Page 0 (Coconut) & Page 1 (Solar): Toggle Inverter Relay 1
             setPlcRelay(0, !g_relay1_inverter);
             if (g_relay1_inverter) {
                 M5StamPLC.tone(1800, 60);
             } else {
                 M5StamPLC.tone(900, 80);
             }
-        } else if (g_lcd_page == 1) {
+        } else if (g_lcd_page == 2) {
             // Page 2: Wi-Fi Menu!
             M5StamPLC.tone(1600, 60);
             promptWifiMenu(false);
-        } else if (g_lcd_page == 2) {
+        } else if (g_lcd_page == 3) {
             // Page 3: Trigger ping latency test & 5G refresh
             M5StamPLC.tone(2000, 60);
             setLcdActivity("PING TEST", TFT_YELLOW);
             measureLatency();
             fetchTeltonika5GMetrics(true);
-        } else if (g_lcd_page == 3) {
+        } else if (g_lcd_page == 4) {
             // Page 4: Sync Weather
             M5StamPLC.tone(2200, 60);
             setLcdActivity("WX SYNC", TFT_CYAN);
@@ -3065,12 +3228,16 @@ void loop() {
         renderLcdDashboard();
     }
 
-    // Button B: Cleanly cycle pages (NO hold delay, 100% instant response across 4 pages!)
+    // Button B: Cleanly cycle pages across 5 screens (0=Coconut, 1..4=Details)
     if (M5StamPLC.BtnB().wasClicked()) {
-        g_lcd_page = (g_lcd_page + 1) % 4; // 4 Pages: Solar -> Network -> 5G -> Weather
+        g_lcd_page = (g_lcd_page + 1) % 5;
         M5StamPLC.tone(1400, 40);
         char act[20];
-        snprintf(act, sizeof(act), "PAGE %u/4", g_lcd_page + 1);
+        if (g_lcd_page == 0) {
+            snprintf(act, sizeof(act), "COCONUT");
+        } else {
+            snprintf(act, sizeof(act), "PAGE %u/4", g_lcd_page);
+        }
         setLcdActivity(act, TFT_CYAN);
         renderLcdDashboard();
     }
