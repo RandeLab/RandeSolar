@@ -28,6 +28,7 @@
 #include "mbedtls/aes.h"
 #include <time.h>
 #include <LittleFS.h>
+#include "secrets.h"
 
 // ==================== TELEMETRY STATE ====================
 struct SolarData {

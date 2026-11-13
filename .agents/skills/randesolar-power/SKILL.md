@@ -97,7 +97,10 @@ python3 .agents/skills/randesolar-power/scripts/check_battery_health.py 168
 * **RDDSPON 6000W Inverter:** Idle draw ~22–28 W (~1.8–2.4 A DC).
 * **Cam Switch (1 - 0 - 2):** 1: Inverter/Battery, 0: OFF, 2: Generator (in shed).
 * **Victron 75|15 MPPT:** Max 15A charge current, 75V max input.
-* **ESP32-S3:** Direct 12V-to-5V DC-DC supply (<0.5 W), 24/7 autonomous logging.
+* **ESP32-S3 / StamPLC:** Direct 9–36V supply (<1 W), 24/7 autonomous Victron BLE logging.
+* **StamPLC Relay 1:** Remote Key Switch logic for 6000W Inverter (N.O. contact).
+* **StamPLC Relay 2:** 12V Internet Watchdog & Winter Autarky Eco-Mode (N.C. contact to Teltonika 5G + PoE switch, ~18W savings during sleep with autonomous burst-sync wakeups).
 
 > Detailed hardware schematics and specifications: [`battery_specifications.md`](./references/battery_specifications.md)  
-> Critical step-load test analysis & plots: [`docs/reports/INVERTER_STANDBY_ANALYSIS.md`](file:///home/dusjagr/Documents/PlatformIO/Projects/RandeSolar/docs/reports/INVERTER_STANDBY_ANALYSIS.md)
+> Critical step-load test analysis & plots: [`docs/reports/INVERTER_STANDBY_ANALYSIS.md`](file:///home/dusjagr/Documents/PlatformIO/Projects/RandeSolar/docs/reports/INVERTER_STANDBY_ANALYSIS.md)  
+> StamPLC Relay 2 Power-Save Architecture: [`stamplc_relay2_router_power_save_architecture.md`](file:///home/dusjagr/.gemini/antigravity/brain/5afe7d28-dc3b-4a87-8c40-0f827c10dae2/stamplc_relay2_router_power_save_architecture.md)
