@@ -265,7 +265,7 @@
       <section class="panel panel-chart" style="border-top-color: var(--accent-blue);">
         <div class="chart-header-row">
           <h2 id="lblChartTitle3">🚀 Internet-Geschwindigkeit & Latenz (Mbit/s & ms)</h2>
-          <span style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono);">Cloudflare Speedtest • Wetter-Korrelation</span>
+          <span style="font-size:0.75rem; color:var(--text-muted); font-family:var(--font-mono);" id="netChartSub">Cloudflare Speedtest • Wetter-Korrelation</span>
         </div>
         <div class="chart-canvas-wrap">
           <canvas id="netChart"></canvas>
@@ -452,6 +452,17 @@
           <div style="font-size:1.45rem; font-weight:700; color:var(--accent-pink); margin-top:2px;"><span id="cellUpMbps">--</span> <small style="font-size:0.8rem;">Mbit/s</small></div>
           <div style="font-size:0.74rem; color:var(--text-muted); margin-top:2px;">X55 Uplink • <span id="lblSpeedTimeMain" style="color:var(--accent-pink); font-weight:bold;">--:--:--</span></div>
         </div>
+        <!-- 5G Speedtest Averages (24h & All-Time) -->
+        <div style="padding:10px 12px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">
+          <div style="font-size:0.72rem; color:var(--accent-blue); font-weight:700;">📊 Ø SPEED (LETZTE 24H)</div>
+          <div style="font-size:1.35rem; font-weight:700; color:var(--accent-blue); margin-top:2px;">⬇️ <span id="avgDown24h">22.7</span> <small style="font-size:0.8rem;">Mbit/s</small></div>
+          <div style="font-size:0.74rem; color:var(--text-muted); margin-top:2px;">⬆️ <span id="avgUp24h" style="color:var(--accent-pink); font-weight:bold;">65.4</span> Mbit/s • <span id="countSpeed24h">20</span> Tests</div>
+        </div>
+        <div style="padding:10px 12px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">
+          <div style="font-size:0.72rem; color:var(--accent-yellow); font-weight:700;">🌐 Ø SPEED (GESAMT)</div>
+          <div style="font-size:1.35rem; font-weight:700; color:var(--accent-blue); margin-top:2px;">⬇️ <span id="avgDownAll">24.2</span> <small style="font-size:0.8rem;">Mbit/s</small></div>
+          <div style="font-size:0.74rem; color:var(--text-muted); margin-top:2px;">⬆️ <span id="avgUpAll" style="color:var(--accent-pink); font-weight:bold;">64.8</span> Mbit/s • <span id="countSpeedAll">44</span> Tests</div>
+        </div>
         <!-- 5G Router RF Metrics -->
         <div style="padding:10px 12px; border:1px solid var(--border); border-radius:var(--border-radius); background:rgba(0,0,0,0.18);">
           <div style="font-size:0.72rem; color:var(--text-muted);">📡 5G GATEWAY EMPFANG</div>
@@ -603,6 +614,6 @@
     </footer>
   </div>
 
-  <script src="./web/app.js?v=4.2"></script>
+  <script src="./web/app.js?v=4.3"></script>
 </body>
 </html>

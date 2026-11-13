@@ -3059,7 +3059,16 @@ void logToSupabase(const SolarData& d) {
         http.addHeader("Authorization", authHeader.c_str());
         http.addHeader("Prefer", "return=minimal");
 
-        char json[700];
+        char p1Str[16], p2Str[16];
+        if (g_dallasTemp1 > -50.0f) snprintf(p1Str, sizeof(p1Str), "%.1f", g_dallasTemp1);
+        else strncpy(p1Str, "null", sizeof(p1Str));
+
+        if (g_dallasTemp2 > -50.0f) snprintf(p2Str, sizeof(p2Str), "%.1f", g_dallasTemp2);
+        else strncpy(p2Str, "null", sizeof(p2Str));
+
+        float plcTemp = (g_plcInternalTemp > -50.0f) ? g_plcInternalTemp : temperatureRead();
+
+        char json[900];
         if (g_wxHasData) {
             snprintf(json, sizeof(json),
                 "{\"solar_power\":%u,\"battery_voltage\":%.2f,\"battery_current\":%.2f,"
@@ -3067,7 +3076,8 @@ void logToSupabase(const SolarData& d) {
                 "\"charger_error\":%u,\"ble_rssi\":%d,\"wifi_rssi\":%d,"
                 "\"net_mbps\":%.2f,\"net_up_mbps\":%.2f,\"net_ping_ms\":%u,\"gw_ping_ms\":%u,\"chip_temp\":%.1f,"
                 "\"wx_temp\":%.1f,\"wx_solar_wm2\":%.1f,\"wx_cloud_pct\":%d,\"wx_rain_mm\":%.2f,"
-                "\"wx_wind_kmh\":%.1f,\"wx_humidity\":%d,\"wx_pressure\":%.1f}",
+                "\"wx_wind_kmh\":%.1f,\"wx_humidity\":%d,\"wx_pressure\":%.1f,"
+                "\"temp_dallas1\":%s,\"temp_dallas2\":%s,\"temp_plc\":%.1f}",
                 d.solar_power,
                 d.battery_voltage,
                 d.battery_current,
@@ -3089,14 +3099,18 @@ void logToSupabase(const SolarData& d) {
                 g_wxRainMm,
                 g_wxWindKmh,
                 g_wxHumidity,
-                g_wxPressure
+                g_wxPressure,
+                p1Str,
+                p2Str,
+                plcTemp
             );
         } else {
             snprintf(json, sizeof(json),
                 "{\"solar_power\":%u,\"battery_voltage\":%.2f,\"battery_current\":%.2f,"
                 "\"yield_today_wh\":%lu,\"external_load\":%.2f,\"charge_state\":%u,\"state_str\":\"%s\","
                 "\"charger_error\":%u,\"ble_rssi\":%d,\"wifi_rssi\":%d,"
-                "\"net_mbps\":%.2f,\"net_up_mbps\":%.2f,\"net_ping_ms\":%u,\"gw_ping_ms\":%u,\"chip_temp\":%.1f}",
+                "\"net_mbps\":%.2f,\"net_up_mbps\":%.2f,\"net_ping_ms\":%u,\"gw_ping_ms\":%u,\"chip_temp\":%.1f,"
+                "\"temp_dallas1\":%s,\"temp_dallas2\":%s,\"temp_plc\":%.1f}",
                 d.solar_power,
                 d.battery_voltage,
                 d.battery_current,
@@ -3111,7 +3125,10 @@ void logToSupabase(const SolarData& d) {
                 g_cellUpMbps,
                 (unsigned int)g_netPingMs,
                 (unsigned int)g_gwPingMs,
-                temperatureRead()
+                temperatureRead(),
+                p1Str,
+                p2Str,
+                plcTemp
             );
         }
 

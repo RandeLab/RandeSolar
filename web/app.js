@@ -1660,6 +1660,75 @@ async function fetchYesterdayYield() {
   }
 }
 
+async function loadSpeedtestAverages() {
+  try {
+    const url = `${SUPABASE_URL}/rest/v1/solar_telemetry?select=created_at,net_mbps,net_up_mbps&net_mbps=gt.0&order=created_at.desc&limit=5000`;
+    const res = await fetch(url, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      }
+    });
+    if (!res.ok) return;
+    const rows = await res.json();
+    if (!Array.isArray(rows) || rows.length === 0) return;
+
+    rows.reverse(); // put in chronological order
+    const tests = [];
+    let lastDown = null;
+    let lastUp = null;
+    let lastTime = 0;
+
+    rows.forEach(r => {
+      const down = r.net_mbps || 0;
+      const up = r.net_up_mbps || 0;
+      if (down > 0) {
+        const t = new Date(r.created_at).getTime();
+        const isNew = (lastDown === null) ||
+                      (down !== lastDown || up !== lastUp) ||
+                      (t - lastTime >= 5.5 * 3600 * 1000);
+        if (isNew) {
+          lastDown = down;
+          lastUp = up;
+          lastTime = t;
+          tests.push({ time: t, down: down, up: up });
+        }
+      }
+    });
+
+    if (tests.length === 0) return;
+
+    const now = Date.now();
+    const t24h = now - 24 * 3600 * 1000;
+    const tests24h = tests.filter(t => t.time >= t24h);
+
+    const avgDownAll = tests.reduce((sum, t) => sum + t.down, 0) / tests.length;
+    const upTestsAll = tests.filter(t => t.up > 0);
+    const avgUpAll = upTestsAll.length > 0 ? (upTestsAll.reduce((sum, t) => sum + t.up, 0) / upTestsAll.length) : 0;
+
+    const avgDown24h = tests24h.length > 0 ? (tests24h.reduce((sum, t) => sum + t.down, 0) / tests24h.length) : avgDownAll;
+    const upTests24h = tests24h.filter(t => t.up > 0);
+    const avgUp24h = upTests24h.length > 0 ? (upTests24h.reduce((sum, t) => sum + t.up, 0) / upTests24h.length) : avgUpAll;
+
+    const setT = (id, val) => { const n = document.getElementById(id); if (n) n.textContent = val; };
+    setT('avgDown24h', avgDown24h.toFixed(1));
+    setT('avgUp24h', avgUp24h.toFixed(1));
+    setT('countSpeed24h', tests24h.length);
+
+    setT('avgDownAll', avgDownAll.toFixed(1));
+    setT('avgUpAll', avgUpAll.toFixed(1));
+    setT('countSpeedAll', tests.length);
+
+    const sub = document.getElementById('netChartSub');
+    if (sub) {
+      sub.textContent = `Ø 24h: ⬇️ ${avgDown24h.toFixed(1)} / ⬆️ ${avgUp24h.toFixed(1)} Mbit/s • Gesamt: ⬇️ ${avgDownAll.toFixed(1)} / ⬆️ ${avgUpAll.toFixed(1)} Mbit/s (${tests.length} Tests)`;
+    }
+    console.log(`[Speedtest Stats] 24h: ⬇️ ${avgDown24h.toFixed(1)} / ⬆️ ${avgUp24h.toFixed(1)} Mbit/s (${tests24h.length} tests) | All: ⬇️ ${avgDownAll.toFixed(1)} / ⬆️ ${avgUpAll.toFixed(1)} Mbit/s (${tests.length} tests)`);
+  } catch (e) {
+    console.warn('[Speedtest Stats] Failed to calculate averages:', e);
+  }
+}
+
 // Setup Timeframe selector buttons (10m, 1h, 6h, 24h, 1w)
 document.querySelectorAll('#timeframeSelector button').forEach(btn => {
   btn.addEventListener('click', (e) => {
@@ -1926,6 +1995,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // Load cloud history from Supabase (default 1h)
   loadSupabaseHistory(currentLimit, 1);
   fetchYesterdayYield();
+  loadSpeedtestAverages();
 
   // Connect to live MQTT stream from HiveMQ
   initMQTT();
