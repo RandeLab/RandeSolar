@@ -1505,25 +1505,25 @@ void drawNeonCoconutLogo(int cx, int cy, float battVolts, float battCurrent, flo
     // Bulk: Bright Neon Green -> Absorption: Bright Gold -> Float: Bright Cyan
     uint16_t cocoGlow, cocoCore, cocoHot;
     switch (chargeState) {
-        case 3: // BULK (Maximum solar power harvest) -> Bright Neon Green!
-            cocoGlow = dsp.color565(0, 120, 50);
-            cocoCore = dsp.color565(57, 255, 20);  // Vivid Neon Spring Green
-            cocoHot  = dsp.color565(210, 255, 200); // White-hot neon tube core
+        case 3: // BULK (Maximum solar power harvest) -> Blazing Neon Spring Green!
+            cocoGlow = dsp.color565(0, 150, 40);
+            cocoCore = dsp.color565(57, 255, 20);   // Blazing Neon Spring Green
+            cocoHot  = dsp.color565(220, 255, 210); // White-hot neon tube core
             break;
-        case 4: // ABSORPTION (Topping off near 14.4V) -> Bright Neon Gold!
-            cocoGlow = dsp.color565(120, 90, 0);
-            cocoCore = dsp.color565(255, 215, 0);  // Vivid Neon Gold
-            cocoHot  = dsp.color565(255, 255, 180);
+        case 4: // ABSORPTION (Topping off near 14.4V) -> Blazing Neon Gold!
+            cocoGlow = dsp.color565(160, 110, 0);
+            cocoCore = dsp.color565(255, 220, 0);   // Blazing Neon Gold
+            cocoHot  = dsp.color565(255, 255, 200); // White-hot neon tube core
             break;
-        case 5: // FLOAT (Fully charged 100% maintain) -> Bright Neon Cyan!
-            cocoGlow = dsp.color565(0, 90, 140);
-            cocoCore = dsp.color565(0, 240, 255);  // Vivid Electric Cyan
-            cocoHot  = dsp.color565(200, 255, 255);
+        case 5: // FLOAT (Fully charged 100% maintain) -> 100% Blazing Electric Cyan!
+            cocoGlow = dsp.color565(0, 160, 220);
+            cocoCore = dsp.color565(0, 255, 255);   // Pure Ultra-Bright Cyan
+            cocoHot  = dsp.color565(240, 255, 255); // White-hot neon tube core
             break;
-        default: // OFF / Night / Standby
-            cocoGlow = dsp.color565(15, 30, 20);
-            cocoCore = dsp.color565(50, 95, 65);   // Dim Pine Green
-            cocoHot  = dsp.color565(75, 125, 90);
+        default: // OFF / Night / Standby -> Radiant Bright Electric Ice Cyan / Sky Blue
+            cocoGlow = dsp.color565(0, 120, 200);
+            cocoCore = dsp.color565(0, 220, 255);   // Radiant Bright Electric Ice Cyan
+            cocoHot  = dsp.color565(220, 250, 255); // White-hot neon tube core
             break;
     }
 
