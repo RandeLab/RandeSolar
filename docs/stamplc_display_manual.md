@@ -7,13 +7,16 @@
 
 ## 🕹️ Hardware Button Summary
 
-The StamPLC front panel features three tactile buttons located directly under the display:
+The StamPLC front panel features three physical tactile buttons arranged horizontally directly below the display:
+* **Btn [A]** (Left)
+* **Btn [B]** (Center)
+* **Btn [C]** (Right)
 
-| Button | Page 0 (Coconut Emblem) | Page 1 (Solar & Battery) | Page 2 (Network & Sync) | Page 3 (Teltonika 5G) | Page 4 (Meteo Microclimate) |
+| Button Position | Page 0 (Coconut Emblem) | Page 1 (Solar & Battery) | Page 2 (Network & Sync) | Page 3 (Teltonika 5G) | Page 4 (Meteo Microclimate) |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Btn [A]** | **Toggle 230V Inverter** (Relay 1 NO)<br>*(1800 Hz high chime ON / 900 Hz low OFF)* | **Toggle 230V Inverter** (Relay 1 NO)<br>*(Instant power switch)* | **Open Wi-Fi Menu**<br>*(Interactive AP selector)* | **Trigger Latency Ping**<br>*(Gateway & Cloudflare 1.1.1.1)* | **Force Weather Sync**<br>*(Fetch Open-Meteo & MeteoSwiss)* |
-| **Btn [B]** | **Next Page ➡️**<br>*(Advances to Page 1)* | **Next Page ➡️**<br>*(Advances to Page 2)* | **Next Page ➡️**<br>*(Advances to Page 3)* | **Next Page ➡️**<br>*(Advances to Page 4)* | **Next Page ➡️**<br>*(Cycles back to Page 0)* |
-| **Btn [C]** | **Toggle 12V LED Strip** (Relay 2 NC)<br>*(2000 Hz ON / 1000 Hz OFF)* | **Force Telemetry Refresh** | **Force Telemetry Refresh** | **Force Telemetry Refresh** | **Force Telemetry Refresh** |
+| **Btn [A] (Left)** | **Toggle 230V Inverter** (Relay 1 NO)<br>*(1800 Hz high chime ON / 900 Hz low OFF)* | **Toggle 230V Inverter** (Relay 1 NO)<br>*(Instant power switch)* | **Open Wi-Fi Menu**<br>*(Interactive AP selector)* | **Trigger Latency Ping**<br>*(Gateway & Cloudflare 1.1.1.1)* | **Force Weather Sync**<br>*(Fetch Open-Meteo & MeteoSwiss)* |
+| **Btn [B] (Center)** | **Next Page ➡️**<br>*(Advances to Page 1)* | **Next Page ➡️**<br>*(Advances to Page 2)* | **Next Page ➡️**<br>*(Advances to Page 3)* | **Next Page ➡️**<br>*(Advances to Page 4)* | **Back to Coconut 🥥**<br>*(Cycles back to Page 0)* |
+| **Btn [C] (Right)** | **Toggle 12V LED Strip** (Relay 2 NC)<br>*(2000 Hz ON / 1000 Hz OFF)* | **Force Telemetry Refresh** | **Force Telemetry Refresh** | **Force Telemetry Refresh** | **Force Telemetry Refresh** |
 
 > [!NOTE]
 > **Safety Undervoltage Guard**: If battery voltage drops below $11.50\,\text{V}$, Relay 1 automatically cuts off the 230V inverter to protect the 4x VOLTIC 95 Ah AGM bank, accompanied by a double low warning tone ($800\,\text{Hz}$).

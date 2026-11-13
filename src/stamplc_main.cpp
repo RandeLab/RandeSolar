@@ -1712,24 +1712,24 @@ void renderLcdDashboard() {
         // Outside Pinion Wheel: Charge % (SOC), Inside Coconut: Charge Mode
         drawNeonCoconutLogo(120, 56, g_data.battery_voltage, g_data.battery_current, g_data.external_load, g_data.charge_state);
 
-        // Minimal single bottom line for button descriptions
+        // Minimal single bottom line for button descriptions matching physical A (Left), B (Center), C (Right)
         dsp.drawFastHLine(0, 118, 240, TFT_DARKGREY);
         dsp.setTextSize(1);
 
-        // Button A: Inverter (Relay 1 NO)
+        // Button A (Left): Inverter (Relay 1 NO)
         dsp.setTextColor(g_relay1_inverter ? TFT_GREEN : TFT_RED, TFT_BLACK);
         dsp.setCursor(4, 122);
         dsp.printf("[A]INV:%s", g_relay1_inverter ? "ON" : "OFF");
 
-        // Button C: 12V LED Strip (Relay 2 NC)
-        dsp.setTextColor(g_led_strip_on ? TFT_YELLOW : TFT_DARKGREY, TFT_BLACK);
-        dsp.setCursor(76, 122);
-        dsp.printf("[C]STRIP:%s", g_led_strip_on ? "ON" : "OFF");
-
-        // Button B: Next Screen
+        // Button B (Center): Next Screen
         dsp.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-        dsp.setCursor(162, 122);
+        dsp.setCursor(92, 122);
         dsp.print("[B] Next >");
+
+        // Button C (Right): 12V LED Strip (Relay 2 NC)
+        dsp.setTextColor(g_led_strip_on ? TFT_YELLOW : TFT_DARKGREY, TFT_BLACK);
+        dsp.setCursor(164, 122);
+        dsp.printf("[C]STRIP:%s", g_led_strip_on ? "ON" : "OFF");
 
     } else if (g_lcd_page == 1) {
         // ==================== PAGE 1: HERO SOLAR & BATTERY [P1/4] ====================
@@ -1772,17 +1772,20 @@ void renderLcdDashboard() {
         dsp.setCursor(135, 86);
         dsp.printf("%ddBm", g_data.rssi);
 
-        // Footer: Buttons & Navigation
+        // Footer: Buttons & Navigation matching physical A (Left), B (Center), C (Right)
         dsp.drawFastHLine(0, 108, 240, TFT_DARKGREY);
-        dsp.setTextSize(2);
-        dsp.setTextColor(g_relay1_inverter ? TFT_GREEN : TFT_RED, TFT_BLACK);
-        dsp.setCursor(4, 114);
-        dsp.printf("[A]INV:%s", g_relay1_inverter ? "ON " : "OFF");
-
         dsp.setTextSize(1);
+        dsp.setTextColor(g_relay1_inverter ? TFT_GREEN : TFT_RED, TFT_BLACK);
+        dsp.setCursor(4, 116);
+        dsp.printf("[A]INV:%s", g_relay1_inverter ? "ON" : "OFF");
+
         dsp.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-        dsp.setCursor(130, 120);
-        dsp.print("[B] Next P2/4");
+        dsp.setCursor(92, 116);
+        dsp.print("[B] Next P2");
+
+        dsp.setTextColor(TFT_GREEN, TFT_BLACK);
+        dsp.setCursor(174, 116);
+        dsp.print("[C] Refresh");
 
     } else if (g_lcd_page == 2) {
         // ==================== PAGE 2: NETWORK & CLOUD SYNC [P2/4] ====================
@@ -1816,7 +1819,13 @@ void renderLcdDashboard() {
         dsp.setTextSize(1);
         dsp.setTextColor(TFT_YELLOW, TFT_BLACK);
         dsp.setCursor(4, 116);
-        dsp.print("[A] Wi-Fi Menu   [B] Next P3/4");
+        dsp.print("[A] Menu");
+        dsp.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+        dsp.setCursor(92, 116);
+        dsp.print("[B] Next P3");
+        dsp.setTextColor(TFT_GREEN, TFT_BLACK);
+        dsp.setCursor(174, 116);
+        dsp.print("[C] Refresh");
 
     } else if (g_lcd_page == 3) {
         // ==================== PAGE 3: TELTONIKA 5G GATEWAY [P3/4] ====================
@@ -1855,7 +1864,13 @@ void renderLcdDashboard() {
         dsp.setTextSize(1);
         dsp.setTextColor(TFT_YELLOW, TFT_BLACK);
         dsp.setCursor(4, 116);
-        dsp.print("[A] Test Ping    [B] Next P4/4");
+        dsp.print("[A] Ping");
+        dsp.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+        dsp.setCursor(92, 116);
+        dsp.print("[B] Next P4");
+        dsp.setTextColor(TFT_GREEN, TFT_BLACK);
+        dsp.setCursor(174, 116);
+        dsp.print("[C] Refresh");
 
     } else if (g_lcd_page == 4) {
         // ==================== PAGE 4: WEATHER & MICROCLIMATE [P4/4] ====================
@@ -1894,7 +1909,13 @@ void renderLcdDashboard() {
         dsp.setTextSize(1);
         dsp.setTextColor(TFT_YELLOW, TFT_BLACK);
         dsp.setCursor(4, 116);
-        dsp.print("[A] Sync Weather [B] Back to Coconut");
+        dsp.print("[A] Sync WX");
+        dsp.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+        dsp.setCursor(92, 116);
+        dsp.print("[B] Coconut");
+        dsp.setTextColor(TFT_GREEN, TFT_BLACK);
+        dsp.setCursor(174, 116);
+        dsp.print("[C] Refresh");
     }
 
     dsp.endWrite();
