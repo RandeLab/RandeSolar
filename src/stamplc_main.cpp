@@ -1774,42 +1774,44 @@ void drawNeonCoconutLogo(int cx, int cy, float battVolts, float battCurrent, flo
     dsp.drawLine(sx0, sy0, sx1, sy1, strawWhite);
 }
 
-// 7 RandeChistli VU-Meter positions from 4°C (bottom) to 30°C (top)
+// 7 RandeChistli VU-Meter positions from 4°C (bottom) to 30°C (top) + 1 Status LED (Pixel 0)
 // Based on Adafruit_NeoPixel Wheel(map(celsius, 4, 30, 160, 1)) from github.com/RandeLab/RandeChistli
 static const uint8_t PROGMEM CHISTLI_COLORS[7][3] = {
-    {   0,  30, 225 }, // Pos 0 (Bottom / ~4°C):  Deep Electric Blue
-    {   0, 111, 144 }, // Pos 1 (~8.3°C):         Cyan-Blue
-    {   0, 189,  66 }, // Pos 2 (~12.7°C):        Teal / Aqua-Green
-    {  15, 240,   0 }, // Pos 3 (~17.0°C):        Pure Lime Green
-    {  93, 162,   0 }, // Pos 4 (~21.3°C):        Yellow-Amber
-    { 174,  81,   0 }, // Pos 5 (~25.7°C):        Orange-Flame
-    { 252,   3,   0 }  // Pos 6 (Top / ~30.0°C):   Bright Hot Red
+    {   0,  30, 225 }, // Pixel 7 (Bottom / ~4°C):  Deep Electric Blue
+    {   0, 111, 144 }, // Pixel 6 (~8°C):          Cyan-Blue
+    {   0, 189,  66 }, // Pixel 5 (~13°C):         Teal / Aqua-Green
+    {  15, 240,   0 }, // Pixel 4 (~17°C..20°C):   Pure Lime Green
+    {  93, 162,   0 }, // Pixel 3 (~21°C..24°C):   Yellow-Amber
+    { 174,  81,   0 }, // Pixel 2 (~25°C..28°C):   Orange-Flame
+    { 252,   3,   0 }  // Pixel 1 (Top / ~30.0°C):  Bright Hot Red
 };
 
 void drawRandeChistliTempBar(int barX, int startY, int barW, int segH, int segGap, float temp) {
     auto& dsp = M5StamPLC.Display();
 
-    // Determine active segment index (0..6)
-    int activeIdx = -1;
-    if (temp >= 4.0f) {
-        activeIdx = (int)roundf((temp - 4.0f) / (30.0f - 4.0f) * 6.0f);
-        if (activeIdx > 6) activeIdx = 6;
-    } else if (temp > -40.0f) {
-        activeIdx = 0; // Cold minimum (lowest blue bar)
-    }
+    // RandeChistli exact integer formula: showPixel = map((long)temp, 4, 30, 7, 1);
+    long tLong = (long)roundf(temp);
+    if (tLong < 4) tLong = 4;
+    if (tLong > 30) tLong = 30;
+    int showPixel = (int)((tLong - 4) * (1 - 7) / (30 - 4) + 7);
+    if (showPixel < 1) showPixel = 1;
+    if (showPixel > 7) showPixel = 7;
 
-    // Draw the 7 vertical segments (i=0 is top / 30°C, i=6 is bottom / 4°C on screen)
+    // Number of active segments from bottom (Pixel 7 is bottom, Pixel 1 is top)
+    int activeFromBottom = 7 - showPixel + 1; // 1 to 7
+
+    // Draw the 7 vertical temperature segments (i=0 is top / Pixel 1, i=6 is bottom / Pixel 7)
     for (int i = 0; i < 7; i++) {
-        int segIdx = 6 - i; // 6 = Top (Red / 30°C), 0 = Bottom (Blue / 4°C)
+        int segIdx = 6 - i; // segIdx: 0 = Pixel 7 (Blue), 6 = Pixel 1 (Red)
         int y = startY + i * (segH + segGap);
         uint8_t r = pgm_read_byte(&CHISTLI_COLORS[segIdx][0]);
         uint8_t g = pgm_read_byte(&CHISTLI_COLORS[segIdx][1]);
         uint8_t b = pgm_read_byte(&CHISTLI_COLORS[segIdx][2]);
         uint16_t activeColor = dsp.color565(r, g, b);
 
-        if (segIdx <= activeIdx) {
+        if (segIdx + 1 <= activeFromBottom) {
             // Segment is lit!
-            if (segIdx == activeIdx) {
+            if (segIdx + 1 == activeFromBottom) {
                 // Topmost active segment: has white accent / core like RandeChistli
                 dsp.fillRoundRect(barX, y, barW, segH, 2, activeColor);
                 dsp.drawRoundRect(barX, y, barW, segH, 2, TFT_WHITE);
@@ -1824,6 +1826,14 @@ void drawRandeChistliTempBar(int barX, int startY, int barW, int segH, int segGa
             dsp.drawRoundRect(barX, y, barW, segH, 2, dsp.color565(40, 40, 40));
         }
     }
+
+    // Pixel 0: The RandeChistli Status LED at the bottom!
+    int statusY = startY + 7 * (segH + segGap) + 1;
+    bool pulseWink = (millis() - g_lastDallasReqMs < 450);
+    uint16_t statusColor = pulseWink ? TFT_CYAN : dsp.color565(90, 165, 0);
+    dsp.fillRoundRect(barX, statusY, barW, segH, 2, statusColor);
+    dsp.drawRoundRect(barX, statusY, barW, segH, 2, pulseWink ? TFT_WHITE : dsp.color565(180, 220, 50));
+    dsp.fillRect(barX + 4, statusY + 2, barW - 8, segH - 4, pulseWink ? TFT_WHITE : dsp.color565(200, 240, 100));
 
     // Small crisp temperature readout above the VU meter
     if (temp > -40.0f) {
@@ -1848,9 +1858,9 @@ void renderLcdDashboard() {
         // Outside Pinion Wheel: Charge % (SOC), Inside Coconut: Charge Mode
         drawNeonCoconutLogo(120, 56, g_data.battery_voltage, g_data.battery_current, g_data.external_load, g_data.charge_state);
 
-        // RandeChistli 7-segment Temperature VU Meter on the left side
+        // RandeChistli 8-pixel Hardware Replica (Pixel 0 Status + Pixels 1..7 Temp VU Meter)
         float currentTemp = (g_dallasCount > 0 && g_dallasTemp1 > -50.0f) ? g_dallasTemp1 : g_plcInternalTemp;
-        drawRandeChistliTempBar(10, 20, 12, 10, 3, currentTemp);
+        drawRandeChistliTempBar(10, 17, 12, 9, 3, currentTemp);
 
         // Minimal single bottom line for button descriptions matching physical A (Left), B (Center), C (Right)
         dsp.drawFastHLine(0, 118, 240, TFT_DARKGREY);

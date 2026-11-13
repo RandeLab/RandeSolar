@@ -46,16 +46,17 @@ A completely number-free, retro-futuristic ambient screen designed for visual tr
     * **Blazing Spring Green** (`#39FF14`): `BULK` harvest mode.
     * **Electric Gold** (`#FFD400`): `ABSORPTION` topping off.
     * **Electric Cyan** (`#00F5FF`): `FLOAT` or night standby.
-* **Left-Hand 7-Segment Temperature VU Meter (RandeChistli Scale)**:
-  * Inspired by the [RandeChistli](https://github.com/RandeLab/RandeChistli) 8-pixel NeoPixel thermometer algorithm (`Wheel(map(celsius, 4, 30, 160, 1))`).
-  * Maps live Dallas 1-Wire sensor temperature from **$4.0^\circ\text{C}$ (Bottom / Deep Blue)** to **$30.0^\circ\text{C}$ (Top / Hot Red)** across 7 distinct neon segments:
-    * **Pos 6 (Top / $30.0^\circ\text{C}$)**: Bright Hot Red
-    * **Pos 5 ($25.7^\circ\text{C}$)**: Orange-Flame
-    * **Pos 4 ($21.3^\circ\text{C}$)**: Yellow-Amber
-    * **Pos 3 ($17.0^\circ\text{C}$)**: Pure Lime Green
-    * **Pos 2 ($12.7^\circ\text{C}$)**: Teal / Aqua-Green
-    * **Pos 1 ($8.3^\circ\text{C}$)**: Cyan-Blue
-    * **Pos 0 (Bottom / $4.0^\circ\text{C}$)**: Deep Electric Blue
+* **Left-Hand 8-Pixel Temperature VU Meter (RandeChistli Hardware Replica)**:
+  * Exact 1:1 replica of the [RandeChistli](https://github.com/RandeLab/RandeChistli) 8-pixel NeoPixel stick hardware:
+    * **Pixel 0 (Bottom-most)**: The dedicated **Status LED** (`Wheel(60)` Amber-Green), winking Cyan when a live 1-Wire conversion arrives.
+    * **Pixels 7 to 1 (7 Temperature Segments)**: Driven by the original integer formula `showPixel = map((long)temp, 4, 30, 7, 1)`:
+      * **Pixel 1 (Top / $30.0^\circ\text{C}$)**: Bright Hot Red (`#FC0300`)
+      * **Pixel 2 ($26.0^\circ\text{C}$)**: Orange-Flame (`#BA4500`)
+      * **Pixel 3 ($22.0^\circ\text{C}$)**: Yellow-Amber (`#758A00`)
+      * **Pixel 4 ($18.0^\circ\text{C}$–$21.0^\circ\text{C}$)**: **Pure Lime Green** (`#30CF00`) — sits right on comfort room temperature!
+      * **Pixel 5 ($14.0^\circ\text{C}$)**: Aqua-Teal (`#00A857`)
+      * **Pixel 6 ($9.0^\circ\text{C}$)**: Cyan-Blue (`#00639C`)
+      * **Pixel 7 (Bottom / $4.0^\circ\text{C}$)**: Deep Electric Blue (`#001EE1`)
   * The topmost active segment highlights with a white core, while segments above remain dimly ghosted.
 * **Yellow Straw ($45^\circ$)**: Solar harvest intake vector.
 * **Bottom Status Bar**: Shows `[A] INV: ON/OFF`, `[C] STRIP: ON/OFF`, and `[B] Next >`.
