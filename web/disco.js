@@ -459,6 +459,7 @@
 
   // --- 12V LED Strip Controls (Victron Load / Relay 2 NC) ---
   let isStripOn = true;
+  let isStripSwitching = false; // Lock to prevent rapid double-clicks / racing loops
 
   function setStripUiState(isOn) {
     isStripOn = isOn;
@@ -475,6 +476,12 @@
   }
 
   window.toggleLedStrip = async function () {
+    if (isStripSwitching) return; // Prevent rapid debounce glitch
+    isStripSwitching = true;
+
+    const btn = document.getElementById('btnToggleStrip');
+    if (btn) btn.disabled = true;
+
     const targetState = !isStripOn;
     setStripUiState(targetState);
     playLaserZap(targetState ? 400 : 800, targetState ? 800 : 400, 0.1);
@@ -500,7 +507,10 @@
       ];
       for (const ep of endpoints) {
         try {
-          const res = await fetch(ep, { method: 'GET', mode: 'cors', cache: 'no-store' });
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 2000);
+          const res = await fetch(ep, { method: 'GET', mode: 'cors', cache: 'no-store', signal: controller.signal });
+          clearTimeout(timeoutId);
           if (res.ok) {
             const data = await res.json();
             if (data.led_strip !== undefined) setStripUiState(data.led_strip);
@@ -509,6 +519,12 @@
         } catch (e) {}
       }
     } catch (e) {}
+
+    // Unlock after 400ms debounce
+    setTimeout(() => {
+      isStripSwitching = false;
+      if (btn) btn.disabled = false;
+    }, 400);
   };
 
   window.pulseLedStrip = function () {
