@@ -402,6 +402,7 @@
       mqttClient.on('connect', function () {
         mqttClient.subscribe('randelab/solar/ack', { qos: 0 });
         mqttClient.subscribe('randelab/solar/cmd', { qos: 0 });
+        mqttClient.subscribe('randelab/solar/telemetry', { qos: 0 });
         const log = document.getElementById('logMini');
         if (log) log.textContent = '🟢 AREA 51 MQTT LINK ACTIVE';
       });
@@ -415,7 +416,11 @@
             const rtt = lastCommandSentMs > 0 ? (Date.now() - lastCommandSentMs) : 0;
             const log = document.getElementById('logMini');
             if (log) {
-              log.textContent = `⚡ ACK FROM ESP32: ${ack.action} (${rtt} ms roundtrip)`;
+              log.textContent = `⚡ ACK FROM ESP32: ${ack.action || 'OK'} (${rtt} ms roundtrip)`;
+            }
+
+            if (ack.led_strip !== undefined) {
+              setStripUiState(ack.led_strip);
             }
 
             if (ack.action === 'disco_strobe') {
@@ -424,10 +429,19 @@
               updateTractorBeam(ack.r, ack.g, ack.b, false);
             }
           } catch (e) {}
+        } else if (topic === 'randelab/solar/telemetry') {
+          try {
+            const t = JSON.parse(payloadStr);
+            if (t.led_strip !== undefined) {
+              setStripUiState(t.led_strip);
+            }
+          } catch (e) {}
         } else if (topic === 'randelab/solar/cmd') {
           try {
             const cmd = JSON.parse(payloadStr);
-            if (cmd.action === 'led' && cmd.color) {
+            if (cmd.action === 'strip' && cmd.state !== undefined) {
+              setStripUiState(cmd.state);
+            } else if (cmd.action === 'led' && cmd.color) {
               if (cmd.color === 'disco' || cmd.color === 'strobe' || cmd.color === 'party') {
                 updateTractorBeam(0, 0, 0, true);
               }
@@ -442,6 +456,76 @@
       });
     } catch (e) {}
   }
+
+  // --- 12V LED Strip Controls (Victron Load / Relay 2 NC) ---
+  let isStripOn = true;
+
+  function setStripUiState(isOn) {
+    isStripOn = isOn;
+    const pill = document.getElementById('stripStatusPill');
+    const btn = document.getElementById('btnToggleStrip');
+    if (pill) {
+      pill.textContent = isOn ? '⚡ ON (NC)' : '🌑 OFF';
+      pill.className = 'strip-pill ' + (isOn ? 'on' : 'off');
+    }
+    if (btn) {
+      btn.textContent = isOn ? '💡 TOGGLE 12V STRIP: [ ON ]' : '💡 TOGGLE 12V STRIP: [ OFF ]';
+      btn.className = 'btn-strip-toggle ' + (isOn ? 'on' : 'off');
+    }
+  }
+
+  window.toggleLedStrip = async function () {
+    const targetState = !isStripOn;
+    setStripUiState(targetState);
+    playLaserZap(targetState ? 400 : 800, targetState ? 800 : 400, 0.1);
+
+    const log = document.getElementById('logMini');
+    if (log) log.textContent = `💡 SWITCHING 12V LED STRIP: ${targetState ? 'ON' : 'OFF'}...`;
+
+    // 1. MQTT Command to HiveMQ
+    if (mqttClient && mqttClient.connected) {
+      mqttClient.publish('randelab/solar/cmd', JSON.stringify({
+        action: 'strip',
+        relay: 2,
+        state: targetState,
+        t: Date.now()
+      }));
+    }
+
+    // 2. Parallel REST Fallback (Local Lab Network)
+    try {
+      const endpoints = [
+        `/api/relay?r=2&state=${targetState ? 1 : 0}`,
+        `http://192.168.1.100/api/relay?r=2&state=${targetState ? 1 : 0}`
+      ];
+      for (const ep of endpoints) {
+        try {
+          const res = await fetch(ep, { method: 'GET', mode: 'cors', cache: 'no-store' });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.led_strip !== undefined) setStripUiState(data.led_strip);
+            break;
+          }
+        } catch (e) {}
+      }
+    } catch (e) {}
+  };
+
+  window.pulseLedStrip = function () {
+    playLaserZap(900, 300, 0.15);
+    const log = document.getElementById('logMini');
+    if (log) log.textContent = '🛸 FIRING 12V LED STRIP DISCO BEAT...';
+    if (mqttClient && mqttClient.connected) {
+      mqttClient.publish('randelab/solar/cmd', JSON.stringify({
+        action: 'strip_pulse',
+        pulses: 3,
+        t: Date.now()
+      }));
+    }
+    // Also trigger via local REST if reachable
+    fetch('/api/relay?pulse=3', { method: 'GET', mode: 'cors', cache: 'no-store' }).catch(() => {});
+    fetch('http://192.168.1.100/api/relay?pulse=3', { method: 'GET', mode: 'cors', cache: 'no-store' }).catch(() => {});
+  };
 
   // --- Dispatch Command (MQTT + Local REST) ---
   window.triggerUfoColor = async function (colorName, rgbPreset, labelText) {
@@ -500,6 +584,12 @@
     setupMQTT();
     // Default Alien Green tractor beam
     updateTractorBeam(57, 255, 20, false, '👽 TRACTOR BEAM: ALIEN GREEN');
+
+    // Query local relay state if available
+    fetch('/api/relay', { cache: 'no-store' })
+      .then(r => r.json())
+      .then(d => { if (d.led_strip !== undefined) setStripUiState(d.led_strip); })
+      .catch(() => {});
   });
 
 })();

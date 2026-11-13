@@ -389,3 +389,116 @@ body::before {
 .weird-footer a:hover {
   text-decoration: underline;
 }
+
+/* ==================== 12V LED STRIP DISCO CONTROLS ==================== */
+.disco-strip-box {
+  width: 100%;
+  background: rgba(18, 10, 30, 0.9);
+  border: 2px solid var(--plasma-gold);
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 0 20px rgba(255, 234, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.strip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.strip-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--plasma-gold);
+  letter-spacing: 1px;
+}
+
+.strip-pill {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.strip-pill.on {
+  background: rgba(57, 255, 20, 0.2);
+  border: 1px solid var(--neon-green);
+  color: var(--neon-green);
+  box-shadow: 0 0 10px rgba(57, 255, 20, 0.4);
+}
+
+.strip-pill.off {
+  background: rgba(255, 16, 48, 0.2);
+  border: 1px solid #ff1030;
+  color: #ff1030;
+  box-shadow: 0 0 10px rgba(255, 16, 48, 0.3);
+}
+
+.strip-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+@media (max-width: 500px) {
+  .strip-controls {
+    grid-template-columns: 1fr;
+  }
+}
+
+.btn-strip-toggle {
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 2px solid var(--plasma-gold);
+  background: rgba(255, 234, 0, 0.15);
+  color: var(--plasma-gold);
+}
+
+.btn-strip-toggle.on {
+  background: var(--plasma-gold);
+  color: #000;
+  box-shadow: 0 0 15px var(--plasma-gold);
+}
+
+.btn-strip-toggle.off {
+  background: rgba(0, 0, 0, 0.6);
+  border-color: #666;
+  color: #888;
+}
+
+.btn-strip-toggle:hover {
+  transform: translateY(-2px);
+}
+
+.btn-strip-pulse {
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+  background: rgba(0, 240, 255, 0.15);
+  border: 2px solid var(--ufo-cyan);
+  color: var(--ufo-cyan);
+  transition: all 0.2s;
+}
+
+.btn-strip-pulse:hover {
+  background: var(--ufo-cyan);
+  color: #000;
+  box-shadow: 0 0 15px var(--ufo-cyan);
+  transform: translateY(-2px);
+}

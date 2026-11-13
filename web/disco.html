@@ -52,6 +52,25 @@
         ⚡ FIRE UFO TRACTOR BEAM (PARTY STROBE) ⚡
       </button>
 
+      <!-- 12V DISCO LED STRIP (VICTRON LOAD / RELAY 2 NC) -->
+      <div class="disco-strip-box">
+        <div class="strip-header">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:1.3rem;">💡</span>
+            <span class="strip-title">12V VICTRON DISCO LED STRIP</span>
+          </div>
+          <span id="stripStatusPill" class="strip-pill on">⚡ ON (NC)</span>
+        </div>
+        <div class="strip-controls">
+          <button id="btnToggleStrip" class="btn-strip-toggle on" onclick="toggleLedStrip()">
+            💡 TOGGLE 12V STRIP: [ ON ]
+          </button>
+          <button class="btn-strip-pulse" onclick="pulseLedStrip()">
+            🛸 UFO DISCO BEAT (3x)
+          </button>
+        </div>
+      </div>
+
       <!-- Coloured Coconut Drinks & Cocktails Matrix -->
       <div class="cocktail-beam-grid">
         <!-- Coco-Pink -->

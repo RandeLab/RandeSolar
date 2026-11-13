@@ -31,9 +31,13 @@
 
 // ==================== STAMPLC HARDWARE STATE ====================
 static bool g_relay1_inverter = false; // Relay 1: Inverter Front Switch (N.O.)
-static bool g_relay2_aux      = false; // Relay 2: Aux 12V Load
-static uint8_t g_lcd_page     = 0;     // 0 = Solar, 1 = Network, 2 = 5G, 3 = Weather (4 Pages)
+static bool g_relay2_aux      = false; // Relay 2 Coil (false = de-energized, true = energized)
+static bool g_led_strip_on    = true;  // 12V LED Strip on Relay 2 NC (lit when coil is de-energized / 0)
+static uint8_t g_lcd_page     = 0;     // 0 = Coconut, 1 = Solar, 2 = Network, 3 = 5G, 4 = Weather
 static unsigned long g_lastLcdUpdate = 0;
+
+static uint8_t  g_stripPulseRemaining = 0;
+static uint32_t g_lastStripPulseMs = 0;
 
 static String g_activeSsid = "";
 static String g_activePass = "";
@@ -49,6 +53,25 @@ void setLcdActivity(const char* tag, uint16_t color = TFT_CYAN) {
     g_lastActivityColor = color;
 }
 
+void setLedStrip(bool on) {
+    g_led_strip_on = on;
+    // Relay 2 is wired to NC (Normally Closed):
+    // When coil is de-energized (false / 0), NC is closed -> LED strip is powered ON!
+    // When coil is energized (true / 1), NC is open -> LED strip is powered OFF!
+    bool coilState = !on;
+    g_relay2_aux = coilState;
+    M5StamPLC.writePlcRelay(1, coilState);
+    Serial.printf("[StamPLC ⚡] 12V LED Strip (Relay 2 NC) -> %s (Coil: %s)\n",
+                  on ? "ON" : "OFF", coilState ? "ENERGIZED/OPEN" : "DE-ENERGIZED/CLOSED");
+    setLcdActivity(on ? "STRIP: ON" : "STRIP: OFF", on ? TFT_YELLOW : TFT_DARKGREY);
+}
+
+void triggerStripPulse(uint8_t count = 3) {
+    g_stripPulseRemaining = count * 2;
+    g_lastStripPulseMs = millis();
+    setLcdActivity("STRIP BEAT", TFT_YELLOW);
+}
+
 void setPlcRelay(uint8_t relayIdx, bool state) {
     if (relayIdx == 0) {
         g_relay1_inverter = state;
@@ -56,10 +79,7 @@ void setPlcRelay(uint8_t relayIdx, bool state) {
         Serial.printf("[StamPLC ⚡] Relay 1 (Inverter) -> %s\n", state ? "ON" : "OFF");
         setLcdActivity(state ? "INV: ON" : "INV: OFF", state ? TFT_GREEN : TFT_RED);
     } else if (relayIdx == 1) {
-        g_relay2_aux = state;
-        M5StamPLC.writePlcRelay(1, state);
-        Serial.printf("[StamPLC ⚡] Relay 2 (Aux) -> %s\n", state ? "ON" : "OFF");
-        setLcdActivity(state ? "AUX: ON" : "AUX: OFF", state ? TFT_GREEN : TFT_RED);
+        setLedStrip(state);
     }
 }
 
@@ -1312,15 +1332,34 @@ void setupOTA() {
 void handleRelayApi() {
     if (server.hasArg("r") && server.hasArg("state")) {
         int r = server.arg("r").toInt();
-        bool state = (server.arg("state").toInt() == 1 || server.arg("state") == "true");
+        String s = server.arg("state");
+        bool state = (s.toInt() == 1 || s == "true" || s == "on");
+        if (s == "toggle") {
+            state = (r == 1) ? !g_relay1_inverter : !g_led_strip_on;
+        }
         if (r == 1) setPlcRelay(0, state);
-        else if (r == 2) setPlcRelay(1, state);
-        char resp[128];
-        snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"relay\":%d,\"state\":%s}", r, state ? "true" : "false");
+        else if (r == 2) setLedStrip(state);
+        char resp[160];
+        snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"relay\":%d,\"state\":%s,\"inverter\":%s,\"led_strip\":%s}",
+                 r, state ? "true" : "false", g_relay1_inverter ? "true" : "false", g_led_strip_on ? "true" : "false");
         server.send(200, "application/json", resp);
+    } else if (server.hasArg("strip")) {
+        String s = server.arg("strip");
+        bool state = (s == "1" || s == "true" || s == "on");
+        if (s == "toggle") state = !g_led_strip_on;
+        setLedStrip(state);
+        char resp[160];
+        snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"action\":\"strip\",\"led_strip\":%s}",
+                 g_led_strip_on ? "true" : "false");
+        server.send(200, "application/json", resp);
+    } else if (server.hasArg("pulse")) {
+        int count = server.arg("pulse").toInt();
+        triggerStripPulse(count > 0 ? count : 3);
+        server.send(200, "application/json", "{\"status\":\"ok\",\"action\":\"pulse\"}");
     } else {
-        char resp[128];
-        snprintf(resp, sizeof(resp), "{\"relay1_inverter\":%s,\"relay2_aux\":%s}", g_relay1_inverter ? "true" : "false", g_relay2_aux ? "true" : "false");
+        char resp[160];
+        snprintf(resp, sizeof(resp), "{\"relay1_inverter\":%s,\"relay2_coil\":%s,\"led_strip\":%s}",
+                 g_relay1_inverter ? "true" : "false", g_relay2_aux ? "true" : "false", g_led_strip_on ? "true" : "false");
         server.send(200, "application/json", resp);
     }
 }
@@ -1516,13 +1555,21 @@ void renderLcdDashboard() {
         // Minimal single bottom line for button descriptions
         dsp.drawFastHLine(0, 118, 240, TFT_DARKGREY);
         dsp.setTextSize(1);
-        dsp.setTextColor(g_relay1_inverter ? TFT_GREEN : TFT_RED, TFT_BLACK);
-        dsp.setCursor(6, 122);
-        dsp.printf("[A] INV: %s", g_relay1_inverter ? "ON " : "OFF");
 
+        // Button A: Inverter (Relay 1 NO)
+        dsp.setTextColor(g_relay1_inverter ? TFT_GREEN : TFT_RED, TFT_BLACK);
+        dsp.setCursor(4, 122);
+        dsp.printf("[A]INV:%s", g_relay1_inverter ? "ON" : "OFF");
+
+        // Button C: 12V LED Strip (Relay 2 NC)
+        dsp.setTextColor(g_led_strip_on ? TFT_YELLOW : TFT_DARKGREY, TFT_BLACK);
+        dsp.setCursor(76, 122);
+        dsp.printf("[C]STRIP:%s", g_led_strip_on ? "ON" : "OFF");
+
+        // Button B: Next Screen
         dsp.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-        dsp.setCursor(136, 122);
-        dsp.print("[B] Details (1/4)");
+        dsp.setCursor(162, 122);
+        dsp.print("[B] Next >");
 
     } else if (g_lcd_page == 1) {
         // ==================== PAGE 1: HERO SOLAR & BATTERY [P1/4] ====================
@@ -1704,7 +1751,7 @@ void handleLiveApi() {
     int wifiRssi = WiFi.RSSI();
     int wifiQual = constrain(2 * (wifiRssi + 100), 0, 100);
 
-    char json[1350];
+    char json[1450];
     snprintf(json, sizeof(json),
         "{\"has_data\":%s,\"solar_power\":%u,\"battery_voltage\":%.2f,\"battery_current\":%.2f,\"panel_voltage\":%.2f,"
         "\"yield_today_wh\":%lu,\"external_load\":%.2f,\"charge_state\":%u,\"state_str\":\"%s\","
@@ -1715,6 +1762,7 @@ void handleLiveApi() {
         "\"cell_mode\":\"%s\",\"cell_band\":\"%s\",\"cell_operator\":\"%s\",\"cell_id\":\"%s\",\"cell_temp\":%.1f,"
         "\"cell_down_mbps\":%.2f,\"cell_up_mbps\":%.2f,\"cell_speed_state\":\"%s\",\"cell_speed_epoch\":%lu,"
         "\"wx_temp\":%.1f,\"wx_solar_wm2\":%.1f,\"wx_cloud_pct\":%d,\"wx_rain_mm\":%.2f,\"wx_wind_kmh\":%.1f,\"wx_humidity\":%d,\"wx_pressure\":%.1f,"
+        "\"relay1_inverter\":%s,\"relay2_coil\":%s,\"led_strip\":%s,"
         "\"buffered_records\":%u,\"ip\":\"%s\",\"gateway_ip\":\"%s\",\"age_sec\":%lu}",
         d.has_data ? "true" : "false",
         d.solar_power,
@@ -1759,6 +1807,9 @@ void handleLiveApi() {
         g_wxWindKmh,
         g_wxHumidity,
         g_wxPressure,
+        g_relay1_inverter ? "true" : "false",
+        g_relay2_aux ? "true" : "false",
+        g_led_strip_on ? "true" : "false",
         (unsigned int)g_bufferedRecordCount,
         WiFi.localIP().toString().c_str(),
         WiFi.gatewayIP().toString().c_str(),
@@ -2274,11 +2325,35 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
             return;
         }
 
-        if (msg.indexOf("relay") >= 0 || msg.indexOf("inverter") >= 0) {
+        // 12V LED Strip / Relay 2 NC commands
+        if (msg.indexOf("strip_pulse") >= 0 || msg.indexOf("pulse_strip") >= 0) {
+            triggerStripPulse(3);
+            mqttClient.publish(MQTT_TOPIC_ACK, "{\"status\":\"ok\",\"action\":\"strip_pulse\",\"led_strip\":true}");
+            Serial.println("[MQTT 🛸] 12V LED Strip pulse triggered via MQTT!");
+            return;
+        }
+
+        if (msg.indexOf("strip") >= 0 || msg.indexOf("ledstrip") >= 0 || msg.indexOf("relay2") >= 0 ||
+            msg.indexOf("\"relay\":2") >= 0 || msg.indexOf("\"relay\": 2") >= 0) {
             bool turnOn = (msg.indexOf("on") >= 0 || msg.indexOf("1") >= 0 || msg.indexOf("true") >= 0);
+            if (msg.indexOf("toggle") >= 0) turnOn = !g_led_strip_on;
+            setLedStrip(turnOn);
+            char ack[140];
+            snprintf(ack, sizeof(ack), "{\"status\":\"ok\",\"action\":\"strip\",\"relay\":2,\"led_strip\":%s}", turnOn ? "true" : "false");
+            mqttClient.publish(MQTT_TOPIC_ACK, ack);
+            Serial.printf("[MQTT 💡] 12V LED Strip commanded via MQTT: %s\n", turnOn ? "ON" : "OFF");
+            return;
+        }
+
+        // Inverter / Relay 1 NO commands
+        if (msg.indexOf("inverter") >= 0 || msg.indexOf("relay1") >= 0 ||
+            msg.indexOf("\"relay\":1") >= 0 || msg.indexOf("\"relay\": 1") >= 0 ||
+            (msg.indexOf("relay") >= 0 && msg.indexOf("strip") < 0)) {
+            bool turnOn = (msg.indexOf("on") >= 0 || msg.indexOf("1") >= 0 || msg.indexOf("true") >= 0);
+            if (msg.indexOf("toggle") >= 0) turnOn = !g_relay1_inverter;
             setPlcRelay(0, turnOn);
-            char ack[128];
-            snprintf(ack, sizeof(ack), "{\"status\":\"ok\",\"relay\":1,\"inverter_on\":%s}", turnOn ? "true" : "false");
+            char ack[140];
+            snprintf(ack, sizeof(ack), "{\"status\":\"ok\",\"action\":\"inverter\",\"relay\":1,\"inverter_on\":%s}", turnOn ? "true" : "false");
             mqttClient.publish(MQTT_TOPIC_ACK, ack);
             Serial.printf("[MQTT ⚡] Inverter relay commanded via MQTT: %s\n", turnOn ? "ON" : "OFF");
             return;
@@ -3242,11 +3317,31 @@ void loop() {
         renderLcdDashboard();
     }
 
-    // Button C: Audio confirmation beep & force dashboard refresh
+    // Button C: Toggle 12V LED Strip (on Page 0) or Dashboard Refresh (on Pages 1..4)
     if (M5StamPLC.BtnC().wasClicked()) {
-        M5StamPLC.tone(2200, 50);
-        setLcdActivity("REFRESH", TFT_GREEN);
+        if (g_lcd_page == 0) {
+            setLedStrip(!g_led_strip_on);
+            if (g_led_strip_on) {
+                M5StamPLC.tone(2000, 60);
+            } else {
+                M5StamPLC.tone(1000, 80);
+            }
+        } else {
+            M5StamPLC.tone(2200, 50);
+            setLcdActivity("REFRESH", TFT_GREEN);
+        }
         renderLcdDashboard();
+    }
+
+    // 12V LED Strip Pulse Animation State Machine (safe 350ms relay switching)
+    if (g_stripPulseRemaining > 0 && millis() - g_lastStripPulseMs >= 350) {
+        g_lastStripPulseMs = millis();
+        g_stripPulseRemaining--;
+        if (g_stripPulseRemaining == 0) {
+            setLedStrip(true); // Return to default lit state
+        } else {
+            setLedStrip(!g_led_strip_on);
+        }
     }
 
     // Update LCD Dashboard every 1000 ms
@@ -3327,7 +3422,8 @@ void loop() {
                 "\"net_ping_ms\":%u,\"gw_ping_ms\":%u,\"dns_ms\":%u,\"ttfb_ms\":%u,"
                 "\"cell_has_data\":%s,\"cell_rsrp\":%d,\"cell_sinr\":%d,\"cell_rsrq\":%d,\"cell_qual\":%d,"
                 "\"cell_mode\":\"%s\",\"cell_band\":\"%s\",\"cell_operator\":\"%s\",\"cell_id\":\"%s\",\"cell_temp\":%.1f,"
-                "\"cell_down_mbps\":%.2f,\"cell_up_mbps\":%.2f,\"cell_speed_epoch\":%lu,\"buffered_records\":%u,\"age_sec\":0}",
+                "\"cell_down_mbps\":%.2f,\"cell_up_mbps\":%.2f,\"cell_speed_epoch\":%lu,"
+                "\"relay1_inverter\":%s,\"relay2_coil\":%s,\"led_strip\":%s,\"buffered_records\":%u,\"age_sec\":0}",
                 d.solar_power,
                 d.panel_voltage,
                 d.battery_voltage,
@@ -3362,6 +3458,9 @@ void loop() {
                 g_cellDownMbps,
                 g_cellUpMbps,
                 (unsigned long)g_lastSpeedtestEpoch,
+                g_relay1_inverter ? "true" : "false",
+                g_relay2_aux ? "true" : "false",
+                g_led_strip_on ? "true" : "false",
                 (unsigned int)g_bufferedRecordCount
             );
             mqttClient.publish(MQTT_TOPIC, json);
