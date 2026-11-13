@@ -6,20 +6,22 @@ Standalone wireless solar & microclimate observatory for the **Victron MPPT 75 |
 
 ---
 
-## ⚡ 100% Standalone ESP32-S3 Architecture (No Laptop Needed!)
+## ⚡ 100% Standalone Architecture (No Laptop Needed!)
 
-The **ESP32-S3** handles the entire pipeline autonomously 24/7 without requiring any laptop or local server:
+Two ESP32-S3 devices run the pipeline autonomously 24/7. The **M5Stack StamPLC** (`stamplc.local` / `192.168.1.100`, firmware [`src/stamplc_main.cpp`](./src/stamplc_main.cpp)) is the main station; the original ESP32-S3 DevKit (`randesolar.local`, [`src/main.cpp`](./src/main.cpp)) is the legacy/backup unit.
 
 1. **BLE Decryption**: Hardware-accelerated AES-128-CTR decryption of Victron MPPT 75|15 Instant Readout beacons (`0x02E1`).
-2. **HiveMQ MQTT**: Streams live telemetry packets every 5s over WebSocket/MQTT (`broker.hivemq.com`).
-3. **Supabase Cloud Database**: Posts dense time-series telemetry every 20s directly to PostgreSQL cloud database over HTTPS for long-term charts.
-4. **35'000-Record LittleFS Flash Buffer**: Up to **48.6 days of complete offline resilience** during cell/internet outages, auto-draining back to Supabase on reconnection. CSV export available at `/api/buffer/csv`.
-5. **Teltonika TRB500 5G Gateway Telemetry**: Direct LAN integration via `ubus` JSON-RPC (`192.168.2.1`), querying cellular RF health (`RSRP`, `SINR`, `RSRQ`), band aggregation (`LTE B3 + 5G N1`), and running native Ookla speedtests on demand.
-6. **MeteoSwiss Microclimate Correlation**: Fetches high-resolution Open-Meteo / ICON-CH weather data (solar irradiance in $W/m^2$, cloud cover %, rain, barometric pressure) to correlate microclimate with solar yield and 5G signal attenuation.
-7. **Standalone Telegram Bot (`@RandeSolarBot`)**: Direct replies to commands (`/status`, `/weather`, `/mood`, `/speed`, `/ping`) and automated 20:00 evening summary reports.
-8. **Onboard Web Server & OTA**: Runs openBrushograph Kraftwerk Studio on port 80 at **[http://randesolar.local](http://randesolar.local)** with wireless Over-The-Air firmware updates (`ArduinoOTA` + Web UI at `/update`).
-9. **GitHub Pages Cloud Dashboard**: Accessible worldwide at **[https://randelab.github.io/RandeSolar/](https://randelab.github.io/RandeSolar/)** with 24-hour time formatting across all charts and metrics.
-10. **Dual-Tier Power Architecture (24/7 Autarky)**: The ESP32-S3 is powered directly from the 12V DC battery bank via a 12V-to-5V USB converter (<0.5W), ensuring continuous BLE beacon tracking and flash logging even when the 6000W 230V AC inverter and cellular routers are completely shut down to conserve energy.
+2. **HiveMQ MQTT**: Streams live telemetry every 5s over WebSocket/MQTT (`broker.hivemq.com`, topic `randelab/solar/telemetry`).
+3. **Supabase Cloud Database**: The StamPLC posts one row every **2 minutes** to the PostgreSQL table `solar_telemetry` over HTTPS (power, battery, network, weather, temperatures).
+4. **35'000-Record LittleFS Flash Buffer**: Up to **48.6 days of offline resilience** during cell/internet outages, auto-draining back to Supabase on reconnection. CSV export at `/api/buffer/csv`.
+5. **Teltonika TRB500 5G Gateway Telemetry**: LAN integration via `ubus` JSON-RPC (`192.168.2.1`): RSRP, SINR, RSRQ, band aggregation, native Ookla speedtests on demand. *(The 6-hourly scheduled speedtest is currently paused during development.)*
+6. **MeteoSwiss Microclimate**: Open-Meteo API with the MeteoSwiss ICON-CH model for `47.7701° N, 8.5738° E, 857 m` (tilted irradiance for a 35° south-facing panel, clouds, rain, pressure), polled every 2 min.
+7. **Dallas DS18B20 1-Wire Temperatures**: Probe 1 (Keller) on StamPLC Port A / GPIO 1 with 4.7 kΩ pull-up; Probe 2 (Raum) prepared. Shown on the LCD (Page 0 VU bar + Page 5), in MQTT, Supabase (`temp_dallas1`, `temp_dallas2`, `temp_plc`) and the web Mikroklima chart.
+8. **StamPLC Display & Relays**: 240×135 IPS with 6 flicker-free (double-buffered) pages and 3 buttons. Relay 1 = 230V inverter (auto cut-off below 11.50 V), Relay 2 NC = 12V LED strip. See the [display manual](./docs/stamplc_display_manual.md).
+9. **Standalone Telegram Bot (`@RandeSolarBot`)**: `/status`, `/weather`, `/mood`, `/speed`, `/ping`, plus a 20:00 evening report.
+10. **Onboard Web Server & OTA**: Kraftwerk Studio on port 80, wireless updates via `ArduinoOTA` and the Web UI at `/update`.
+11. **GitHub Pages Dashboard**: **[https://randelab.github.io/RandeSolar/](https://randelab.github.io/RandeSolar/)**, including speedtest averages (last 24 h and all-time) from Supabase history.
+12. **Dual-Tier Power (24/7 Autarky)**: The controller runs from the 12V battery bank (<0.5W), so BLE tracking and flash logging continue while the 6000W inverter and routers are off.
 
 ---
 
@@ -37,7 +39,7 @@ Das Gesamtsystem ist in zwei modulare Spezialdokumentationen aufgeteilt:
 
 3. 📺 **M5Stack StamPLC Hardware-Display & Tasten-Handbuch:**  
    👉 [**`docs/stamplc_display_manual.md`**](./docs/stamplc_display_manual.md)  
-   *Bedienungsanleitung für das 240x135 IPS-Farbdisplay des StamPLC: Die 5 Bildschirm-Seiten (Page 0 Minimalistisches Hackteria Neon Coconut Emblem mit % SoC Pinion Wheel, Page 1 Solar & Batterie Hero, Page 2 Netzwerk & Sync, Page 3 Teltonika 5G Gateway, Page 4 Meteo 857m), Tastenbelegung [A]/[B]/[C], Relais-Steuerung (230V Inverter & 12V LED Strip) und integrierter ByteBeat Chiptune Synthesizer.*
+   *Bedienungsanleitung für das 240x135 IPS-Farbdisplay des StamPLC: Die 6 Bildschirm-Seiten (Page 0 Neon Coconut Emblem mit % SoC Pinion Wheel und RandeChistli-Temperaturbalken, Page 1 Solar & Batterie, Page 2 Netzwerk & Sync, Page 3 Teltonika 5G, Page 4 Meteo 857m, Page 5 Dallas 1-Wire Temperaturen), flackerfreies Double-Buffering, Tastenbelegung [A]/[B]/[C], Relais-Steuerung (230V Inverter & 12V LED Strip) und integrierter ByteBeat Chiptune Synthesizer.*
 
 4. 🗺️ **HF-Radar & Grenznetz-Topographie (OSM):**  
    👉 [**`docs/maps/README.md`**](./docs/maps/README.md)  
@@ -47,16 +49,17 @@ Das Gesamtsystem ist in zwei modulare Spezialdokumentationen aufgeteilt:
 
 ### Flash or Monitor Firmware:
 ```bash
-# 1. First-time flash over USB (/dev/ttyACM0):
-pio run -e esp32-s3-devkitc-1 -t upload
+# StamPLC (main station) - wireless OTA (use the IP, mDNS can time out):
+pio run -e m5stack-stamplc-ota -t upload --upload-port 192.168.1.100
+# StamPLC first-time flash over USB:
+pio run -e m5stack-stamplc -t upload
 
-# 2. Wireless OTA flash over Wi-Fi (randesolar.local):
-pio run -e esp32-s3-ota -t upload
+# Legacy ESP32-S3 DevKit:
+pio run -e esp32-s3-devkitc-1 -t upload   # USB
+pio run -e esp32-s3-ota -t upload         # OTA (randesolar.local)
 
-# 3. Or upload .pio/build/esp32-s3-devkitc-1/firmware.bin in your browser:
-#    http://randesolar.local/update
-
-# Open serial monitor:
+# Browser upload: http://<device>/update
+# Serial monitor:
 pio device monitor
 ```
 

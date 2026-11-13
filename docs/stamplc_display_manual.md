@@ -12,18 +12,21 @@ The StamPLC front panel features three physical tactile buttons arranged horizon
 * **Btn [B]** (Center)
 * **Btn [C]** (Right)
 
-| Button Position | Page 0 (Coconut Emblem) | Page 1 (Solar & Battery) | Page 2 (Network & Sync) | Page 3 (Teltonika 5G) | Page 4 (Meteo Microclimate) |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Btn [A] (Left)** | **Toggle 230V Inverter** (Relay 1 NO)<br>*(1800 Hz high chime ON / 900 Hz low OFF)* | **Toggle 230V Inverter** (Relay 1 NO)<br>*(Instant power switch)* | **Open Wi-Fi Menu**<br>*(Interactive AP selector)* | **Trigger Latency Ping**<br>*(Gateway & Cloudflare 1.1.1.1)* | **Force Weather Sync**<br>*(Fetch Open-Meteo & MeteoSwiss)* |
-| **Btn [B] (Center)** | **Next Page ➡️**<br>*(Advances to Page 1)* | **Next Page ➡️**<br>*(Advances to Page 2)* | **Next Page ➡️**<br>*(Advances to Page 3)* | **Next Page ➡️**<br>*(Advances to Page 4)* | **Back to Coconut 🥥**<br>*(Cycles back to Page 0)* |
-| **Btn [C] (Right)** | **Toggle 12V LED Strip** (Relay 2 NC)<br>*(2000 Hz ON / 1000 Hz OFF)* | **Force Telemetry Refresh** | **Force Telemetry Refresh** | **Force Telemetry Refresh** | **Force Telemetry Refresh** |
+| Button Position | Page 0 (Coconut Emblem) | Page 1 (Solar & Battery) | Page 2 (Network & Sync) | Page 3 (Teltonika 5G) | Page 4 (Meteo Microclimate) | Page 5 (Temperature) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Btn [A] (Left)** | **Toggle 230V Inverter** (Relay 1 NO)<br>*(1800 Hz high chime ON / 900 Hz low OFF)* | **Toggle 230V Inverter** (Relay 1 NO)<br>*(Instant power switch)* | **Open Wi-Fi Menu**<br>*(Interactive AP selector)* | **Trigger Latency Ping**<br>*(Gateway & Cloudflare 1.1.1.1)* | **Force Weather Sync**<br>*(Fetch Open-Meteo & MeteoSwiss)* | **Re-Scan 1-Wire Bus**<br>*(2400 Hz chirp)* |
+| **Btn [B] (Center)** | **Next Page ➡️** | **Next Page ➡️** | **Next Page ➡️** | **Next Page ➡️** | **Next Page ➡️** | **Back to Coconut 🥥** |
+| **Btn [C] (Right)** | **Toggle 12V LED Strip** (Relay 2 NC)<br>*(2000 Hz ON / 1000 Hz OFF)* | **Force Refresh** | **Force Refresh** | **Force Refresh** | **Force Refresh** | **Force Refresh** |
 
 > [!NOTE]
 > **Safety Undervoltage Guard**: If battery voltage drops below $11.50\,\text{V}$, Relay 1 automatically cuts off the 230V inverter to protect the 4x VOLTIC 95 Ah AGM bank, accompanied by a double low warning tone ($800\,\text{Hz}$).
 
+> [!TIP]
+> **Flicker-free rendering**: All pages are drawn into a 240×135 off-screen `M5Canvas` sprite (~63 KB SRAM) and pushed to the panel in one transfer once per second. The screen is never blanked between frames. If the sprite allocation fails at boot, the firmware falls back to direct drawing (with the old 1 s flicker) and logs `[Display ⚠️]` on serial.
+
 ---
 
-## 📺 The 5 Display Pages
+## 📺 The 6 Display Pages
 
 ### Page 0: The Minimalist Ambient Coconut Emblem
 <p align="center">
@@ -63,14 +66,14 @@ A completely number-free, retro-futuristic ambient screen designed for visual tr
 
 ---
 
-### Page 1: Hero Solar & Battery Telemetry (`[P1/4]`)
+### Page 1: Hero Solar & Battery Telemetry (`[P1/5]`)
 <p align="center">
   <img src="./images/page1_solar.png" alt="Page 1: Hero Solar & Battery" width="480">
 </p>
 
 The core operational dashboard for daily power monitoring.
 
-* **Top Header**: Title `RANDESOLAR`, page index `[P1/4]`, and real-time Inverter pill badge (`INV 230V: ON/OFF`).
+* **Top Header**: Title `RANDESOLAR`, page index `[P1/5]`, and real-time Inverter pill badge (`INV 230V: ON/OFF`).
 * **Row 1**:
   * **Solar Generation (Yellow, Size 3)**: Instantaneous PV harvest in Watts (e.g., `74W`).
   * **Daily Yield (Grey, Size 2)**: Total accumulated harvest today in Watt-hours (e.g., `950Wh`).
@@ -84,7 +87,7 @@ The core operational dashboard for daily power monitoring.
 
 ---
 
-### Page 2: Local Network & Cloud Sync (`[P2/4]`)
+### Page 2: Local Network & Cloud Sync (`[P2/5]`)
 <p align="center">
   <img src="./images/page2_network.png" alt="Page 2: Network & Cloud Sync" width="480">
 </p>
@@ -101,7 +104,7 @@ Connectivity diagnostics and offline flash logging status.
 
 ---
 
-### Page 3: Teltonika 5G Mobile Gateway (`[P3/4]`)
+### Page 3: Teltonika 5G Mobile Gateway (`[P3/5]`)
 <p align="center">
   <img src="./images/page3_teltonika.png" alt="Page 3: Teltonika 5G Gateway" width="480">
 </p>
@@ -119,7 +122,7 @@ Live telematics queried directly from the TRB500 5G industrial gateway via JSON-
 
 ---
 
-### Page 4: MeteoSwiss & Local Microclimate (`[P4/4]`)
+### Page 4: MeteoSwiss & Local Microclimate (`[P4/5]`)
 <p align="center">
   <img src="./images/page4_meteo.png" alt="Page 4: Weather & Microclimate" width="480">
 </p>
@@ -136,7 +139,66 @@ Hyperlocal weather metrics for RandeLab (857 m altitude, tilt $35^\circ$).
   * Relative humidity percentage and $10\text{m}$ wind speed in km/h.
 * **Barometric Pressure**:
   * Surface atmospheric pressure in hPa adjusted for 857 m elevation (e.g., `928.4 hPa`).
-* **Footer**: `[A] Sync Weather` triggers an instant fetch; `[B] Back to Coconut` returns to Page 0.
+* **Footer**: `[A] Sync WX` triggers an instant fetch; `[B] Next P5` advances to the temperature page.
+
+---
+
+### Page 5: Dallas 1-Wire Temperatures (`[P5/5]`)
+
+Live readings from the DS18B20 probes on the 1-Wire bus, plus the StamPLC internal board temperature.
+
+**Wiring (Port A, red Grove socket)**
+
+| Grove wire | Signal | DS18B20 |
+| :--- | :--- | :--- |
+| Black | GND | GND |
+| Red | 5V | VDD |
+| Yellow | **GPIO 1** (1-Wire data) | DQ |
+| White | GPIO 2 (unused) | — |
+
+* A **4.7 kΩ pull-up** between DQ and 5V is required. Several probes can share the same three wires (parallel bus).
+* Probes are read asynchronously (non-blocking `requestTemperatures()` + 11-bit resolution, ~375 ms conversion), so the display and BLE never stall.
+
+**Screen layouts**
+
+* **0 probes found**: `No 1-Wire Probe` in red, wiring hint (`Port A / GPIO 1`, check pull-up) and the PLC board temperature.
+* **1 probe**: Big green `XX.X C` (size 4), the probe's 64-bit factory ROM ID (e.g. `ID: 28FF…`), and the PLC board temperature.
+* **2+ probes**: Probe 1 (green) and Probe 2 (cyan) side by side, `Diff: ±X.X C | Bus: N Devices`, and the PLC board temperature.
+* Disconnected or failed probes show `--.- C` (internally `-999.0`). No value is invented.
+
+**Probe naming (used everywhere: LCD, MQTT, Supabase, web)**
+
+| Firmware var | JSON / DB column | Label | Status |
+| :--- | :--- | :--- | :--- |
+| `g_dallasTemp1` | `temp_dallas1` | Probe 1 / Keller | ✅ Installed |
+| `g_dallasTemp2` | `temp_dallas2` | Probe 2 / Raum | ⏳ Prepared, not soldered yet |
+| `g_plcInternalTemp` | `temp_plc` | StamPLC Board | ✅ Built-in |
+
+> [!NOTE]
+> Probe order on the bus follows the 1-Wire search order (determined by each probe's ROM ID), not the physical wire. After adding the second probe, check Page 5: if "Keller" and "Raum" are swapped, swap the probes (or pin the ROM IDs in firmware).
+
+* **Footer**: `[A] Re-Scan` re-enumerates the bus (use after plugging in a probe); `[B] Coconut` returns to Page 0.
+
+---
+
+## ☁️ Where the Temperatures Go
+
+| Channel | Interval | Fields |
+| :--- | :--- | :--- |
+| LCD Page 0 (VU bar) + Page 5 | 1 s | Probe 1 (falls back to PLC temp if no probe) |
+| `GET /api/live` (LAN) | on request | `temp_dallas1`, `temp_dallas2`, `temp_plc`, `dallas_count` |
+| MQTT `randelab/solar/telemetry` | 5 s | same as above |
+| Supabase `solar_telemetry` | 120 s | `temp_dallas1`, `temp_dallas2` (`null` if absent), `temp_plc` |
+| Web dashboard | live + history | Mikroklima cards and the Wetter & Mikroklima chart (Probe 1 lime green, Probe 2 pink) |
+
+> [!IMPORTANT]
+> Supabase columns `temp_dallas1`, `temp_dallas2`, `temp_plc` (type `REAL`) were added on 2026-11-13. Rows before that have `null` for these fields. Offline-buffered LittleFS records do **not** carry temperatures yet (only power/battery fields).
+
+---
+
+## 🚧 Development Flags
+
+* **Speedtest at boot / scheduled speedtest is currently paused** in firmware (to stop a speedtest on every OTA reboot during development). Re-enable when development is finished. Manual tests via the web button / MQTT still work.
 
 ---
 
