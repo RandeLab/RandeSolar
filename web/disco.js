@@ -423,6 +423,12 @@
               setStripUiState(ack.led_strip);
             }
 
+            if (ack.action === 'bytebeat') {
+              setByteBeatUiState(ack.tune, true);
+            } else if (ack.action === 'bytebeat_stop') {
+              setByteBeatUiState(0, false);
+            }
+
             if (ack.action === 'disco_strobe') {
               updateTractorBeam(0, 0, 0, true);
             } else if (ack.r !== undefined && ack.g !== undefined && ack.b !== undefined) {
@@ -541,6 +547,81 @@
     // Also trigger via local REST if reachable
     fetch('/api/relay?pulse=3', { method: 'GET', mode: 'cors', cache: 'no-store' }).catch(() => {});
     fetch('http://192.168.1.100/api/relay?pulse=3', { method: 'GET', mode: 'cors', cache: 'no-store' }).catch(() => {});
+  };
+
+  // --- ByteBeat 1-Liner Chiptune Synthesizer Controls (ESP32 StamPLC Speaker) ---
+  let activeByteBeatTune = 0;
+  let byteBeatTimer = null;
+
+  function setByteBeatUiState(tuneId, isPlaying) {
+    activeByteBeatTune = isPlaying ? tuneId : 0;
+    const pill = document.getElementById('bytebeatStatusPill');
+    if (pill) {
+      if (isPlaying && tuneId > 0) {
+        const names = ['', 'VIZNUT #1', 'SIERPINSKI', 'CYBERFUNK', 'BITSHIFT', 'ACID 303'];
+        pill.textContent = `🎵 PLAYING: ${names[tuneId] || ('TUNE #' + tuneId)}`;
+        pill.className = 'bytebeat-pill playing';
+      } else {
+        pill.textContent = '🛑 IDLE';
+        pill.className = 'bytebeat-pill';
+      }
+    }
+
+    if (isPlaying) {
+      if (byteBeatTimer) clearTimeout(byteBeatTimer);
+      byteBeatTimer = setTimeout(() => {
+        setByteBeatUiState(0, false);
+      }, currentDurationSec * 1000);
+    }
+  }
+
+  window.triggerByteBeat = async function (tuneId, tuneName) {
+    playLaserZap(600, 1200, 0.08);
+    const log = document.getElementById('logMini');
+
+    if (tuneId === 0) {
+      if (log) log.textContent = '🛑 STOPPING BYTEBEAT CHIPTUNE...';
+      setByteBeatUiState(0, false);
+
+      if (mqttClient && mqttClient.connected) {
+        mqttClient.publish('randelab/solar/cmd', JSON.stringify({
+          action: 'bytebeat',
+          tune: 0,
+          t: Date.now()
+        }));
+      }
+      fetch('/api/sound?tune=0', { cache: 'no-store' }).catch(() => {});
+      fetch('http://192.168.1.100/api/sound?tune=0', { cache: 'no-store' }).catch(() => {});
+      return;
+    }
+
+    setByteBeatUiState(tuneId, true);
+    if (log) log.textContent = `👾 PLAYING ON ESP32: "${tuneName.toUpperCase()}" (${currentDurationSec}s)...`;
+
+    // 1. MQTT Command to HiveMQ
+    if (mqttClient && mqttClient.connected) {
+      mqttClient.publish('randelab/solar/cmd', JSON.stringify({
+        action: 'bytebeat',
+        tune: tuneId,
+        name: tuneName,
+        duration_sec: currentDurationSec,
+        t: Date.now()
+      }));
+    }
+
+    // 2. Parallel REST Fallback (Local Lab Network)
+    try {
+      const endpoints = [
+        `/api/sound?tune=${tuneId}&duration=${currentDurationSec}`,
+        `http://192.168.1.100/api/sound?tune=${tuneId}&duration=${currentDurationSec}`
+      ];
+      for (const ep of endpoints) {
+        try {
+          const res = await fetch(ep, { method: 'GET', mode: 'cors', cache: 'no-store' });
+          if (res.ok) break;
+        } catch (e) {}
+      }
+    } catch (e) {}
   };
 
   // --- Dispatch Command (MQTT + Local REST) ---

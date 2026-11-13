@@ -14,7 +14,7 @@
   <!-- MQTT.js CDN for Real-Time HiveMQ WebSockets Link -->
   <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
 
-  <link rel="stylesheet" href="./web/disco.css?v=4.0">
+  <link rel="stylesheet" href="./web/disco.css?v=4.2">
 </head>
 <body>
 
@@ -67,6 +67,55 @@
           </button>
           <button class="btn-strip-pulse" onclick="pulseLedStrip()">
             🛸 UFO DISCO BEAT (3x)
+          </button>
+        </div>
+      </div>
+
+      <!-- VINTAGE BYTEBEAT 1-LINER CHIPTUNE SYNTHESIZER (ESP32 SPEAKER) -->
+      <div class="bytebeat-box">
+        <div class="bytebeat-header">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:1.3rem;">👾</span>
+            <span class="bytebeat-title">ESP32 BYTEBEAT 1-LINER SYNTH</span>
+          </div>
+          <span id="bytebeatStatusPill" class="bytebeat-pill">🛑 IDLE</span>
+        </div>
+        <div class="bytebeat-grid">
+          <!-- Tune 1: Viznut -->
+          <button class="btn-bytebeat" onclick="triggerByteBeat(1, 'Viznut Classic')" style="border-color:#00f0ff; color:#00f0ff;">
+            <span class="bb-icon">🕹️</span>
+            <span class="bb-title">VIZNUT #1</span>
+            <span class="bb-formula">(t*5&t>>7)|(t*3&t>>10)</span>
+          </button>
+          <!-- Tune 2: Sierpinski Harmony -->
+          <button class="btn-bytebeat" onclick="triggerByteBeat(2, 'Sierpinski Fractal')" style="border-color:#39ff14; color:#39ff14;">
+            <span class="bb-icon">📐</span>
+            <span class="bb-title">SIERPINSKI</span>
+            <span class="bb-formula">t*((t>>12|t>>8)&63&t>>4)</span>
+          </button>
+          <!-- Tune 3: Cyberfunk -->
+          <button class="btn-bytebeat" onclick="triggerByteBeat(3, 'Cyberfunk Groove')" style="border-color:#ff007f; color:#ff007f;">
+            <span class="bb-icon">🕺</span>
+            <span class="bb-title">CYBERFUNK</span>
+            <span class="bb-formula">(t*5&t>>5)|(t*3&t>>8)</span>
+          </button>
+          <!-- Tune 4: Bitshift Madness -->
+          <button class="btn-bytebeat" onclick="triggerByteBeat(4, 'Bitshift Madness')" style="border-color:#ffea00; color:#ffea00;">
+            <span class="bb-icon">⚡</span>
+            <span class="bb-title">BITSHIFT</span>
+            <span class="bb-formula">(t>>7|t|t>>6)*10+...</span>
+          </button>
+          <!-- Tune 5: Acid 303 -->
+          <button class="btn-bytebeat" onclick="triggerByteBeat(5, 'Acid 303 Bass')" style="border-color:#ff7700; color:#ff7700;">
+            <span class="bb-icon">🧪</span>
+            <span class="bb-title">ACID 303</span>
+            <span class="bb-formula">(t*(t>>5|t>>8))>>16&63</span>
+          </button>
+          <!-- Stop -->
+          <button class="btn-bytebeat" onclick="triggerByteBeat(0, 'Stop')" style="border-color:#ff1030; color:#ff1030;">
+            <span class="bb-icon">🛑</span>
+            <span class="bb-title">STOP SOUND</span>
+            <span class="bb-formula">M5StamPLC.noTone()</span>
           </button>
         </div>
       </div>
@@ -170,6 +219,6 @@
 
   </div>
 
-  <script src="./web/disco.js?v=4.1"></script>
+  <script src="./web/disco.js?v=4.2"></script>
 </body>
 </html>

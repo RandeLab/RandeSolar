@@ -438,6 +438,101 @@ void triggerTxFlash() {
 
 void updateNeoPixel();
 
+// ==================== VINTAGE BYTEBEAT SYNTHESIZER ====================
+// Algorithmic 1-liner chiptunes played on the StamPLC piezo speaker (STAMPLC_PIN_BUZZ / GPIO 44)
+static int      g_bbTuneId = 0;          // 0 = Idle, 1 = Viznut Classic, 2 = Sierpinski Harmony, 3 = Cyberpunk Groove, 4 = Bitshift Madness, 5 = Acid 303
+static uint32_t g_bbStartMs = 0;
+static uint32_t g_bbDurationMs = 0;
+static uint32_t g_bbLastStepMs = 0;
+static uint32_t g_bbStepIntervalMs = 70; // ~14 Hz step rate
+static uint32_t g_bbT = 0;               // Time counter for formula
+static uint32_t g_bbTStep = 64;          // Phase step per tick
+
+// Melodic Quantization Scale (A minor / Pentatonic with octave extensions)
+static const uint16_t BB_SCALE[24] = {
+    196, 220, 247, 262, 294, 330, 349, 392,
+    440, 494, 523, 587, 659, 698, 784, 880,
+    988, 1047, 1175, 1319, 1397, 1568, 1760, 1976
+};
+
+void startByteBeat(int tuneId, uint32_t durationSec = 10) {
+    if (tuneId <= 0 || tuneId > 5) {
+        g_bbTuneId = 0;
+        M5StamPLC.noTone();
+        return;
+    }
+    g_bbTuneId = tuneId;
+    g_bbStartMs = millis();
+    g_bbDurationMs = durationSec * 1000;
+    g_bbLastStepMs = 0;
+    g_bbT = 1000; // Start at non-zero phase where motifs are rich
+
+    switch (tuneId) {
+        case 1: g_bbStepIntervalMs = 65; g_bbTStep = 60; break;  // Viznut Classic
+        case 2: g_bbStepIntervalMs = 80; g_bbTStep = 55; break;  // Sierpinski
+        case 3: g_bbStepIntervalMs = 60; g_bbTStep = 50; break;  // Cyberfunk
+        case 4: g_bbStepIntervalMs = 70; g_bbTStep = 45; break;  // Bitshift Madness
+        case 5: g_bbStepIntervalMs = 50; g_bbTStep = 40; break;  // Acid 303
+        default: g_bbStepIntervalMs = 70; g_bbTStep = 50; break;
+    }
+    setLcdActivity("BYTEBEAT 🎵", TFT_MAGENTA);
+    Serial.printf("[ByteBeat 🎵] Started Tune #%d for %us\n", tuneId, durationSec);
+}
+
+void stopByteBeat() {
+    if (g_bbTuneId > 0) {
+        g_bbTuneId = 0;
+        M5StamPLC.noTone();
+        Serial.println("[ByteBeat 🛑] Stopped");
+    }
+}
+
+void updateByteBeat() {
+    if (g_bbTuneId <= 0) return;
+
+    uint32_t now = millis();
+    if (now - g_bbStartMs >= g_bbDurationMs) {
+        stopByteBeat();
+        return;
+    }
+
+    if (now - g_bbLastStepMs >= g_bbStepIntervalMs) {
+        g_bbLastStepMs = now;
+        uint32_t t = g_bbT;
+        g_bbT += g_bbTStep;
+
+        uint8_t b = 0;
+        switch (g_bbTuneId) {
+            case 1: // Viznut Classic: (t * 5 & t >> 7) | (t * 3 & t >> 10)
+                b = (uint8_t)(((t * 5) & (t >> 7)) | ((t * 3) & (t >> 10)));
+                break;
+            case 2: // Sierpinski Harmony: t * ((t >> 12 | t >> 8) & 63 & t >> 4)
+                b = (uint8_t)(t * (((t >> 12) | (t >> 8)) & 63 & (t >> 4)));
+                break;
+            case 3: // Cyberfunk Groove: (t * 5 & t >> 5) | (t * 3 & t >> 8)
+                b = (uint8_t)(((t * 5) & (t >> 5)) | ((t * 3) & (t >> 8)));
+                break;
+            case 4: // Bitshift Madness: (t >> 7 | t | t >> 6) * 10 + 4 * (t & t >> 13 | t >> 6)
+                b = (uint8_t)(((t >> 7) | t | (t >> 6)) * 10 + 4 * ((t & (t >> 13)) | (t >> 6)));
+                break;
+            case 5: // Acid 303: ((t * (t >> 5 | t >> 8)) >> (t >> 16)) & 63
+                b = (uint8_t)(((t * ((t >> 5) | (t >> 8))) >> (t >> 16)) & 63);
+                break;
+            default:
+                b = 0;
+                break;
+        }
+
+        // Rhythmic rests on low bits for funky staccato gating
+        if ((b & 0x07) == 0 || b == 0) {
+            M5StamPLC.noTone();
+        } else {
+            uint16_t freq = BB_SCALE[b % 24];
+            M5StamPLC.tone(freq, g_bbStepIntervalMs - 10);
+        }
+    }
+}
+
 static SolarData g_data;
 static volatile bool g_newDataAvailable = false;
 static portMUX_TYPE g_mux = portMUX_INITIALIZER_UNLOCKED;
@@ -2086,6 +2181,49 @@ void handleLedApi() {
     server.send(200, "application/json", res);
 }
 
+void handleSoundApi() {
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    server.sendHeader("Access-Control-Allow-Headers", "*");
+
+    if (server.method() == HTTP_OPTIONS) {
+        server.send(204);
+        return;
+    }
+
+    int tuneId = 1;
+    if (server.hasArg("tune")) {
+        tuneId = server.arg("tune").toInt();
+    } else if (server.hasArg("id")) {
+        tuneId = server.arg("id").toInt();
+    } else if (server.hasArg("name")) {
+        String n = server.arg("name");
+        n.toLowerCase();
+        if (n.indexOf("viznut") >= 0 || n.indexOf("classic") >= 0) tuneId = 1;
+        else if (n.indexOf("sierpinski") >= 0 || n.indexOf("fractal") >= 0) tuneId = 2;
+        else if (n.indexOf("cyber") >= 0 || n.indexOf("funk") >= 0) tuneId = 3;
+        else if (n.indexOf("bitshift") >= 0 || n.indexOf("madness") >= 0) tuneId = 4;
+        else if (n.indexOf("acid") >= 0 || n.indexOf("303") >= 0) tuneId = 5;
+        else if (n.indexOf("stop") >= 0 || n.indexOf("off") >= 0) tuneId = 0;
+    }
+
+    uint32_t dur = 10;
+    if (server.hasArg("duration")) {
+        dur = server.arg("duration").toInt();
+        if (dur == 0) dur = 10;
+    }
+
+    if (tuneId <= 0) {
+        stopByteBeat();
+        server.send(200, "application/json", "{\"status\":\"ok\",\"action\":\"bytebeat_stop\"}");
+    } else {
+        startByteBeat(tuneId, dur);
+        char buf[128];
+        snprintf(buf, sizeof(buf), "{\"status\":\"ok\",\"action\":\"bytebeat\",\"tune\":%d,\"duration_sec\":%u}", tuneId, dur);
+        server.send(200, "application/json", buf);
+    }
+}
+
 void measureLatency() {
     if (WiFi.status() != WL_CONNECTED) return;
     if (WiFi.SSID() != "RandeLab") { g_gwPingMs = 8; g_netPingMs = 15; return; }
@@ -2421,6 +2559,41 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
             snprintf(ack, sizeof(ack), "{\"status\":\"ok\",\"action\":\"inverter\",\"relay\":1,\"inverter_on\":%s}", turnOn ? "true" : "false");
             mqttClient.publish(MQTT_TOPIC_ACK, ack);
             Serial.printf("[MQTT ⚡] Inverter relay commanded via MQTT: %s\n", turnOn ? "ON" : "OFF");
+            return;
+        }
+
+        // Remote ByteBeat Chiptune Synthesizer Command Handler
+        if (msg.indexOf("bytebeat") >= 0 || msg.indexOf("tune") >= 0 || msg.indexOf("sound") >= 0 || msg.indexOf("synth") >= 0) {
+            int tuneId = 1;
+            if (msg.indexOf("viznut") >= 0 || msg.indexOf("classic") >= 0) tuneId = 1;
+            else if (msg.indexOf("sierpinski") >= 0 || msg.indexOf("fractal") >= 0) tuneId = 2;
+            else if (msg.indexOf("cyber") >= 0 || msg.indexOf("funk") >= 0) tuneId = 3;
+            else if (msg.indexOf("bitshift") >= 0 || msg.indexOf("madness") >= 0) tuneId = 4;
+            else if (msg.indexOf("acid") >= 0 || msg.indexOf("303") >= 0) tuneId = 5;
+            else if (msg.indexOf("stop") >= 0 || msg.indexOf("off") >= 0) tuneId = 0;
+            else if (msg.indexOf("1") >= 0) tuneId = 1;
+            else if (msg.indexOf("2") >= 0) tuneId = 2;
+            else if (msg.indexOf("3") >= 0) tuneId = 3;
+            else if (msg.indexOf("4") >= 0) tuneId = 4;
+            else if (msg.indexOf("5") >= 0) tuneId = 5;
+
+            uint32_t dur = 10;
+            if (msg.indexOf("dur") >= 0) {
+                // simple duration parsing
+                int idx = msg.indexOf("dur");
+                dur = msg.substring(idx + 4, idx + 8).toInt();
+                if (dur == 0) dur = 10;
+            }
+
+            if (tuneId <= 0) {
+                stopByteBeat();
+                mqttClient.publish(MQTT_TOPIC_ACK, "{\"status\":\"ok\",\"action\":\"bytebeat_stop\"}");
+            } else {
+                startByteBeat(tuneId, dur);
+                char ack[140];
+                snprintf(ack, sizeof(ack), "{\"status\":\"ok\",\"action\":\"bytebeat\",\"tune\":%d,\"duration_sec\":%u}", tuneId, dur);
+                mqttClient.publish(MQTT_TOPIC_ACK, ack);
+            }
             return;
         }
 
@@ -3259,6 +3432,7 @@ void setup() {
     server.on("/api/speedtest", handleSpeedtestApi);
     server.on("/api/wifi/scan", handleWifiScanApi);
     server.on("/api/led", handleLedApi);
+    server.on("/api/sound", handleSoundApi);
     server.on("/api/relay", handleRelayApi);
     server.on("/update", HTTP_GET, handleOtaPage);
     server.on("/update", HTTP_POST, handleOtaUploadDone, handleOtaUploadChunk);
@@ -3426,6 +3600,9 @@ void loop() {
 
     // Update onboard NeoPixel state machine
     updateNeoPixel();
+
+    // Update vintage ByteBeat chiptune synthesizer
+    updateByteBeat();
 
     uint32_t now = millis();
 

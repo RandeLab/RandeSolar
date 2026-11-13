@@ -502,3 +502,105 @@ body::before {
   box-shadow: 0 0 15px var(--ufo-cyan);
   transform: translateY(-2px);
 }
+
+/* ==================== BYTEBEAT CHIPTUNE DECK ==================== */
+.bytebeat-box {
+  width: 100%;
+  margin-top: 14px;
+  padding: 14px;
+  background: rgba(18, 0, 36, 0.85);
+  border: 2px solid var(--alien-pink);
+  border-radius: 12px;
+  box-shadow: 0 0 20px rgba(255, 0, 127, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bytebeat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px dashed rgba(255, 0, 127, 0.4);
+  padding-bottom: 8px;
+}
+
+.bytebeat-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 800;
+  font-size: 0.95rem;
+  letter-spacing: 1px;
+  color: var(--alien-pink);
+}
+
+.bytebeat-pill {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid #666;
+  color: #888;
+  transition: all 0.2s;
+}
+
+.bytebeat-pill.playing {
+  border-color: var(--neon-green);
+  color: var(--neon-green);
+  box-shadow: 0 0 10px rgba(57, 255, 20, 0.5);
+  animation: stripPulseAnim 1.2s infinite;
+}
+
+.bytebeat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.btn-bytebeat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 8px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  text-decoration: none;
+}
+
+.btn-bytebeat:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: 0 0 15px currentColor;
+}
+
+.btn-bytebeat:active {
+  transform: translateY(1px);
+}
+
+.bb-icon {
+  font-size: 1.4rem;
+}
+
+.bb-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.bb-formula {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  opacity: 0.65;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
