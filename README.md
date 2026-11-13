@@ -35,7 +35,11 @@ Das Gesamtsystem ist in zwei modulare Spezialdokumentationen aufgeteilt:
    👉 [**`NETWORK_5G_INFRASTRUCTURE.md`**](./NETWORK_5G_INFRASTRUCTURE.md)  
    *Teltonika TRB500 Industrial Gateway, TP-Link Omada PoE Access Point, ubus JSON-RPC Schnittstelle, nativer Ookla 5G-Speedtest, 5G-HF-Physik auf 857m (RSRP/SINR), Frequenz-Tuning (700 MHz vs. 3.5 GHz N78) und 35'000-Datensatz LittleFS Flash-Puffer.*
 
-3. 🗺️ **HF-Radar & Grenznetz-Topographie (OSM):**  
+3. 📺 **M5Stack StamPLC Hardware-Display & Tasten-Handbuch:**  
+   👉 [**`docs/stamplc_display_manual.md`**](./docs/stamplc_display_manual.md)  
+   *Bedienungsanleitung für das 240x135 IPS-Farbdisplay des StamPLC: Die 5 Bildschirm-Seiten (Page 0 Minimalistisches Hackteria Neon Coconut Emblem mit % SoC Pinion Wheel, Page 1 Solar & Batterie Hero, Page 2 Netzwerk & Sync, Page 3 Teltonika 5G Gateway, Page 4 Meteo 857m), Tastenbelegung [A]/[B]/[C], Relais-Steuerung (230V Inverter & 12V LED Strip) und integrierter ByteBeat Chiptune Synthesizer.*
+
+4. 🗺️ **HF-Radar & Grenznetz-Topographie (OSM):**  
    👉 [**`docs/maps/README.md`**](./docs/maps/README.md)  
    *Interaktive OpenStreetMap-Vektorkarte (randen_rf_map.svg) mit eingemessenen Schweizer und deutschen Grenzmasten, 384 GPS-Grenzpunkten der Swisstopo-Landesgrenze, Peilungen und interaktiven Hover-Tooltips.*
 
