@@ -880,7 +880,7 @@ function initChart() {
             fill: false,
             spanGaps: true,
             yAxisID: 'yTemp',
-            pointRadius: 2,
+            pointRadius: 0,
             pointHoverRadius: 5,
           },
           {
@@ -893,7 +893,7 @@ function initChart() {
             fill: false,
             spanGaps: true,
             yAxisID: 'yTemp',
-            pointRadius: 2,
+            pointRadius: 0,
             pointHoverRadius: 5,
           }
         ]
