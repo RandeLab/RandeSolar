@@ -515,8 +515,8 @@ void updateByteBeat() {
             case 4: // Bitshift Madness: (t >> 7 | t | t >> 6) * 10 + 4 * (t & t >> 13 | t >> 6)
                 b = (uint8_t)(((t >> 7) | t | (t >> 6)) * 10 + 4 * ((t & (t >> 13)) | (t >> 6)));
                 break;
-            case 5: // Acid 303: ((t * (t >> 5 | t >> 8)) >> (t >> 16)) & 63
-                b = (uint8_t)(((t * ((t >> 5) | (t >> 8))) >> (t >> 16)) & 63);
+            case 5: // Acid 303: (t * (t >> 8 | t >> 9) & 46 & t >> 8) ^ (t & t >> 13 | t >> 6)
+                b = (uint8_t)(((t * ((t >> 8) | (t >> 9)) & 46 & (t >> 8)) ^ ((t & (t >> 13)) | (t >> 6))));
                 break;
             default:
                 b = 0;
