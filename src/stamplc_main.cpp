@@ -1398,29 +1398,36 @@ void drawLcdHeader(const char* title, const char* pageStr) {
 void drawNeonCoconutLogo(int cx, int cy, float battVolts, float battCurrent, float extLoad, uint8_t chargeState) {
     auto& dsp = M5StamPLC.Display();
 
-    // 1. Outside Pinion Wheel: Always in iconic Hackteria Neon Pink style!
-    // Shows Battery Charge % (State of Charge 0..100%) along the 7 teeth!
-    int soc = estimateBatterySoC(battVolts, battCurrent, extLoad, chargeState);
-
-    // 7 teeth map proportionally to 0% .. 100% Battery SoC:
-    int activeTeeth = 0;
-    if (soc >= 93) activeTeeth = 7;      // ~100% (All 7 teeth bright pink!)
-    else if (soc >= 79) activeTeeth = 6; // ~85%
-    else if (soc >= 64) activeTeeth = 5; // ~70%
-    else if (soc >= 50) activeTeeth = 4; // ~50% (Half-way: teeth up to 12 o'clock center)
-    else if (soc >= 36) activeTeeth = 3; // ~40%
-    else if (soc >= 21) activeTeeth = 2; // ~25%
-    else if (soc >= 7)  activeTeeth = 1; // ~15%
-    else activeTeeth = 0;                // Critical low (<7%) -> all dim pink outline
+    // 1. Outside Pinion Wheel: Shows Battery Charge % (0..100%) in Hackteria Neon Pink!
+    // Active teeth radiate with thick neon glow + white-hot core.
+    // Inactive teeth appear as dark unlit neon glass tube outline.
+    int activeTeeth = 1;
+    if (chargeState == 5) {
+        // Float -> 100% full battery!
+        activeTeeth = 7;
+    } else if (battVolts >= 12.80f) {
+        activeTeeth = 6;
+    } else if (battVolts >= 12.55f) {
+        activeTeeth = 5; // e.g. 12.62V -> 5 teeth lit!
+    } else if (battVolts >= 12.40f) {
+        activeTeeth = 4; // Half-way mark (teeth up to 12 o'clock center)
+    } else if (battVolts >= 12.25f) {
+        activeTeeth = 3;
+    } else if (battVolts >= 12.05f) {
+        activeTeeth = 2;
+    } else if (battVolts >= 11.85f) {
+        activeTeeth = 1;
+    } else {
+        activeTeeth = 0; // Critical low (<11.85V)
+    }
 
     // Bright Neon Pink (powered glowing neon tube)
-    uint16_t brightGlow  = dsp.color565(140, 0, 70);
+    uint16_t brightGlow  = dsp.color565(160, 0, 80);
     uint16_t brightCore  = dsp.color565(255, 30, 150);
-    uint16_t brightHot   = dsp.color565(255, 210, 235);
+    uint16_t brightHot   = dsp.color565(255, 230, 245);
 
-    // Dim Neon Pink (subdued unlit/resting neon tube)
-    uint16_t dimGlow     = dsp.color565(35, 0, 18);
-    uint16_t dimCore     = dsp.color565(95, 15, 55);
+    // Dark Unlit Neon Glass Tube Outline (high contrast!)
+    uint16_t unlitTube   = dsp.color565(45, 45, 55);
 
     // OSHW Pinion Wheel: 7 Teeth, bottom open throat (curving inward into coconut)
     const float R_OUT = 47.0f;
@@ -1429,15 +1436,15 @@ void drawNeonCoconutLogo(int cx, int cy, float battVolts, float battCurrent, flo
 
     // Throat bottom-left (starts at cx - 14, cy + 38 to cx - 22, cy + 30)
     bool throatL_bright = (activeTeeth > 0);
-    uint16_t tg = throatL_bright ? brightGlow : dimGlow;
-    uint16_t tc = throatL_bright ? brightCore : dimCore;
-    dsp.drawLine(cx - 15, cy + 38, cx - 23, cy + 30, tg);
-    dsp.drawLine(cx - 13, cy + 38, cx - 21, cy + 30, tg);
-    dsp.drawLine(cx - 14, cy + 37, cx - 22, cy + 29, tg);
-    dsp.drawLine(cx - 14, cy + 39, cx - 22, cy + 31, tg);
-    dsp.drawLine(cx - 14, cy + 38, cx - 22, cy + 30, tc);
     if (throatL_bright) {
+        dsp.drawLine(cx - 15, cy + 38, cx - 23, cy + 30, brightGlow);
+        dsp.drawLine(cx - 13, cy + 38, cx - 21, cy + 30, brightGlow);
+        dsp.drawLine(cx - 14, cy + 37, cx - 22, cy + 29, brightGlow);
+        dsp.drawLine(cx - 14, cy + 39, cx - 22, cy + 31, brightGlow);
+        dsp.drawLine(cx - 14, cy + 38, cx - 22, cy + 30, brightCore);
         dsp.drawLine(cx - 14, cy + 38, cx - 22, cy + 30, brightHot);
+    } else {
+        dsp.drawLine(cx - 14, cy + 38, cx - 22, cy + 30, unlitTube);
     }
 
     int16_t prevX = cx - 22;
@@ -1458,8 +1465,6 @@ void drawNeonCoconutLogo(int cx, int cy, float battVolts, float battCurrent, flo
         int16_t pValley2_Y = cy + (int16_t)(R_IN  * sinf(tRad + rw));
 
         bool isBright = (i < activeTeeth);
-        uint16_t gCol = isBright ? brightGlow : dimGlow;
-        uint16_t cCol = isBright ? brightCore : dimCore;
 
         int16_t segX[5] = { prevX, pValley1_X, pCrest1_X, pCrest2_X, pValley2_X };
         int16_t segY[5] = { prevY, pValley1_Y, pCrest1_Y, pCrest2_Y, pValley2_Y };
@@ -1467,16 +1472,19 @@ void drawNeonCoconutLogo(int cx, int cy, float battVolts, float battCurrent, flo
         for (int s = 0; s < 4; s++) {
             int x0 = segX[s],   y0 = segY[s];
             int x1 = segX[s+1], y1 = segY[s+1];
-            // Outer halo glow
-            dsp.drawLine(x0 - 1, y0, x1 - 1, y1, gCol);
-            dsp.drawLine(x0 + 1, y0, x1 + 1, y1, gCol);
-            dsp.drawLine(x0, y0 - 1, x1, y1 - 1, gCol);
-            dsp.drawLine(x0, y0 + 1, x1, y1 + 1, gCol);
-            // Core tube
-            dsp.drawLine(x0, y0, x1, y1, cCol);
-            // White-hot center highlight for bright active teeth
             if (isBright) {
+                // Outer halo glow
+                dsp.drawLine(x0 - 1, y0, x1 - 1, y1, brightGlow);
+                dsp.drawLine(x0 + 1, y0, x1 + 1, y1, brightGlow);
+                dsp.drawLine(x0, y0 - 1, x1, y1 - 1, brightGlow);
+                dsp.drawLine(x0, y0 + 1, x1, y1 + 1, brightGlow);
+                // Core tube
+                dsp.drawLine(x0, y0, x1, y1, brightCore);
+                // White-hot center highlight
                 dsp.drawLine(x0, y0, x1, y1, brightHot);
+            } else {
+                // Inactive unlit dark neon glass outline (no glow)
+                dsp.drawLine(x0, y0, x1, y1, unlitTube);
             }
         }
         prevX = pValley2_X;
@@ -1485,20 +1493,19 @@ void drawNeonCoconutLogo(int cx, int cy, float battVolts, float battCurrent, flo
 
     // Throat bottom-right (curves back inward to meet coconut)
     bool throatR_bright = (activeTeeth >= 7);
-    uint16_t tr_g = throatR_bright ? brightGlow : dimGlow;
-    uint16_t tr_c = throatR_bright ? brightCore : dimCore;
-
-    dsp.drawLine(prevX - 1, prevY, cx + 21, cy + 30, tr_g);
-    dsp.drawLine(prevX + 1, prevY, cx + 23, cy + 30, tr_g);
-    dsp.drawLine(prevX, prevY, cx + 22, cy + 30, tr_c);
-
-    dsp.drawLine(cx + 21, cy + 30, cx + 13, cy + 38, tr_g);
-    dsp.drawLine(cx + 23, cy + 30, cx + 15, cy + 38, tr_g);
-    dsp.drawLine(cx + 22, cy + 30, cx + 14, cy + 38, tr_c);
-
     if (throatR_bright) {
+        dsp.drawLine(prevX - 1, prevY, cx + 21, cy + 30, brightGlow);
+        dsp.drawLine(prevX + 1, prevY, cx + 23, cy + 30, brightGlow);
+        dsp.drawLine(prevX, prevY, cx + 22, cy + 30, brightCore);
         dsp.drawLine(prevX, prevY, cx + 22, cy + 30, brightHot);
+
+        dsp.drawLine(cx + 21, cy + 30, cx + 13, cy + 38, brightGlow);
+        dsp.drawLine(cx + 23, cy + 30, cx + 15, cy + 38, brightGlow);
+        dsp.drawLine(cx + 22, cy + 30, cx + 14, cy + 38, brightCore);
         dsp.drawLine(cx + 22, cy + 30, cx + 14, cy + 38, brightHot);
+    } else {
+        dsp.drawLine(prevX, prevY, cx + 22, cy + 30, unlitTube);
+        dsp.drawLine(cx + 22, cy + 30, cx + 14, cy + 38, unlitTube);
     }
 
     // 2. Inside Coconut Color = Charge State
