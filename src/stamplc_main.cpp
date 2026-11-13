@@ -1774,6 +1774,66 @@ void drawNeonCoconutLogo(int cx, int cy, float battVolts, float battCurrent, flo
     dsp.drawLine(sx0, sy0, sx1, sy1, strawWhite);
 }
 
+// 7 RandeChistli VU-Meter positions from 4°C (bottom) to 30°C (top)
+// Based on Adafruit_NeoPixel Wheel(map(celsius, 4, 30, 160, 1)) from github.com/RandeLab/RandeChistli
+static const uint8_t PROGMEM CHISTLI_COLORS[7][3] = {
+    {   0,  30, 225 }, // Pos 0 (Bottom / ~4°C):  Deep Electric Blue
+    {   0, 111, 144 }, // Pos 1 (~8.3°C):         Cyan-Blue
+    {   0, 189,  66 }, // Pos 2 (~12.7°C):        Teal / Aqua-Green
+    {  15, 240,   0 }, // Pos 3 (~17.0°C):        Pure Lime Green
+    {  93, 162,   0 }, // Pos 4 (~21.3°C):        Yellow-Amber
+    { 174,  81,   0 }, // Pos 5 (~25.7°C):        Orange-Flame
+    { 252,   3,   0 }  // Pos 6 (Top / ~30.0°C):   Bright Hot Red
+};
+
+void drawRandeChistliTempBar(int barX, int startY, int barW, int segH, int segGap, float temp) {
+    auto& dsp = M5StamPLC.Display();
+
+    // Determine active segment index (0..6)
+    int activeIdx = -1;
+    if (temp >= 4.0f) {
+        activeIdx = (int)roundf((temp - 4.0f) / (30.0f - 4.0f) * 6.0f);
+        if (activeIdx > 6) activeIdx = 6;
+    } else if (temp > -40.0f) {
+        activeIdx = 0; // Cold minimum (lowest blue bar)
+    }
+
+    // Draw the 7 vertical segments (i=0 is top / 30°C, i=6 is bottom / 4°C on screen)
+    for (int i = 0; i < 7; i++) {
+        int segIdx = 6 - i; // 6 = Top (Red / 30°C), 0 = Bottom (Blue / 4°C)
+        int y = startY + i * (segH + segGap);
+        uint8_t r = pgm_read_byte(&CHISTLI_COLORS[segIdx][0]);
+        uint8_t g = pgm_read_byte(&CHISTLI_COLORS[segIdx][1]);
+        uint8_t b = pgm_read_byte(&CHISTLI_COLORS[segIdx][2]);
+        uint16_t activeColor = dsp.color565(r, g, b);
+
+        if (segIdx <= activeIdx) {
+            // Segment is lit!
+            if (segIdx == activeIdx) {
+                // Topmost active segment: has white accent / core like RandeChistli
+                dsp.fillRoundRect(barX, y, barW, segH, 2, activeColor);
+                dsp.drawRoundRect(barX, y, barW, segH, 2, TFT_WHITE);
+                dsp.fillRect(barX + 3, y + 2, barW - 6, segH - 4, TFT_WHITE);
+            } else {
+                dsp.fillRoundRect(barX, y, barW, segH, 2, activeColor);
+            }
+        } else {
+            // Inactive segment: dim ghosted tube with dark border
+            uint16_t dimColor = dsp.color565(r / 6, g / 6, b / 6);
+            dsp.fillRoundRect(barX, y, barW, segH, 2, dimColor);
+            dsp.drawRoundRect(barX, y, barW, segH, 2, dsp.color565(40, 40, 40));
+        }
+    }
+
+    // Small crisp temperature readout above the VU meter
+    if (temp > -40.0f) {
+        dsp.setTextSize(1);
+        dsp.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+        dsp.setCursor(barX - 2, startY - 11);
+        dsp.printf("%.0fC", temp);
+    }
+}
+
 void renderLcdDashboard() {
     auto& dsp = M5StamPLC.Display();
     dsp.setBrightness(180);
@@ -1787,6 +1847,10 @@ void renderLcdDashboard() {
         // Giant Neon Hackteria OSHW Coconut Logo filling the display
         // Outside Pinion Wheel: Charge % (SOC), Inside Coconut: Charge Mode
         drawNeonCoconutLogo(120, 56, g_data.battery_voltage, g_data.battery_current, g_data.external_load, g_data.charge_state);
+
+        // RandeChistli 7-segment Temperature VU Meter on the left side
+        float currentTemp = (g_dallasCount > 0 && g_dallasTemp1 > -50.0f) ? g_dallasTemp1 : g_plcInternalTemp;
+        drawRandeChistliTempBar(10, 20, 12, 10, 3, currentTemp);
 
         // Minimal single bottom line for button descriptions matching physical A (Left), B (Center), C (Right)
         dsp.drawFastHLine(0, 118, 240, TFT_DARKGREY);

@@ -46,6 +46,17 @@ A completely number-free, retro-futuristic ambient screen designed for visual tr
     * **Blazing Spring Green** (`#39FF14`): `BULK` harvest mode.
     * **Electric Gold** (`#FFD400`): `ABSORPTION` topping off.
     * **Electric Cyan** (`#00F5FF`): `FLOAT` or night standby.
+* **Left-Hand 7-Segment Temperature VU Meter (RandeChistli Scale)**:
+  * Inspired by the [RandeChistli](https://github.com/RandeLab/RandeChistli) 8-pixel NeoPixel thermometer algorithm (`Wheel(map(celsius, 4, 30, 160, 1))`).
+  * Maps live Dallas 1-Wire sensor temperature from **$4.0^\circ\text{C}$ (Bottom / Deep Blue)** to **$30.0^\circ\text{C}$ (Top / Hot Red)** across 7 distinct neon segments:
+    * **Pos 6 (Top / $30.0^\circ\text{C}$)**: Bright Hot Red
+    * **Pos 5 ($25.7^\circ\text{C}$)**: Orange-Flame
+    * **Pos 4 ($21.3^\circ\text{C}$)**: Yellow-Amber
+    * **Pos 3 ($17.0^\circ\text{C}$)**: Pure Lime Green
+    * **Pos 2 ($12.7^\circ\text{C}$)**: Teal / Aqua-Green
+    * **Pos 1 ($8.3^\circ\text{C}$)**: Cyan-Blue
+    * **Pos 0 (Bottom / $4.0^\circ\text{C}$)**: Deep Electric Blue
+  * The topmost active segment highlights with a white core, while segments above remain dimly ghosted.
 * **Yellow Straw ($45^\circ$)**: Solar harvest intake vector.
 * **Bottom Status Bar**: Shows `[A] INV: ON/OFF`, `[C] STRIP: ON/OFF`, and `[B] Next >`.
 
