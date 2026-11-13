@@ -2405,7 +2405,7 @@ void checkTelegramUpdates() {
 
     WiFiClientSecure secClient;
     secClient.setInsecure();
-    secClient.setTimeout(3500);
+    secClient.setTimeout(1200);
 
     HTTPClient http;
     String url = "https://api.telegram.org/bot" + String(TELEGRAM_BOT_TOKEN) + 
@@ -3032,16 +3032,16 @@ void loop() {
 
     uint32_t now = millis();
 
-    // Check Telegram commands every 3.5 seconds
+    // Check Telegram commands every 30 seconds (reduces TLS blocking by 90% for instant button response)
     static uint32_t lastTelegramCheck = 0;
-    if (now - lastTelegramCheck >= 3500) {
+    if (now - lastTelegramCheck >= 30000) {
         lastTelegramCheck = now;
         checkTelegramUpdates();
     }
 
-    // Periodic Wi-Fi scan publish (every 60 seconds) so retained message stays fresh for GitHub Pages
+    // Periodic Wi-Fi scan publish (every 5 minutes) so retained message stays fresh for GitHub Pages
     static uint32_t lastWifiScanPublish = 0;
-    if (WiFi.SSID() == "RandeLab" && now - lastWifiScanPublish >= 120000) {
+    if (WiFi.SSID() == "RandeLab" && now - lastWifiScanPublish >= 300000) {
         lastWifiScanPublish = now;
         triggerWifiScanAndPublish();
     }
