@@ -1395,30 +1395,23 @@ void drawLcdHeader(const char* title, const char* pageStr) {
     dsp.drawFastHLine(0, 18, 240, TFT_DARKGREY);
 }
 
-void drawNeonCoconutLogo(int cx, int cy, float battVolts, uint8_t chargeState) {
+void drawNeonCoconutLogo(int cx, int cy, float battVolts, float battCurrent, float extLoad, uint8_t chargeState) {
     auto& dsp = M5StamPLC.Display();
 
-    // 1. Outside Gear: Always in iconic Hackteria Neon Pink style!
-    // Shows charge stage along the 7 teeth: active teeth in bright radiant pink, others in dim pink.
-    int activeTeeth = 1;
-    if (chargeState == 5) {
-        // FLOAT: 100% full maintenance -> ALL 7 teeth radiant bright pink!
-        activeTeeth = 7;
-    } else if (chargeState == 4) {
-        // ABSORPTION: topping off -> 6 teeth bright pink!
-        activeTeeth = 6;
-    } else if (chargeState == 3) {
-        // BULK: charging up -> 2 to 5 teeth based on voltage progress
-        if (battVolts >= 13.0f) activeTeeth = 5;
-        else if (battVolts >= 12.50f) activeTeeth = 4; // e.g. 12.63V -> 4 teeth (up to 12 o'clock)!
-        else if (battVolts >= 12.10f) activeTeeth = 3;
-        else activeTeeth = 2;
-    } else {
-        // OFF / Night / Standby
-        if (battVolts >= 12.60f) activeTeeth = 3;
-        else if (battVolts >= 12.20f) activeTeeth = 2;
-        else activeTeeth = 1;
-    }
+    // 1. Outside Pinion Wheel: Always in iconic Hackteria Neon Pink style!
+    // Shows Battery Charge % (State of Charge 0..100%) along the 7 teeth!
+    int soc = estimateBatterySoC(battVolts, battCurrent, extLoad, chargeState);
+
+    // 7 teeth map proportionally to 0% .. 100% Battery SoC:
+    int activeTeeth = 0;
+    if (soc >= 93) activeTeeth = 7;      // ~100% (All 7 teeth bright pink!)
+    else if (soc >= 79) activeTeeth = 6; // ~85%
+    else if (soc >= 64) activeTeeth = 5; // ~70%
+    else if (soc >= 50) activeTeeth = 4; // ~50% (Half-way: teeth up to 12 o'clock center)
+    else if (soc >= 36) activeTeeth = 3; // ~40%
+    else if (soc >= 21) activeTeeth = 2; // ~25%
+    else if (soc >= 7)  activeTeeth = 1; // ~15%
+    else activeTeeth = 0;                // Critical low (<7%) -> all dim pink outline
 
     // Bright Neon Pink (powered glowing neon tube)
     uint16_t brightGlow  = dsp.color565(140, 0, 70);
@@ -1509,23 +1502,28 @@ void drawNeonCoconutLogo(int cx, int cy, float battVolts, uint8_t chargeState) {
     }
 
     // 2. Inside Coconut Color = Charge State
-    uint16_t cocoGlow, cocoCore;
+    // Bulk: Bright Neon Green -> Absorption: Bright Gold -> Float: Bright Cyan
+    uint16_t cocoGlow, cocoCore, cocoHot;
     switch (chargeState) {
-        case 3: // BULK (Maximum solar power harvest)
-            cocoGlow = dsp.color565(120, 100, 0);
-            cocoCore = dsp.color565(255, 220, 0); // Bright Neon Gold
-            break;
-        case 4: // ABSORPTION (Gentle topping off)
+        case 3: // BULK (Maximum solar power harvest) -> Bright Neon Green!
             cocoGlow = dsp.color565(0, 120, 50);
-            cocoCore = dsp.color565(0, 255, 128); // Bright Neon Spring Green
+            cocoCore = dsp.color565(57, 255, 20);  // Vivid Neon Spring Green
+            cocoHot  = dsp.color565(210, 255, 200); // White-hot neon tube core
             break;
-        case 5: // FLOAT (Fully charged maintain)
-            cocoGlow = dsp.color565(0, 80, 130);
-            cocoCore = dsp.color565(0, 230, 255); // Bright Neon Cyan
+        case 4: // ABSORPTION (Topping off near 14.4V) -> Bright Neon Gold!
+            cocoGlow = dsp.color565(120, 90, 0);
+            cocoCore = dsp.color565(255, 215, 0);  // Vivid Neon Gold
+            cocoHot  = dsp.color565(255, 255, 180);
             break;
-        default: // OFF / Night
-            cocoGlow = dsp.color565(25, 25, 30);
-            cocoCore = dsp.color565(80, 95, 115); // Dim Slate
+        case 5: // FLOAT (Fully charged 100% maintain) -> Bright Neon Cyan!
+            cocoGlow = dsp.color565(0, 90, 140);
+            cocoCore = dsp.color565(0, 240, 255);  // Vivid Electric Cyan
+            cocoHot  = dsp.color565(200, 255, 255);
+            break;
+        default: // OFF / Night / Standby
+            cocoGlow = dsp.color565(15, 30, 20);
+            cocoCore = dsp.color565(50, 95, 65);   // Dim Pine Green
+            cocoHot  = dsp.color565(75, 125, 90);
             break;
     }
 
@@ -1570,6 +1568,7 @@ void drawNeonCoconutLogo(int cx, int cy, float battVolts, uint8_t chargeState) {
         dsp.drawLine(x0, y0 - 1, x1, y1 - 1, cocoGlow);
         dsp.drawLine(x0, y0 + 1, x1, y1 + 1, cocoGlow);
         dsp.drawLine(x0, y0, x1, y1, cocoCore);
+        dsp.drawLine(x0, y0, x1, y1, cocoHot);
     }
 
     // 3. Straw: 3rd Distinct Neon Color (Electric Yellow / Amber)
@@ -1603,7 +1602,8 @@ void renderLcdDashboard() {
         dsp.fillScreen(TFT_BLACK);
 
         // Giant Neon Hackteria OSHW Coconut Logo filling the display
-        drawNeonCoconutLogo(120, 56, g_data.battery_voltage, g_data.charge_state);
+        // Outside Pinion Wheel: Charge % (SOC), Inside Coconut: Charge Mode
+        drawNeonCoconutLogo(120, 56, g_data.battery_voltage, g_data.battery_current, g_data.external_load, g_data.charge_state);
 
         // Minimal single bottom line for button descriptions
         dsp.drawFastHLine(0, 118, 240, TFT_DARKGREY);
