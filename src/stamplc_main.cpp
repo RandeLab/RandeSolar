@@ -28,12 +28,33 @@
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include "secrets.h"
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+// ==================== DALLAS 1-WIRE TEMPERATURE SENSORS ====================
+// StamPLC Grove Port A (RED): Pin 1 = GPIO 1 (DATA), Pin 3 = 5V, Pin 4 = GND
+#define ONE_WIRE_BUS 1
+
+static OneWire           g_oneWire(ONE_WIRE_BUS);
+static DallasTemperature g_dallasSensors(&g_oneWire);
+
+static uint8_t       g_dallasCount       = 0;
+static float         g_dallasTemp1       = -999.0f;
+static float         g_dallasTemp2       = -999.0f;
+static DeviceAddress g_dallasAddr1       = {0};
+static DeviceAddress g_dallasAddr2       = {0};
+static uint32_t      g_lastDallasReqMs   = 0;
+static bool          g_dallasReqPending  = false;
+static float         g_plcInternalTemp   = 0.0f;
+
+void scanDallasSensors();
+void updateDallasSensors();
 
 // ==================== STAMPLC HARDWARE STATE ====================
 static bool g_relay1_inverter = false; // Relay 1: Inverter Front Switch (N.O.)
 static bool g_relay2_aux      = false; // Relay 2 Coil (false = de-energized, true = energized)
 static bool g_led_strip_on    = true;  // 12V LED Strip on Relay 2 NC (lit when coil is de-energized / 0)
-static uint8_t g_lcd_page     = 0;     // 0 = Coconut, 1 = Solar, 2 = Network, 3 = 5G, 4 = Weather
+static uint8_t g_lcd_page     = 0;     // 0 = Coconut, 1 = Solar, 2 = Network, 3 = 5G, 4 = Weather, 5 = Temp
 static unsigned long g_lastLcdUpdate = 0;
 
 static uint8_t  g_stripPulseRemaining = 0;
@@ -121,6 +142,61 @@ static float g_minBattToday = 99.0f;
 static float g_maxBattToday = 0.0f;
 static int g_lastReportDay = -1;
 static int g_currentMday = -1;
+
+void scanDallasSensors() {
+    g_dallasSensors.begin();
+    g_dallasSensors.setWaitForConversion(false);
+    g_dallasCount = g_dallasSensors.getDeviceCount();
+    memset(g_dallasAddr1, 0, sizeof(DeviceAddress));
+    memset(g_dallasAddr2, 0, sizeof(DeviceAddress));
+    if (g_dallasCount > 0) {
+        g_dallasSensors.getAddress(g_dallasAddr1, 0);
+        g_dallasSensors.setResolution(g_dallasAddr1, 11);
+    }
+    if (g_dallasCount > 1) {
+        g_dallasSensors.getAddress(g_dallasAddr2, 1);
+        g_dallasSensors.setResolution(g_dallasAddr2, 11);
+    }
+    g_dallasSensors.requestTemperatures();
+    g_dallasReqPending = true;
+    g_lastDallasReqMs = millis();
+    g_plcInternalTemp = M5StamPLC.getTemp();
+    Serial.printf("[1-Wire 🌡️] Bus scanned: found %u device(s) on GPIO 1 (Port A)\n", g_dallasCount);
+}
+
+void updateDallasSensors() {
+    uint32_t now = millis();
+    static uint32_t lastPlcCheck = 0;
+    if (now - lastPlcCheck >= 2000) {
+        lastPlcCheck = now;
+        g_plcInternalTemp = M5StamPLC.getTemp();
+    }
+
+    if (g_dallasReqPending) {
+        if (now - g_lastDallasReqMs >= 400) {
+            g_dallasCount = g_dallasSensors.getDeviceCount();
+            if (g_dallasCount > 0) {
+                float t1 = g_dallasSensors.getTempCByIndex(0);
+                if (t1 > -55.0f && t1 < 125.0f && t1 != 85.0f) {
+                    g_dallasTemp1 = t1;
+                }
+            }
+            if (g_dallasCount > 1) {
+                float t2 = g_dallasSensors.getTempCByIndex(1);
+                if (t2 > -55.0f && t2 < 125.0f && t2 != 85.0f) {
+                    g_dallasTemp2 = t2;
+                }
+            }
+            g_dallasReqPending = false;
+        }
+    } else {
+        if (now - g_lastDallasReqMs >= 2000) {
+            g_dallasSensors.requestTemperatures();
+            g_dallasReqPending = true;
+            g_lastDallasReqMs = now;
+        }
+    }
+}
 
 // ==================== PANEL VOLTAGE ADC (SOLAR PV VOLTAGE) ====================
 // Voltage divider: Solar(+) ---[ 100k ]---+---[ 4.7k ]--- Solar(-) / GND
@@ -1732,8 +1808,8 @@ void renderLcdDashboard() {
         dsp.printf("[C]STRIP:%s", g_led_strip_on ? "ON" : "OFF");
 
     } else if (g_lcd_page == 1) {
-        // ==================== PAGE 1: HERO SOLAR & BATTERY [P1/4] ====================
-        drawLcdHeader("RANDESOLAR", "[P1/4]");
+        // ==================== PAGE 1: HERO SOLAR & BATTERY [P1/5] ====================
+        drawLcdHeader("RANDESOLAR", "[P1/5]");
 
         // Row 1: Solar Power (BIG Size 3) & Daily Yield (Size 2)
         dsp.setTextColor(TFT_YELLOW, TFT_BLACK);
@@ -1788,8 +1864,8 @@ void renderLcdDashboard() {
         dsp.print("[C] Refresh");
 
     } else if (g_lcd_page == 2) {
-        // ==================== PAGE 2: NETWORK & CLOUD SYNC [P2/4] ====================
-        drawLcdHeader("NETWORK & SYNC", "[P2/4]");
+        // ==================== PAGE 2: NETWORK & CLOUD SYNC [P2/5] ====================
+        drawLcdHeader("NETWORK & SYNC", "[P2/5]");
 
         // Wi-Fi SSID
         dsp.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -1828,8 +1904,8 @@ void renderLcdDashboard() {
         dsp.print("[C] Refresh");
 
     } else if (g_lcd_page == 3) {
-        // ==================== PAGE 3: TELTONIKA 5G GATEWAY [P3/4] ====================
-        drawLcdHeader("TELTONIKA 5G", "[P3/4]");
+        // ==================== PAGE 3: TELTONIKA 5G GATEWAY [P3/5] ====================
+        drawLcdHeader("TELTONIKA 5G", "[P3/5]");
 
         // 5G Operator & Mode
         dsp.setTextColor(TFT_CYAN, TFT_BLACK);
@@ -1873,8 +1949,8 @@ void renderLcdDashboard() {
         dsp.print("[C] Refresh");
 
     } else if (g_lcd_page == 4) {
-        // ==================== PAGE 4: WEATHER & MICROCLIMATE [P4/4] ====================
-        drawLcdHeader("METEO • 857m", "[P4/4]");
+        // ==================== PAGE 4: WEATHER & MICROCLIMATE [P4/5] ====================
+        drawLcdHeader("METEO • 857m", "[P4/5]");
 
         // Temperature & Solar Irradiance
         dsp.setTextSize(2);
@@ -1912,6 +1988,101 @@ void renderLcdDashboard() {
         dsp.print("[A] Sync WX");
         dsp.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
         dsp.setCursor(92, 116);
+        dsp.print("[B] Next P5");
+        dsp.setTextColor(TFT_GREEN, TFT_BLACK);
+        dsp.setCursor(174, 116);
+        dsp.print("[C] Refresh");
+
+    } else if (g_lcd_page == 5) {
+        // ==================== PAGE 5: DALLAS 1-WIRE TEMPERATURES [P5/5] ====================
+        drawLcdHeader("TEMPERATURE • 857m", "[P5/5]");
+
+        if (g_dallasCount == 0) {
+            dsp.setTextSize(2);
+            dsp.setTextColor(TFT_RED, TFT_BLACK);
+            dsp.setCursor(4, 26);
+            dsp.print("No 1-Wire Probe");
+
+            dsp.setTextSize(1);
+            dsp.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+            dsp.setCursor(4, 50);
+            dsp.print("Port A (Grove Red) / GPIO 1");
+            dsp.setCursor(4, 62);
+            dsp.print("Check 4.7k Pullup / Pins");
+
+            dsp.setTextSize(2);
+            dsp.setTextColor(TFT_CYAN, TFT_BLACK);
+            dsp.setCursor(4, 86);
+            dsp.printf("PLC Board: %.1f C", g_plcInternalTemp);
+        } else if (g_dallasCount == 1) {
+            dsp.setTextSize(1);
+            dsp.setTextColor(TFT_YELLOW, TFT_BLACK);
+            dsp.setCursor(4, 22);
+            dsp.print("PROBE 1 (DALLAS DS18B20)");
+
+            dsp.setTextSize(4);
+            dsp.setTextColor(TFT_GREEN, TFT_BLACK);
+            dsp.setCursor(4, 36);
+            if (g_dallasTemp1 > -100.0f) {
+                dsp.printf("%.1f C", g_dallasTemp1);
+            } else {
+                dsp.print("--.- C");
+            }
+
+            dsp.setTextSize(1);
+            dsp.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+            dsp.setCursor(4, 72);
+            dsp.printf("ID: %02X%02X%02X%02X%02X%02X%02X%02X",
+                       g_dallasAddr1[0], g_dallasAddr1[1], g_dallasAddr1[2], g_dallasAddr1[3],
+                       g_dallasAddr1[4], g_dallasAddr1[5], g_dallasAddr1[6], g_dallasAddr1[7]);
+
+            dsp.setTextSize(2);
+            dsp.setTextColor(TFT_CYAN, TFT_BLACK);
+            dsp.setCursor(4, 86);
+            dsp.printf("PLC Board: %.1f C", g_plcInternalTemp);
+        } else {
+            // 2 or more sensors
+            dsp.setTextSize(1);
+            dsp.setTextColor(TFT_YELLOW, TFT_BLACK);
+            dsp.setCursor(4, 22);
+            dsp.print("PROBE 1 [P1]      PROBE 2 [P2]");
+
+            dsp.setTextSize(3);
+            dsp.setTextColor(TFT_GREEN, TFT_BLACK);
+            dsp.setCursor(4, 36);
+            if (g_dallasTemp1 > -100.0f) {
+                dsp.printf("%.1fC", g_dallasTemp1);
+            } else {
+                dsp.print("--.-C");
+            }
+
+            dsp.setTextColor(TFT_CYAN, TFT_BLACK);
+            dsp.setCursor(125, 36);
+            if (g_dallasTemp2 > -100.0f) {
+                dsp.printf("%.1fC", g_dallasTemp2);
+            } else {
+                dsp.print("--.-C");
+            }
+
+            dsp.setTextSize(1);
+            dsp.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+            dsp.setCursor(4, 68);
+            dsp.printf("Diff: %+.1f C | Bus: %d Devices", (g_dallasTemp1 - g_dallasTemp2), g_dallasCount);
+
+            dsp.setTextSize(2);
+            dsp.setTextColor(TFT_MAGENTA, TFT_BLACK);
+            dsp.setCursor(4, 86);
+            dsp.printf("PLC Board: %.1f C", g_plcInternalTemp);
+        }
+
+        // Footer
+        dsp.drawFastHLine(0, 108, 240, TFT_DARKGREY);
+        dsp.setTextSize(1);
+        dsp.setTextColor(TFT_YELLOW, TFT_BLACK);
+        dsp.setCursor(4, 116);
+        dsp.print("[A] Re-Scan");
+        dsp.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+        dsp.setCursor(92, 116);
         dsp.print("[B] Coconut");
         dsp.setTextColor(TFT_GREEN, TFT_BLACK);
         dsp.setCursor(174, 116);
@@ -1932,7 +2103,7 @@ void handleLiveApi() {
     int wifiRssi = WiFi.RSSI();
     int wifiQual = constrain(2 * (wifiRssi + 100), 0, 100);
 
-    char json[1450];
+    char json[1600];
     snprintf(json, sizeof(json),
         "{\"has_data\":%s,\"solar_power\":%u,\"battery_voltage\":%.2f,\"battery_current\":%.2f,\"panel_voltage\":%.2f,"
         "\"yield_today_wh\":%lu,\"external_load\":%.2f,\"charge_state\":%u,\"state_str\":\"%s\","
@@ -1943,6 +2114,7 @@ void handleLiveApi() {
         "\"cell_mode\":\"%s\",\"cell_band\":\"%s\",\"cell_operator\":\"%s\",\"cell_id\":\"%s\",\"cell_temp\":%.1f,"
         "\"cell_down_mbps\":%.2f,\"cell_up_mbps\":%.2f,\"cell_speed_state\":\"%s\",\"cell_speed_epoch\":%lu,"
         "\"wx_temp\":%.1f,\"wx_solar_wm2\":%.1f,\"wx_cloud_pct\":%d,\"wx_rain_mm\":%.2f,\"wx_wind_kmh\":%.1f,\"wx_humidity\":%d,\"wx_pressure\":%.1f,"
+        "\"temp_dallas1\":%.1f,\"temp_dallas2\":%.1f,\"temp_plc\":%.1f,\"dallas_count\":%u,"
         "\"relay1_inverter\":%s,\"relay2_coil\":%s,\"led_strip\":%s,"
         "\"buffered_records\":%u,\"ip\":\"%s\",\"gateway_ip\":\"%s\",\"age_sec\":%lu}",
         d.has_data ? "true" : "false",
@@ -1988,6 +2160,10 @@ void handleLiveApi() {
         g_wxWindKmh,
         g_wxHumidity,
         g_wxPressure,
+        g_dallasTemp1,
+        g_dallasTemp2,
+        g_plcInternalTemp,
+        (unsigned int)g_dallasCount,
         g_relay1_inverter ? "true" : "false",
         g_relay2_aux ? "true" : "false",
         g_led_strip_on ? "true" : "false",
@@ -3485,6 +3661,9 @@ void setup() {
     // Configure ADC1 for Solar Panel Voltage Divider
     analogSetPinAttenuation(SOLAR_ADC_PIN, ADC_11db);
 
+    // Initialize Dallas 1-Wire bus on Port A (GPIO 1)
+    scanDallasSensors();
+
     Serial.println("\n========================================");
     Serial.println("  RandeSolar StamPLC • Victron MPPT & Inverter Guard");
     Serial.printf("  MQTT Broker:   %s:%d\n", MQTT_BROKER, MQTT_PORT);
@@ -3588,6 +3767,7 @@ void loop() {
     server.handleClient();
     reconnectMQTT();
     mqttClient.loop();
+    updateDallasSensors();
 
     // Button A: Context-sensitive action per active page!
     if (M5StamPLC.BtnA().wasClicked()) {
@@ -3615,25 +3795,30 @@ void loop() {
             M5StamPLC.tone(2200, 60);
             setLcdActivity("WX SYNC", TFT_CYAN);
             fetchMeteoSwissWeather(true);
+        } else if (g_lcd_page == 5) {
+            // Page 5: Scan Dallas 1-Wire sensors
+            M5StamPLC.tone(2400, 60);
+            setLcdActivity("SCAN 1WIRE", TFT_YELLOW);
+            scanDallasSensors();
         }
         renderLcdDashboard();
     }
 
-    // Button B: Cleanly cycle pages across 5 screens (0=Coconut, 1..4=Details)
+    // Button B: Cleanly cycle pages across 6 screens (0=Coconut, 1..5=Details)
     if (M5StamPLC.BtnB().wasClicked()) {
-        g_lcd_page = (g_lcd_page + 1) % 5;
+        g_lcd_page = (g_lcd_page + 1) % 6;
         M5StamPLC.tone(1400, 40);
         char act[20];
         if (g_lcd_page == 0) {
             snprintf(act, sizeof(act), "COCONUT");
         } else {
-            snprintf(act, sizeof(act), "PAGE %u/4", g_lcd_page);
+            snprintf(act, sizeof(act), "PAGE %u/5", g_lcd_page);
         }
         setLcdActivity(act, TFT_CYAN);
         renderLcdDashboard();
     }
 
-    // Button C: Toggle 12V LED Strip (on Page 0) or Dashboard Refresh (on Pages 1..4)
+    // Button C: Toggle 12V LED Strip (on Page 0) or Dashboard Refresh (on Pages 1..5)
     if (M5StamPLC.BtnC().wasClicked()) {
         if (g_lcd_page == 0) {
             setLedStrip(!g_led_strip_on);
@@ -3699,6 +3884,8 @@ void loop() {
 
     // Scheduled Router 5G Speedtest every 6 hours (21,600,000 ms)
     // Conserves GoMo mobile data (~1.2 GB/month instead of ~500 GB) & solar battery
+    // [PAUSED during development as requested by user]
+    /*
     static uint32_t lastSpeedtestTrigger = 0;
     static bool firstSpeedtestDone = false;
     if (!firstSpeedtestDone) {
@@ -3717,6 +3904,7 @@ void loop() {
         measureLatency();
         Serial.println("[Speedtest ⏱️] 6-Hour scheduled router Ookla speedtest triggered!");
     }
+    */
 
     // Publish to MQTT every 5 seconds when BLE data is active
     static uint32_t lastMqttPublish = 0;
@@ -3732,7 +3920,7 @@ void loop() {
         if (d.has_data && mqttClient.connected()) {
             int wifiRssi = WiFi.RSSI();
             int wifiQual = constrain(2 * (wifiRssi + 100), 0, 100);
-            char json[900];
+            char json[1100];
             snprintf(json, sizeof(json),
                 "{\"solar_power\":%u,\"panel_voltage\":%.2f,\"battery_voltage\":%.2f,\"battery_current\":%.2f,"
                 "\"yield_today_wh\":%lu,\"external_load\":%.2f,\"charge_state\":%u,\"state_str\":\"%s\","
@@ -3742,6 +3930,7 @@ void loop() {
                 "\"cell_has_data\":%s,\"cell_rsrp\":%d,\"cell_sinr\":%d,\"cell_rsrq\":%d,\"cell_qual\":%d,"
                 "\"cell_mode\":\"%s\",\"cell_band\":\"%s\",\"cell_operator\":\"%s\",\"cell_id\":\"%s\",\"cell_temp\":%.1f,"
                 "\"cell_down_mbps\":%.2f,\"cell_up_mbps\":%.2f,\"cell_speed_epoch\":%lu,"
+                "\"temp_dallas1\":%.1f,\"temp_dallas2\":%.1f,\"temp_plc\":%.1f,\"dallas_count\":%u,"
                 "\"relay1_inverter\":%s,\"relay2_coil\":%s,\"led_strip\":%s,\"buffered_records\":%u,\"age_sec\":0}",
                 d.solar_power,
                 d.panel_voltage,
@@ -3777,6 +3966,10 @@ void loop() {
                 g_cellDownMbps,
                 g_cellUpMbps,
                 (unsigned long)g_lastSpeedtestEpoch,
+                g_dallasTemp1,
+                g_dallasTemp2,
+                g_plcInternalTemp,
+                (unsigned int)g_dallasCount,
                 g_relay1_inverter ? "true" : "false",
                 g_relay2_aux ? "true" : "false",
                 g_led_strip_on ? "true" : "false",
