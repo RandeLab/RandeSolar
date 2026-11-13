@@ -2557,29 +2557,85 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
             return;
         }
 
-        if (msg.indexOf("strip") >= 0 || msg.indexOf("ledstrip") >= 0 || msg.indexOf("relay2") >= 0 ||
-            msg.indexOf("\"relay\":2") >= 0 || msg.indexOf("\"relay\": 2") >= 0) {
-            bool turnOn = (msg.indexOf("on") >= 0 || msg.indexOf("1") >= 0 || msg.indexOf("true") >= 0);
-            if (msg.indexOf("toggle") >= 0) turnOn = !g_led_strip_on;
+        // Parse JSON object if present
+        StaticJsonDocument<256> doc;
+        DeserializationError err = deserializeJson(doc, msg);
+
+        if (!err && doc.containsKey("action")) {
+            const char* act = doc["action"];
+
+            if (strcmp(act, "strip") == 0 || strcmp(act, "ledstrip") == 0) {
+                bool turnOn = true;
+                if (doc.containsKey("state")) {
+                    turnOn = doc["state"].as<bool>();
+                } else if (doc.containsKey("on")) {
+                    turnOn = doc["on"].as<bool>();
+                } else {
+                    turnOn = !g_led_strip_on;
+                }
+                setLedStrip(turnOn);
+                char ack[140];
+                snprintf(ack, sizeof(ack), "{\"status\":\"ok\",\"action\":\"strip\",\"relay\":2,\"led_strip\":%s}", turnOn ? "true" : "false");
+                mqttClient.publish(MQTT_TOPIC_ACK, ack);
+                Serial.printf("[MQTT 💡] 12V LED Strip commanded via MQTT JSON: %s\n", turnOn ? "ON" : "OFF");
+                return;
+            }
+
+            if (strcmp(act, "inverter") == 0) {
+                bool turnOn = doc.containsKey("state") ? doc["state"].as<bool>() : !g_relay1_inverter;
+                setPlcRelay(0, turnOn);
+                char ack[140];
+                snprintf(ack, sizeof(ack), "{\"status\":\"ok\",\"action\":\"inverter\",\"relay\":1,\"inverter_on\":%s}", turnOn ? "true" : "false");
+                mqttClient.publish(MQTT_TOPIC_ACK, ack);
+                Serial.printf("[MQTT ⚡] Inverter relay commanded via MQTT JSON: %s\n", turnOn ? "ON" : "OFF");
+                return;
+            }
+
+            if (strcmp(act, "bytebeat") == 0) {
+                int tuneId = doc.containsKey("tune") ? doc["tune"].as<int>() : 1;
+                uint32_t dur = doc.containsKey("duration_sec") ? doc["duration_sec"].as<uint32_t>() : 10;
+                if (tuneId <= 0) {
+                    stopByteBeat();
+                    mqttClient.publish(MQTT_TOPIC_ACK, "{\"status\":\"ok\",\"action\":\"bytebeat_stop\"}");
+                } else {
+                    startByteBeat(tuneId, dur);
+                    char ack[140];
+                    snprintf(ack, sizeof(ack), "{\"status\":\"ok\",\"action\":\"bytebeat\",\"tune\":%d,\"duration_sec\":%u}", tuneId, dur);
+                    mqttClient.publish(MQTT_TOPIC_ACK, ack);
+                }
+                return;
+            }
+        }
+
+        // Plaintext fallback handlers
+        if (msg.indexOf("strip") >= 0 || msg.indexOf("ledstrip") >= 0 || msg.indexOf("relay2") >= 0) {
+            bool turnOn = true;
+            if (msg.indexOf("false") >= 0 || msg.indexOf("off") >= 0 || msg.indexOf("0") >= 0) {
+                turnOn = false;
+            } else if (msg.indexOf("toggle") >= 0) {
+                turnOn = !g_led_strip_on;
+            }
             setLedStrip(turnOn);
             char ack[140];
             snprintf(ack, sizeof(ack), "{\"status\":\"ok\",\"action\":\"strip\",\"relay\":2,\"led_strip\":%s}", turnOn ? "true" : "false");
             mqttClient.publish(MQTT_TOPIC_ACK, ack);
-            Serial.printf("[MQTT 💡] 12V LED Strip commanded via MQTT: %s\n", turnOn ? "ON" : "OFF");
+            Serial.printf("[MQTT 💡] 12V LED Strip commanded via MQTT text: %s\n", turnOn ? "ON" : "OFF");
             return;
         }
 
         // Inverter / Relay 1 NO commands
-        if (msg.indexOf("inverter") >= 0 || msg.indexOf("relay1") >= 0 ||
-            msg.indexOf("\"relay\":1") >= 0 || msg.indexOf("\"relay\": 1") >= 0 ||
-            (msg.indexOf("relay") >= 0 && msg.indexOf("strip") < 0)) {
-            bool turnOn = (msg.indexOf("on") >= 0 || msg.indexOf("1") >= 0 || msg.indexOf("true") >= 0);
-            if (msg.indexOf("toggle") >= 0) turnOn = !g_relay1_inverter;
+        if (msg.indexOf("inverter") >= 0 || msg.indexOf("relay1") >= 0) {
+            bool turnOn = true;
+            if (msg.indexOf("false") >= 0 || msg.indexOf("off") >= 0 || msg.indexOf("0") >= 0) {
+                turnOn = false;
+            } else if (msg.indexOf("toggle") >= 0) {
+                turnOn = !g_relay1_inverter;
+            }
             setPlcRelay(0, turnOn);
             char ack[140];
             snprintf(ack, sizeof(ack), "{\"status\":\"ok\",\"action\":\"inverter\",\"relay\":1,\"inverter_on\":%s}", turnOn ? "true" : "false");
             mqttClient.publish(MQTT_TOPIC_ACK, ack);
-            Serial.printf("[MQTT ⚡] Inverter relay commanded via MQTT: %s\n", turnOn ? "ON" : "OFF");
+            Serial.printf("[MQTT ⚡] Inverter relay commanded via MQTT text: %s\n", turnOn ? "ON" : "OFF");
             return;
         }
 
