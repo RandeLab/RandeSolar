@@ -58,6 +58,9 @@ const el = {
   yieldYesterday: document.getElementById('yieldYesterday'),
   batteryMinMax: document.getElementById('batteryMinMax'),
   lblPeak: document.getElementById('lblPeak'),
+  tempDallas1: document.getElementById('tempDallas1'),
+  tempDallas2: document.getElementById('tempDallas2'),
+  tempPlc: document.getElementById('tempPlc'),
   lblYesterday: document.getElementById('lblYesterday'),
   lblMinMax: document.getElementById('lblMinMax'),
   chipTempValue: document.getElementById('chipTempValue'),
@@ -866,6 +869,32 @@ function initChart() {
             yAxisID: 'yRain',
             pointRadius: 2,
             pointHoverRadius: 4,
+          },
+          {
+            label: 'Probe 1 / Keller (°C)',
+            data: [],
+            borderColor: '#39FF14',
+            backgroundColor: 'rgba(57, 255, 20, 0.12)',
+            borderWidth: 2.2,
+            tension: 0.25,
+            fill: false,
+            spanGaps: true,
+            yAxisID: 'yTemp',
+            pointRadius: 2,
+            pointHoverRadius: 5,
+          },
+          {
+            label: 'Probe 2 / Raum (°C)',
+            data: [],
+            borderColor: '#FF2E93',
+            backgroundColor: 'rgba(255, 46, 147, 0.12)',
+            borderWidth: 2.2,
+            tension: 0.25,
+            fill: false,
+            spanGaps: true,
+            yAxisID: 'yTemp',
+            pointRadius: 2,
+            pointHoverRadius: 5,
           }
         ]
       },
@@ -1061,6 +1090,46 @@ function updateDashboard(data) {
     if (el.chipTempValue) el.chipTempValue.textContent = `${Number(data.chip_temp).toFixed(1)} °C`;
     const ctDiag = document.getElementById('chipTempDiag');
     if (ctDiag) ctDiag.textContent = Number(data.chip_temp).toFixed(1);
+  }
+
+  // Local Microclimate & Dallas 1-Wire Temperature Probes
+  if (data.temp_dallas1 !== undefined) {
+    const elP1 = document.getElementById('tempDallas1');
+    const elP1Sub = document.getElementById('tempDallas1Sub');
+    if (elP1) {
+      if (data.temp_dallas1 > -50) {
+        elP1.textContent = Number(data.temp_dallas1).toFixed(1);
+        if (elP1Sub) elP1Sub.textContent = 'DS18B20 1-Wire • Aktiv';
+      } else {
+        elP1.textContent = '--';
+        if (elP1Sub) elP1Sub.textContent = 'Getrennt';
+      }
+    }
+  }
+
+  if (data.temp_dallas2 !== undefined) {
+    const elP2 = document.getElementById('tempDallas2');
+    const elP2Sub = document.getElementById('tempDallas2Sub');
+    if (elP2) {
+      if (data.temp_dallas2 > -50) {
+        elP2.textContent = Number(data.temp_dallas2).toFixed(1);
+        if (elP2Sub) elP2Sub.textContent = 'DS18B20 1-Wire • Aktiv';
+      } else {
+        elP2.textContent = '--';
+        if (elP2Sub) elP2Sub.textContent = 'Bereit (in Vorbereitung)';
+      }
+    }
+  }
+
+  if (data.temp_plc !== undefined) {
+    const elPlc = document.getElementById('tempPlc');
+    if (elPlc) {
+      if (data.temp_plc > -50) {
+        elPlc.textContent = Number(data.temp_plc).toFixed(1);
+      } else {
+        elPlc.textContent = '--';
+      }
+    }
   }
   if (data.free_heap_kb !== undefined) {
     const fhDiag = document.getElementById('freeHeapDiag');
@@ -1264,12 +1333,17 @@ function appendChartPoint(item, force = false) {
     netChartInstance.update('none');
   }
 
-  // 4. Local Weather & Microclimate History
-  if (weatherChartInstance && (item.wx_temp !== undefined || item.wx_solar_wm2 !== undefined || item.wx_cloud_pct !== undefined)) {
+  // 4. Local Weather & Microclimate History (Meteo + Dallas 1-Wire Probes)
+  if (weatherChartInstance && (item.wx_temp !== undefined || item.wx_solar_wm2 !== undefined || item.wx_cloud_pct !== undefined || item.temp_dallas1 !== undefined || item.temp_dallas2 !== undefined)) {
     weatherChartInstance.data.datasets[0].data.push({ x: ptTime, y: item.wx_solar_wm2 !== undefined && item.wx_solar_wm2 !== null ? item.wx_solar_wm2 : null });
     weatherChartInstance.data.datasets[1].data.push({ x: ptTime, y: item.wx_temp !== undefined && item.wx_temp !== null ? item.wx_temp : null });
     weatherChartInstance.data.datasets[2].data.push({ x: ptTime, y: item.wx_cloud_pct !== undefined && item.wx_cloud_pct !== null ? item.wx_cloud_pct : null });
     weatherChartInstance.data.datasets[3].data.push({ x: ptTime, y: item.wx_rain_mm !== undefined && item.wx_rain_mm !== null ? item.wx_rain_mm : null });
+
+    const p1 = (item.temp_dallas1 !== undefined && item.temp_dallas1 !== null && item.temp_dallas1 > -50) ? item.temp_dallas1 : null;
+    const p2 = (item.temp_dallas2 !== undefined && item.temp_dallas2 !== null && item.temp_dallas2 > -50) ? item.temp_dallas2 : null;
+    if (weatherChartInstance.data.datasets[4]) weatherChartInstance.data.datasets[4].data.push({ x: ptTime, y: p1 });
+    if (weatherChartInstance.data.datasets[5]) weatherChartInstance.data.datasets[5].data.push({ x: ptTime, y: p2 });
 
     weatherChartInstance.options.scales.x.min = sinceTime;
     weatherChartInstance.options.scales.x.max = now;
@@ -1477,6 +1551,8 @@ async function loadSupabaseHistory(limit = 240, hours = 1) {
       weatherChartInstance.data.datasets[1].data = [];
       weatherChartInstance.data.datasets[2].data = [];
       weatherChartInstance.data.datasets[3].data = [];
+      if (weatherChartInstance.data.datasets[4]) weatherChartInstance.data.datasets[4].data = [];
+      if (weatherChartInstance.data.datasets[5]) weatherChartInstance.data.datasets[5].data = [];
     }
 
     // Downsample chart data points if dataset is dense (e.g. 1 week), keeps 60fps rendering
@@ -1531,11 +1607,16 @@ async function loadSupabaseHistory(limit = 240, hours = 1) {
         if (netChartInstance.data.datasets[5]) netChartInstance.data.datasets[5].data.push({ x: ptTime, y: item.wx_cloud_pct !== undefined && item.wx_cloud_pct !== null ? item.wx_cloud_pct : null });
       }
 
-      if (weatherChartInstance && (item.wx_temp !== undefined || item.wx_solar_wm2 !== undefined || item.wx_cloud_pct !== undefined)) {
+      if (weatherChartInstance && (item.wx_temp !== undefined || item.wx_solar_wm2 !== undefined || item.wx_cloud_pct !== undefined || item.temp_dallas1 !== undefined || item.temp_dallas2 !== undefined)) {
         weatherChartInstance.data.datasets[0].data.push({ x: ptTime, y: item.wx_solar_wm2 !== undefined && item.wx_solar_wm2 !== null ? item.wx_solar_wm2 : null });
         weatherChartInstance.data.datasets[1].data.push({ x: ptTime, y: item.wx_temp !== undefined && item.wx_temp !== null ? item.wx_temp : null });
         weatherChartInstance.data.datasets[2].data.push({ x: ptTime, y: item.wx_cloud_pct !== undefined && item.wx_cloud_pct !== null ? item.wx_cloud_pct : null });
         weatherChartInstance.data.datasets[3].data.push({ x: ptTime, y: item.wx_rain_mm !== undefined && item.wx_rain_mm !== null ? item.wx_rain_mm : null });
+
+        const p1 = (item.temp_dallas1 !== undefined && item.temp_dallas1 !== null && item.temp_dallas1 > -50) ? item.temp_dallas1 : null;
+        const p2 = (item.temp_dallas2 !== undefined && item.temp_dallas2 !== null && item.temp_dallas2 > -50) ? item.temp_dallas2 : null;
+        if (weatherChartInstance.data.datasets[4]) weatherChartInstance.data.datasets[4].data.push({ x: ptTime, y: p1 });
+        if (weatherChartInstance.data.datasets[5]) weatherChartInstance.data.datasets[5].data.push({ x: ptTime, y: p2 });
       }
     });
 
