@@ -32,21 +32,34 @@
 // ==================== STAMPLC HARDWARE STATE ====================
 static bool g_relay1_inverter = false; // Relay 1: Inverter Front Switch (N.O.)
 static bool g_relay2_aux      = false; // Relay 2: Aux 12V Load
-static uint8_t g_lcd_page     = 0;     // 0 = Metrics, 1 = Network & Sync, 2 = Screen Off
+static uint8_t g_lcd_page     = 0;     // 0 = Solar, 1 = Network, 2 = 5G, 3 = Weather (4 Pages)
 static unsigned long g_lastLcdUpdate = 0;
 
 static String g_activeSsid = "";
 static String g_activePass = "";
+
+// Live LCD Activity Banner (displayed across all pages when events occur)
+static String   g_lastActivity = "BOOT OK";
+static uint32_t g_lastActivityMs = 0;
+static uint16_t g_lastActivityColor = TFT_GREEN;
+
+void setLcdActivity(const char* tag, uint16_t color = TFT_CYAN) {
+    g_lastActivity = tag;
+    g_lastActivityMs = millis();
+    g_lastActivityColor = color;
+}
 
 void setPlcRelay(uint8_t relayIdx, bool state) {
     if (relayIdx == 0) {
         g_relay1_inverter = state;
         M5StamPLC.writePlcRelay(0, state);
         Serial.printf("[StamPLC ⚡] Relay 1 (Inverter) -> %s\n", state ? "ON" : "OFF");
+        setLcdActivity(state ? "INV: ON" : "INV: OFF", state ? TFT_GREEN : TFT_RED);
     } else if (relayIdx == 1) {
         g_relay2_aux = state;
         M5StamPLC.writePlcRelay(1, state);
         Serial.printf("[StamPLC ⚡] Relay 2 (Aux) -> %s\n", state ? "ON" : "OFF");
+        setLcdActivity(state ? "AUX: ON" : "AUX: OFF", state ? TFT_GREEN : TFT_RED);
     }
 }
 
@@ -568,6 +581,7 @@ class VictronScanCallbacks : public NimBLEScanCallbacks {
             if (batteryVoltage > g_maxBattToday) g_maxBattToday = batteryVoltage;
         }
         portEXIT_CRITICAL(&g_mux);
+        setLcdActivity("BLE RX", TFT_GREEN);
 
         if (panelVoltage > 1.0f) {
             Serial.printf("[☀️ BEACON] Solar: %uW (PV: %.1fV) | Batt: %.2fV, %.1fA | State: %s (%s) | Yield: %uWh | RSSI: %ddBm\n",
@@ -1311,22 +1325,22 @@ void handleRelayApi() {
     }
 }
 
-void renderLcdDashboard() {
+void drawLcdHeader(const char* title, const char* pageStr) {
     auto& dsp = M5StamPLC.Display();
-    dsp.setBrightness(180);
-    dsp.startWrite();
+    dsp.fillScreen(TFT_BLACK);
+    dsp.setTextColor(TFT_CYAN, TFT_BLACK);
+    dsp.setTextSize(1);
+    dsp.setCursor(4, 4);
+    dsp.printf("%s %s", title, pageStr);
 
-    if (g_lcd_page == 0) {
-        // ==================== PAGE 0: HERO SOLAR & BATTERY ====================
-        dsp.fillScreen(TFT_BLACK);
-
-        // Header: RANDESOLAR | INV STATUS
-        dsp.setTextColor(TFT_CYAN, TFT_BLACK);
+    // Live Activity Tag in Top Right (x=136..238)
+    if (millis() - g_lastActivityMs < 3000) {
+        dsp.fillRect(136, 2, 100, 14, g_lastActivityColor);
+        dsp.setTextColor(TFT_BLACK, g_lastActivityColor);
         dsp.setTextSize(1);
-        dsp.setCursor(4, 4);
-        dsp.print("RANDESOLAR • 857m");
-
-        dsp.setTextSize(1);
+        dsp.setCursor(140, 5);
+        dsp.printf(" %s", g_lastActivity.c_str());
+    } else {
         if (g_relay1_inverter) {
             dsp.fillRect(146, 2, 90, 14, TFT_DARKGREEN);
             dsp.setTextColor(TFT_WHITE, TFT_DARKGREEN);
@@ -1338,8 +1352,18 @@ void renderLcdDashboard() {
             dsp.setCursor(150, 5);
             dsp.print("INV 230V: OFF");
         }
+    }
+    dsp.drawFastHLine(0, 18, 240, TFT_DARKGREY);
+}
 
-        dsp.drawFastHLine(0, 18, 240, TFT_DARKGREY);
+void renderLcdDashboard() {
+    auto& dsp = M5StamPLC.Display();
+    dsp.setBrightness(180);
+    dsp.startWrite();
+
+    if (g_lcd_page == 0) {
+        // ==================== PAGE 0: HERO SOLAR & BATTERY [P1/4] ====================
+        drawLcdHeader("RANDESOLAR", "[P1/4]");
 
         // Row 1: Solar Power (BIG Size 3) & Daily Yield (Size 2)
         dsp.setTextColor(TFT_YELLOW, TFT_BLACK);
@@ -1387,91 +1411,120 @@ void renderLcdDashboard() {
 
         dsp.setTextSize(1);
         dsp.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-        dsp.setCursor(125, 120);
-        dsp.print("[B] Next P2/3");
+        dsp.setCursor(130, 120);
+        dsp.print("[B] Next P2/4");
 
     } else if (g_lcd_page == 1) {
-        // ==================== PAGE 1: NETWORK & SUPABASE SYNC ====================
-        dsp.fillScreen(TFT_BLACK);
-        dsp.setTextColor(TFT_CYAN, TFT_BLACK);
-        dsp.setTextSize(1);
-        dsp.setCursor(4, 4);
-        dsp.print("NETWORK & CLOUD SYNC [P2/3]");
-        dsp.drawFastHLine(0, 16, 240, TFT_DARKGREY);
+        // ==================== PAGE 1: NETWORK & CLOUD SYNC [P2/4] ====================
+        drawLcdHeader("NETWORK & SYNC", "[P2/4]");
 
         // Wi-Fi SSID
         dsp.setTextColor(TFT_WHITE, TFT_BLACK);
         dsp.setTextSize(2);
-        dsp.setCursor(4, 20);
+        dsp.setCursor(4, 22);
         dsp.printf("WiFi: %s", WiFi.SSID().c_str());
 
         // IP Address
         dsp.setTextSize(2);
-        dsp.setCursor(4, 42);
+        dsp.setCursor(4, 44);
         dsp.printf("IP: %s", WiFi.localIP().toString().c_str());
 
         // MQTT Status
         dsp.setTextSize(2);
-        dsp.setCursor(4, 64);
+        dsp.setCursor(4, 66);
         dsp.setTextColor(mqttClient.connected() ? TFT_GREEN : TFT_RED, TFT_BLACK);
         dsp.printf("MQTT: %s", mqttClient.connected() ? "CONNECTED" : "OFFLINE");
 
-        // Flash Offline Buffer
+        // Flash Offline Buffer & Gateway Ping
         dsp.setTextColor(TFT_WHITE, TFT_BLACK);
         dsp.setTextSize(2);
-        dsp.setCursor(4, 86);
-        dsp.printf("Buffer: %u rec", (unsigned int)g_bufferedRecordCount);
+        dsp.setCursor(4, 88);
+        dsp.printf("Buf:%urec Ping:%ums", (unsigned int)g_bufferedRecordCount, (unsigned int)g_gwPingMs);
 
         // Footer
         dsp.drawFastHLine(0, 108, 240, TFT_DARKGREY);
         dsp.setTextSize(1);
         dsp.setTextColor(TFT_YELLOW, TFT_BLACK);
         dsp.setCursor(4, 116);
-        dsp.print("[A] Wi-Fi Menu   [B] Next P3/3");
+        dsp.print("[A] Wi-Fi Menu   [B] Next P3/4");
 
     } else if (g_lcd_page == 2) {
-        // ==================== PAGE 2 (3RD PAGE): 5G GATEWAY & WEATHER ====================
-        dsp.fillScreen(TFT_BLACK);
-        dsp.setTextColor(TFT_CYAN, TFT_BLACK);
-        dsp.setTextSize(1);
-        dsp.setCursor(4, 4);
-        dsp.print("TELTONIKA 5G & WEATHER [P3/3]");
-        dsp.drawFastHLine(0, 16, 240, TFT_DARKGREY);
+        // ==================== PAGE 2: TELTONIKA 5G GATEWAY [P3/4] ====================
+        drawLcdHeader("TELTONIKA 5G", "[P3/4]");
 
-        // 5G Operator & Band
+        // 5G Operator & Mode
+        dsp.setTextColor(TFT_CYAN, TFT_BLACK);
+        dsp.setTextSize(2);
+        dsp.setCursor(4, 22);
+        dsp.printf("%s • %s", g_cellOperator.length() ? g_cellOperator.c_str() : "5G", g_cellMode.length() ? g_cellMode.c_str() : "NSA");
+
+        // Bands
         dsp.setTextColor(TFT_WHITE, TFT_BLACK);
         dsp.setTextSize(2);
-        dsp.setCursor(4, 20);
-        dsp.printf("5G: %s (%s)", g_cellMode.length() ? g_cellMode.c_str() : "TRB500", g_cellBand.c_str());
+        dsp.setCursor(4, 44);
+        dsp.printf("Band: %s", g_cellBand.length() ? g_cellBand.c_str() : "n78/B3");
 
-        // Speed / RSRP
+        // Signal Quality (RSRP & SINR)
         dsp.setTextSize(2);
         dsp.setTextColor(TFT_GREEN, TFT_BLACK);
-        dsp.setCursor(4, 42);
+        dsp.setCursor(4, 66);
+        dsp.printf("RSRP:%d SINR:%ddB", g_cellRsrp, g_cellSinr);
+
+        // Speedtest or Modem Temperature
+        dsp.setTextSize(2);
+        dsp.setTextColor(TFT_YELLOW, TFT_BLACK);
+        dsp.setCursor(4, 88);
         if (g_cellDownMbps > 0) {
-            dsp.printf("Spd: %.0fM / %.0fM", g_cellDownMbps, g_cellUpMbps);
+            dsp.printf("Spd: %.0fM v / %.0fM ^", g_cellDownMbps, g_cellUpMbps);
         } else {
-            dsp.printf("RSRP: %d dBm", g_cellRsrp);
+            dsp.printf("Modem Temp: %.1f C", g_cellTemp);
         }
-
-        // Weather Temperature & Solar Irradiance
-        dsp.setTextSize(2);
-        dsp.setTextColor(TFT_CYAN, TFT_BLACK);
-        dsp.setCursor(4, 64);
-        dsp.printf("Wx: %.1f C  %.0fW/m2", g_wxTemp, g_wxSolarWm2);
-
-        // Rain & Cloud cover
-        dsp.setTextSize(2);
-        dsp.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
-        dsp.setCursor(4, 86);
-        dsp.printf("Cloud:%d%% Rain:%.1fmm", g_wxCloudPct, g_wxRainMm);
 
         // Footer
         dsp.drawFastHLine(0, 108, 240, TFT_DARKGREY);
         dsp.setTextSize(1);
         dsp.setTextColor(TFT_YELLOW, TFT_BLACK);
         dsp.setCursor(4, 116);
-        dsp.print("[A] Test Ping    [B] Back P1/3");
+        dsp.print("[A] Test Ping    [B] Next P4/4");
+
+    } else if (g_lcd_page == 3) {
+        // ==================== PAGE 3: WEATHER & MICROCLIMATE [P4/4] ====================
+        drawLcdHeader("METEO • 857m", "[P4/4]");
+
+        // Temperature & Solar Irradiance
+        dsp.setTextSize(2);
+        dsp.setTextColor(TFT_CYAN, TFT_BLACK);
+        dsp.setCursor(4, 22);
+        dsp.printf("Temp: %.1f C", g_wxTemp);
+
+        dsp.setTextColor(TFT_YELLOW, TFT_BLACK);
+        dsp.setCursor(130, 22);
+        dsp.printf("%.0fW/m2", g_wxSolarWm2);
+
+        // Cloud Cover & Rain
+        dsp.setTextSize(2);
+        dsp.setTextColor(TFT_LIGHTGREY, TFT_BLACK);
+        dsp.setCursor(4, 44);
+        dsp.printf("Cloud:%d%% Rain:%.1f", g_wxCloudPct, g_wxRainMm);
+
+        // Humidity & Wind
+        dsp.setTextSize(2);
+        dsp.setTextColor(TFT_WHITE, TFT_BLACK);
+        dsp.setCursor(4, 66);
+        dsp.printf("Hum:%d%% Wind:%.1f", g_wxHumidity, g_wxWindKmh);
+
+        // Barometric Pressure
+        dsp.setTextSize(2);
+        dsp.setTextColor(TFT_GREEN, TFT_BLACK);
+        dsp.setCursor(4, 88);
+        dsp.printf("Baro: %.1f hPa", g_wxPressure);
+
+        // Footer
+        dsp.drawFastHLine(0, 108, 240, TFT_DARKGREY);
+        dsp.setTextSize(1);
+        dsp.setTextColor(TFT_YELLOW, TFT_BLACK);
+        dsp.setCursor(4, 116);
+        dsp.print("[A] Sync Weather [B] Back P1/4");
     }
 
     dsp.endWrite();
@@ -1848,6 +1901,7 @@ void fetchMeteoSwissWeather(bool force) {
                 g_wxSolarWm2 = rad.toFloat();
                 g_wxHasData = true;
                 g_lastWxFetchMs = now;
+                setLcdActivity("METEO OK", TFT_CYAN);
                 Serial.printf("[Weather 🌤️] Randen: %.1f°C | %d%% Cloud | %.1f mm Rain | %.0f W/m² Solar | %.1f hPa\n",
                     g_wxTemp, g_wxCloudPct, g_wxRainMm, g_wxSolarWm2, g_wxPressure);
             }
@@ -1953,6 +2007,7 @@ void fetchTeltonika5GMetrics(bool force) {
 
             g_cellHasData = true;
             g_lastCellFetchMs = now;
+            setLcdActivity("5G UBUS", TFT_GREEN);
             Serial.printf("[TRB500 📡] 5G: %s %s (%s) | RSRP: %d dBm | SINR: %d dB | Qual: %d%% | Cell: %s | Temp: %.1f°C\n",
                 g_cellOperator.c_str(), g_cellMode.c_str(), g_cellBand.c_str(),
                 g_cellRsrp, g_cellSinr, g_cellQual, g_cellId.c_str(), g_cellTemp);
@@ -2259,8 +2314,10 @@ void logToSupabase(const SolarData& d) {
 
         int code = http.POST((uint8_t*)json, strlen(json));
         if (code == 200 || code == 201) {
+            setLcdActivity("CLOUD OK", TFT_CYAN);
             Serial.printf("[Supabase 💾] Logged row to cloud: %.2fV | %uW | %.1fA\n", d.battery_voltage, d.solar_power, d.battery_current);
         } else {
+            setLcdActivity("CLOUD FAIL", TFT_RED);
             Serial.printf("[Supabase ⚠️] Insert failed (HTTP %d): %s\n", code, http.errorToString(code).c_str());
             // Router Wi-Fi is connected, but 5G cellular uplink is down: buffer to flash!
             storeOfflineRecord(d);
@@ -2980,6 +3037,7 @@ void loop() {
 
     // Button A: Context-sensitive action per active page!
     if (M5StamPLC.BtnA().wasClicked()) {
+        setLcdActivity("BTN [A]", TFT_WHITE);
         if (g_lcd_page == 0) {
             // Page 1: Toggle Inverter Relay 1
             setPlcRelay(0, !g_relay1_inverter);
@@ -2993,23 +3051,35 @@ void loop() {
             M5StamPLC.tone(1600, 60);
             promptWifiMenu(false);
         } else if (g_lcd_page == 2) {
-            // Page 3: Trigger ping latency test
+            // Page 3: Trigger ping latency test & 5G refresh
             M5StamPLC.tone(2000, 60);
+            setLcdActivity("PING TEST", TFT_YELLOW);
             measureLatency();
+            fetchTeltonika5GMetrics(true);
+        } else if (g_lcd_page == 3) {
+            // Page 4: Sync Weather
+            M5StamPLC.tone(2200, 60);
+            setLcdActivity("WX SYNC", TFT_CYAN);
+            fetchMeteoSwissWeather(true);
         }
         renderLcdDashboard();
     }
 
-    // Button B: Cleanly cycle pages (NO hold delay, 100% instant response!)
+    // Button B: Cleanly cycle pages (NO hold delay, 100% instant response across 4 pages!)
     if (M5StamPLC.BtnB().wasClicked()) {
-        g_lcd_page = (g_lcd_page + 1) % 3;
+        g_lcd_page = (g_lcd_page + 1) % 4; // 4 Pages: Solar -> Network -> 5G -> Weather
         M5StamPLC.tone(1400, 40);
+        char act[20];
+        snprintf(act, sizeof(act), "PAGE %u/4", g_lcd_page + 1);
+        setLcdActivity(act, TFT_CYAN);
         renderLcdDashboard();
     }
 
-    // Button C: Audio confirmation beep
+    // Button C: Audio confirmation beep & force dashboard refresh
     if (M5StamPLC.BtnC().wasClicked()) {
         M5StamPLC.tone(2200, 50);
+        setLcdActivity("REFRESH", TFT_GREEN);
+        renderLcdDashboard();
     }
 
     // Update LCD Dashboard every 1000 ms
@@ -3129,6 +3199,7 @@ void loop() {
             );
             mqttClient.publish(MQTT_TOPIC, json);
             triggerTxFlash();
+            setLcdActivity("MQTT TX", TFT_YELLOW);
             Serial.printf("[MQTT 📡] Published to %s: %s\n", MQTT_TOPIC, json);
         }
     }
