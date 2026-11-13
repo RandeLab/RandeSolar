@@ -68,6 +68,17 @@ static String   g_lastActivity = "BOOT OK";
 static uint32_t g_lastActivityMs = 0;
 static uint16_t g_lastActivityColor = TFT_GREEN;
 
+// ==================== DOUBLE BUFFERING FOR ZERO FLICKER ====================
+static M5Canvas g_canvas(&M5StamPLC.Display());
+static bool g_canvas_ready = false;
+
+inline LovyanGFX& getDisplayTarget() {
+    if (g_canvas_ready) {
+        return g_canvas;
+    }
+    return M5StamPLC.Display();
+}
+
 void setLcdActivity(const char* tag, uint16_t color = TFT_CYAN) {
     g_lastActivity = tag;
     g_lastActivityMs = millis();
@@ -1383,7 +1394,7 @@ void handleOtaPage() {
 }
 
 void drawOtaLcdScreen(const char* title, uint8_t pct) {
-    auto& dsp = M5StamPLC.Display();
+    auto& dsp = getDisplayTarget();
     dsp.startWrite();
     if (pct == 0) {
         dsp.fillScreen(TFT_BLACK);
@@ -1404,6 +1415,9 @@ void drawOtaLcdScreen(const char* title, uint8_t pct) {
     dsp.setCursor(100, 102);
     dsp.printf("%u%%", pct);
     dsp.endWrite();
+    if (g_canvas_ready) {
+        g_canvas.pushSprite(0, 0);
+    }
 }
 
 void handleOtaUploadDone() {
@@ -1536,7 +1550,7 @@ void handleRelayApi() {
 }
 
 void drawLcdHeader(const char* title, const char* pageStr) {
-    auto& dsp = M5StamPLC.Display();
+    auto& dsp = getDisplayTarget();
     dsp.fillScreen(TFT_BLACK);
     dsp.setTextColor(TFT_CYAN, TFT_BLACK);
     dsp.setTextSize(1);
@@ -1567,7 +1581,7 @@ void drawLcdHeader(const char* title, const char* pageStr) {
 }
 
 void drawNeonCoconutLogo(int cx, int cy, float battVolts, float battCurrent, float extLoad, uint8_t chargeState) {
-    auto& dsp = M5StamPLC.Display();
+    auto& dsp = getDisplayTarget();
 
     // 1. Outside Pinion Wheel: Shows Battery Charge % (0..100%) in Hackteria Neon Pink!
     // Active teeth radiate with thick neon glow + white-hot core.
@@ -1787,7 +1801,7 @@ static const uint8_t PROGMEM CHISTLI_COLORS[7][3] = {
 };
 
 void drawRandeChistliTempBar(int barX, int startY, int barW, int segH, int segGap, float temp) {
-    auto& dsp = M5StamPLC.Display();
+    auto& dsp = getDisplayTarget();
 
     // RandeChistli exact integer formula: showPixel = map((long)temp, 4, 30, 7, 1);
     long tLong = (long)roundf(temp);
@@ -1845,8 +1859,8 @@ void drawRandeChistliTempBar(int barX, int startY, int barW, int segH, int segGa
 }
 
 void renderLcdDashboard() {
-    auto& dsp = M5StamPLC.Display();
-    dsp.setBrightness(180);
+    auto& dsp = getDisplayTarget();
+    M5StamPLC.Display().setBrightness(180);
     dsp.startWrite();
 
     if (g_lcd_page == 0) {
@@ -2164,6 +2178,9 @@ void renderLcdDashboard() {
     }
 
     dsp.endWrite();
+    if (g_canvas_ready) {
+        g_canvas.pushSprite(0, 0);
+    }
 }
 
 void handleLiveApi() {
@@ -3577,6 +3594,9 @@ void drawWifiMenu(int selected, int countdownSec) {
     }
 
     dsp.endWrite();
+    if (g_canvas_ready) {
+        g_canvas.pushSprite(0, 0);
+    }
 }
 
 bool connectToWifi(const char* ssid, const char* pass) {
@@ -3732,6 +3752,14 @@ void setup() {
     M5StamPLC.Display().setRotation(0); // Upright (Rotated 90 deg anticlockwise from 1)
     M5StamPLC.Display().setBrightness(180);
     M5StamPLC.Display().fillScreen(TFT_BLACK);
+
+    // Double-buffered M5Canvas Sprite for 100% flicker-free rendering
+    if (g_canvas.createSprite(240, 135)) {
+        g_canvas_ready = true;
+        Serial.println("[Display 🎨] Allocated 240x135 M5Canvas buffer - Zero-Flicker double buffering active!");
+    } else {
+        Serial.println("[Display ⚠️] M5Canvas allocation failed - falling back to direct rendering");
+    }
 
     // Initial safe relay states (Inverter OFF by default on boot)
     M5StamPLC.writePlcRelay(0, false);
