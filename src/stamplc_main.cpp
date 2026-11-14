@@ -142,6 +142,11 @@ static const char* MDNS_HOST     = "stamplc";
 static const char* TELEGRAM_BOT_TOKEN = SECRETS_TELEGRAM_BOT_TOKEN;
 static const char* TELEGRAM_CHAT_ID   = SECRETS_TELEGRAM_CHAT_ID;
 static int64_t g_lastTelegramUpdateId = 0;
+static char g_telegramDebugLog[256] = "No check yet";
+static int g_telegramLastHttpCode = 0;
+static uint32_t g_telegramLastCheckMs = 0;
+static String g_telegramLastCmd = "";
+static int g_telegramLastSendCode = 0;
 
 // Supabase Cloud History Logger
 static const char* SUPABASE_URL = SECRETS_SUPABASE_URL;
@@ -2268,6 +2273,21 @@ void handleLiveApi() {
     server.send(200, "application/json", json);
 }
 
+void handleTelegramApi() {
+    char json[700];
+    snprintf(json, sizeof(json),
+        "{\"last_check_sec\":%lu,\"last_code\":%d,\"update_id\":%lld,\"last_cmd\":\"%s\",\"last_send_code\":%d,\"log\":\"%s\"}",
+        (millis() - g_telegramLastCheckMs) / 1000,
+        g_telegramLastHttpCode,
+        (long long)g_lastTelegramUpdateId,
+        g_telegramLastCmd.c_str(),
+        g_telegramLastSendCode,
+        g_telegramDebugLog
+    );
+    server.sendHeader("Access-Control-Allow-Origin", "*");
+    server.send(200, "application/json", json);
+}
+
 void handleBufferApi() {
     server.sendHeader("Access-Control-Allow-Origin", "*");
     if (!g_littleFsReady || !LittleFS.exists(OFFLINE_BUFFER_PATH)) {
@@ -3224,15 +3244,19 @@ void sendTelegramMessage(const String& text, const char* targetChatId) {
         http.addHeader("Content-Type", "application/json");
         String payload = "{\"chat_id\":\"" + String(targetChatId) + "\",\"text\":\"" + escapeJsonString(text) + "\",\"parse_mode\":\"Markdown\"}";
         int code = http.POST(payload);
+        g_telegramLastSendCode = code;
         if (code == 200) {
             Serial.printf("[Telegram ✈️] Message delivered (HTTP %d)\n", code);
         } else if (code == 400) {
             Serial.printf("[Telegram ⚠️] Markdown failed (HTTP 400), retrying plain text...\n");
             http.end();
+            secClient.stop();
+            delay(50);
             if (http.begin(secClient, url)) {
                 http.addHeader("Content-Type", "application/json");
                 String plain = "{\"chat_id\":\"" + String(targetChatId) + "\",\"text\":\"" + escapeJsonString(text) + "\"}";
                 int retry = http.POST(plain);
+                g_telegramLastSendCode = retry;
                 Serial.printf("[Telegram ✈️] Plain text result: HTTP %d\n", retry);
             }
         } else if (code > 0) {
@@ -3241,6 +3265,7 @@ void sendTelegramMessage(const String& text, const char* targetChatId) {
             Serial.printf("[Telegram ❌] Send failed: %s\n", http.errorToString(code).c_str());
         }
         http.end();
+        secClient.stop();
     }
 }
 
@@ -3307,30 +3332,42 @@ String generateHumanMoodReport(const SolarData& d) {
 
 void checkTelegramUpdates() {
     if (WiFi.status() != WL_CONNECTED) return;
-
-    WiFiClientSecure secClient;
-    secClient.setInsecure();
-    secClient.setTimeout(3500);
-
-    HTTPClient http;
-    String url = "https://api.telegram.org/bot" + String(TELEGRAM_BOT_TOKEN) + 
-                 "/getUpdates?offset=" + String((long long)(g_lastTelegramUpdateId + 1)) + 
-                 "&limit=5&timeout=0";
+    g_telegramLastCheckMs = millis();
 
     String response = "";
-    if (http.begin(secClient, url)) {
-        int code = http.GET();
-        if (code == 200) {
-            response = http.getString();
-        } else if (code > 0) {
-            Serial.printf("[Telegram ⚠️] getUpdates HTTP %d\n", code);
+    {
+        WiFiClientSecure secClient;
+        secClient.setInsecure();
+        secClient.setTimeout(4500);
+
+        HTTPClient http;
+        String url = "https://api.telegram.org/bot" + String(TELEGRAM_BOT_TOKEN) + 
+                     "/getUpdates?offset=" + String((long long)(g_lastTelegramUpdateId + 1)) + 
+                     "&limit=5&timeout=0";
+
+        if (http.begin(secClient, url)) {
+            int code = http.GET();
+            g_telegramLastHttpCode = code;
+            if (code == 200) {
+                response = http.getString();
+                snprintf(g_telegramDebugLog, sizeof(g_telegramDebugLog), "HTTP 200 len=%d", (int)response.length());
+            } else if (code > 0) {
+                snprintf(g_telegramDebugLog, sizeof(g_telegramDebugLog), "HTTP %d", code);
+                Serial.printf("[Telegram ⚠️] getUpdates HTTP %d\n", code);
+            } else {
+                snprintf(g_telegramDebugLog, sizeof(g_telegramDebugLog), "Err %d: %s", code, http.errorToString(code).c_str());
+                Serial.printf("[Telegram ⚠️] getUpdates error: %s\n", http.errorToString(code).c_str());
+            }
+            http.end();
         } else {
-            Serial.printf("[Telegram ⚠️] getUpdates error: %s\n", http.errorToString(code).c_str());
+            snprintf(g_telegramDebugLog, sizeof(g_telegramDebugLog), "http.begin failed");
         }
-        http.end(); // Free TLS session immediately before processing and sending replies
-    }
+        secClient.stop();
+    } // CRITICAL: secClient & http are destroyed HERE! lwIP socket and mbedTLS heap fully freed!
 
     if (response.length() == 0) return;
+
+    delay(80); // Brief pause to let lwIP socket state settle before opening outgoing reply socket
 
     int idx = 0;
     while ((idx = response.indexOf("\"update_id\":", idx)) != -1) {
@@ -3358,6 +3395,7 @@ void checkTelegramUpdates() {
             if (textEnd != -1) {
                 String cmd = response.substring(textStart, textEnd);
                 cmd.toLowerCase();
+                g_telegramLastCmd = cmd;
                 Serial.printf("[Telegram 📩] RX command: %s (Chat %s)\n", cmd.c_str(), fromChatId.c_str());
                         
                         if (cmd.startsWith("/status")) {
@@ -3828,6 +3866,7 @@ void setup() {
     server.on("/api/led", handleLedApi);
     server.on("/api/sound", handleSoundApi);
     server.on("/api/relay", handleRelayApi);
+    server.on("/api/telegram", handleTelegramApi);
     server.on("/update", HTTP_GET, handleOtaPage);
     server.on("/update", HTTP_POST, handleOtaUploadDone, handleOtaUploadChunk);
     server.begin();
