@@ -446,6 +446,7 @@ body.theme-pinkograph .btn:hover {
 .panel-battery { border-top-color: var(--accent-blue); }
 .panel-current { border-top-color: var(--accent-pink); }
 .panel-state { border-top-color: var(--accent-green); }
+.panel-autarky { border-top-color: var(--accent-orange); }
 
 .panel h2 {
   color: var(--accent-green);
@@ -578,6 +579,16 @@ body.theme-pinkograph .panel h2 {
 
 .state-off {
   color: var(--text-muted);
+  border-color: var(--border);
+}
+
+.state-autarky-sync {
+  color: var(--accent-green);
+  border-color: var(--accent-green);
+}
+
+.state-autarky-sleep {
+  color: var(--accent-blue);
   border-color: var(--border);
 }
 

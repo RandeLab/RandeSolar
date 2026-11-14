@@ -65,6 +65,15 @@ const el = {
   lblMinMax: document.getElementById('lblMinMax'),
   chipTempValue: document.getElementById('chipTempValue'),
   netSpeedValue: document.getElementById('netSpeedValue'),
+  lblPanelAutarky: document.getElementById('lblPanelAutarky'),
+  autarkyTimerVal: document.getElementById('autarkyTimerVal'),
+  autarkyTimerUnit: document.getElementById('autarkyTimerUnit'),
+  autarkyBadge: document.getElementById('autarkyBadge'),
+  autarkyInverterState: document.getElementById('autarkyInverterState'),
+  lblAutarkyInverter: document.getElementById('lblAutarkyInverter'),
+  lblAutarkyCycle: document.getElementById('lblAutarkyCycle'),
+  lblAutarkyLastSync: document.getElementById('lblAutarkyLastSync'),
+  autarkyLastSync: document.getElementById('autarkyLastSync'),
 };
 
 // Studio Theme Palettes for Chart.js
@@ -188,6 +197,16 @@ const i18n = {
     peak: "Spitze heute",
     yesterday: "Gestern",
     minMax: "Min / Max",
+    panelAutarky: "Winter-Autarkie (Eco)",
+    autarkyInverter: "230V Inverter",
+    autarkyCycle: "Zyklus",
+    autarkyLastSync: "Letzter Sync",
+    autarkyUnitWait: "bis Sync",
+    autarkyUnitActive: "Sync läuft",
+    autarkyStandby: "STANDBY",
+    autarkyActive: "AKTIV (SYNC)",
+    autarkyInvOff: "AUS (0W)",
+    autarkyInvOn: "EIN (~35W)",
     states: { 0: "AUS", 2: "FEHLER", 3: "HAUPTLADUNG", 4: "NACHLADUNG", 5: "ERHALTUNG", 252: "EXT. STEUERUNG" },
     ledTitle: "💡 ESP32-S3 Status-LED (WS2812 Farbcodes)",
     ledSubtitle: "Die integrierte RGB-LED auf GPIO 48 zeigt den aktuellen Betriebszustand und die Funkübertragung in Echtzeit an:",
@@ -216,6 +235,16 @@ const i18n = {
     peak: "Peak Today",
     yesterday: "Yesterday",
     minMax: "Min / Max",
+    panelAutarky: "Winter Autarky (Eco)",
+    autarkyInverter: "230V Inverter",
+    autarkyCycle: "Cycle",
+    autarkyLastSync: "Last Sync",
+    autarkyUnitWait: "to Sync",
+    autarkyUnitActive: "Sync active",
+    autarkyStandby: "STANDBY",
+    autarkyActive: "ACTIVE (SYNC)",
+    autarkyInvOff: "OFF (0W)",
+    autarkyInvOn: "ON (~35W)",
     states: { 0: "OFF", 2: "FAULT", 3: "BULK", 4: "ABSORPTION", 5: "FLOAT", 252: "EXT CONTROL" },
     ledTitle: "💡 ESP32-S3 Status LED (WS2812 Color Codes)",
     ledSubtitle: "The onboard RGB LED on GPIO 48 displays real-time controller state and radio telemetry transmission:",
@@ -317,6 +346,10 @@ window.setTheme = function(theme) {
   if (el.lblPeak && l.peak) el.lblPeak.textContent = l.peak;
   if (el.lblYesterday && l.yesterday) el.lblYesterday.textContent = l.yesterday;
   if (el.lblMinMax && l.minMax) el.lblMinMax.textContent = l.minMax;
+  if (el.lblPanelAutarky && l.panelAutarky) el.lblPanelAutarky.textContent = l.panelAutarky;
+  if (el.lblAutarkyInverter && l.autarkyInverter) el.lblAutarkyInverter.textContent = l.autarkyInverter;
+  if (el.lblAutarkyCycle && l.autarkyCycle) el.lblAutarkyCycle.textContent = l.autarkyCycle;
+  if (el.lblAutarkyLastSync && l.autarkyLastSync) el.lblAutarkyLastSync.textContent = l.autarkyLastSync;
 
   // Mood Heading & Live Text
   const headingEl = document.getElementById('lblMoodHeading');
@@ -1243,6 +1276,8 @@ function updateDashboard(data) {
     moodEl.textContent = getHumanMoodText(data, currentLang);
   }
 
+  updateAutarkyPanel(data);
+
   setOnlineStatus(true);
 }
 
@@ -1448,9 +1483,92 @@ function updateMainSpeedAge() {
   if (elElapsed) elElapsed.textContent = str;
 }
 
+// Autarky Mode State & Dynamic Countdown
+let lastSyncEpochMs = null;
+let lastKnownInverterState = false;
+
+function updateAutarkyPanel(data) {
+  if (data) {
+    if (data.created_at) {
+      lastSyncEpochMs = new Date(data.created_at).getTime();
+    } else if (lastBeaconTime) {
+      lastSyncEpochMs = lastBeaconTime;
+    }
+    if (data.relay1_inverter !== undefined) {
+      lastKnownInverterState = Boolean(data.relay1_inverter);
+    }
+  }
+
+  if (!lastSyncEpochMs && lastBeaconTime) {
+    lastSyncEpochMs = lastBeaconTime;
+  }
+  if (!lastSyncEpochMs) return;
+
+  const l = i18n[currentLang] || i18n.de;
+  const now = Date.now();
+  const elapsedSec = Math.max(0, Math.floor((now - lastSyncEpochMs) / 1000));
+  const elapsedMin = Math.floor(elapsedSec / 60);
+
+  // In Autarky mode, cycle is 3600 seconds (1 hour):
+  // 5 minutes (300 sec) burst ON, 55 minutes (3300 sec) sleep OFF.
+  const cycleSec = 3600;
+  const burstSec = 300;
+
+  // Active sync burst: within first 5 minutes of cycle
+  const isActiveBurst = lastKnownInverterState && (elapsedSec < burstSec);
+
+  if (isActiveBurst) {
+    const remBurstSec = Math.max(0, burstSec - elapsedSec);
+    const m = Math.floor(remBurstSec / 60);
+    const s = remBurstSec % 60;
+    if (el.autarkyTimerVal) el.autarkyTimerVal.textContent = `${m}:${String(s).padStart(2, '0')}`;
+    if (el.autarkyTimerUnit) el.autarkyTimerUnit.textContent = l.autarkyUnitActive || 'Sync läuft';
+    if (el.autarkyBadge) {
+      el.autarkyBadge.textContent = l.autarkyActive || 'AKTIV (SYNC)';
+      el.autarkyBadge.className = 'state-pill state-autarky-sync';
+    }
+    if (el.autarkyInverterState) {
+      el.autarkyInverterState.textContent = l.autarkyInvOn || 'EIN (~35W)';
+      el.autarkyInverterState.className = 'detail-val val-green';
+    }
+  } else {
+    // Sleeping (Standby)
+    let remSleepSec = cycleSec - (elapsedSec % cycleSec);
+    if (remSleepSec < 0) remSleepSec = 0;
+    const m = Math.floor(remSleepSec / 60);
+    const s = remSleepSec % 60;
+    if (el.autarkyTimerVal) el.autarkyTimerVal.textContent = `${m}:${String(s).padStart(2, '0')}`;
+    if (el.autarkyTimerUnit) el.autarkyTimerUnit.textContent = l.autarkyUnitWait || 'bis Sync';
+    if (el.autarkyBadge) {
+      el.autarkyBadge.textContent = l.autarkyStandby || 'STANDBY';
+      el.autarkyBadge.className = 'state-pill state-autarky-sleep';
+    }
+    if (el.autarkyInverterState) {
+      el.autarkyInverterState.textContent = l.autarkyInvOff || 'AUS (0W)';
+      el.autarkyInverterState.className = 'detail-val';
+    }
+  }
+
+  // Update Last Sync display
+  if (el.autarkyLastSync) {
+    if (elapsedSec < 10) {
+      el.autarkyLastSync.textContent = currentLang === 'de' ? 'Gerade eben' : 'Just now';
+    } else if (elapsedSec < 60) {
+      el.autarkyLastSync.textContent = `${elapsedSec}s ` + (currentLang === 'de' ? 'vor' : 'ago');
+    } else if (elapsedMin < 60) {
+      el.autarkyLastSync.textContent = `${elapsedMin}m ` + (currentLang === 'de' ? 'vor' : 'ago');
+    } else {
+      const h = Math.floor(elapsedMin / 60);
+      const rm = elapsedMin % 60;
+      el.autarkyLastSync.textContent = `${h}h ${rm}m ` + (currentLang === 'de' ? 'vor' : 'ago');
+    }
+  }
+}
+
 // Timer tick
 setInterval(() => {
   updateMainSpeedAge();
+  updateAutarkyPanel();
   if (!lastBeaconTime) {
     if (el.lastSeenTimer) el.lastSeenTimer.textContent = 'Warte...';
     return;
