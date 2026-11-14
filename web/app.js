@@ -1583,11 +1583,10 @@ async function loadSupabaseHistory(limit = 240, hours = 1) {
         const rawDown = (item.cell_down_mbps && item.cell_down_mbps > 0) ? item.cell_down_mbps : item.net_mbps;
         const rawUp = (item.cell_up_mbps && item.cell_up_mbps > 0) ? item.cell_up_mbps : item.net_up_mbps;
 
-        // Record a speedtest point only when a test was actually executed (value changed or scheduled cycle)
+        // Record a speedtest point only when a test was actually executed (speed values changed)
         if (rawDown !== undefined && rawDown !== null && rawDown > 0) {
           const isNewTest = (lastSeenDown === null) ||
-                            (rawDown !== lastSeenDown || rawUp !== lastSeenUp) ||
-                            (ptTime - lastSpeedtestTime >= 5.5 * 3600 * 1000);
+                            (rawDown !== lastSeenDown || rawUp !== lastSeenUp);
 
           if (isNewTest) {
             lastSeenDown = rawDown;
@@ -1685,8 +1684,7 @@ async function loadSpeedtestAverages() {
       if (down > 0) {
         const t = new Date(r.created_at).getTime();
         const isNew = (lastDown === null) ||
-                      (down !== lastDown || up !== lastUp) ||
-                      (t - lastTime >= 5.5 * 3600 * 1000);
+                      (down !== lastDown || up !== lastUp);
         if (isNew) {
           lastDown = down;
           lastUp = up;
