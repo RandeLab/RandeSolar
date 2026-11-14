@@ -57,6 +57,16 @@ static bool g_led_strip_on    = true;  // 12V LED Strip on Relay 2 NC (lit when 
 static uint8_t g_lcd_page     = 0;     // 0 = Coconut, 1 = Solar, 2 = Network, 3 = 5G, 4 = Weather, 5 = Temp
 static unsigned long g_lastLcdUpdate = 0;
 
+// ==================== AUTARKY TIMED BURST CONTROLLER ====================
+// Runs 6000W Inverter for 5 minutes once every hour (55 min sleeping)
+// Cuts 230V idle draw by ~92% during winter off-grid periods.
+static bool     g_autarkyMode         = true;        // Autarky mode active!
+static bool     g_autarkyInBurst      = true;        // Start with active 5-min burst on boot
+static uint32_t g_autarkyCycleStartMs = 0;           // Cycle anchor
+static uint32_t g_autarkyBurstStartMs = 0;           // Burst anchor
+
+void updateAutarkySchedule();
+
 static uint8_t  g_stripPulseRemaining = 0;
 static uint32_t g_lastStripPulseMs = 0;
 
@@ -628,6 +638,47 @@ void updateByteBeat() {
 static SolarData g_data;
 static volatile bool g_newDataAvailable = false;
 static portMUX_TYPE g_mux = portMUX_INITIALIZER_UNLOCKED;
+
+void updateAutarkySchedule() {
+    if (!g_autarkyMode) return;
+    uint32_t now = millis();
+
+    // 1. Critical Low-Battery Guard:
+    // If battery drops below 11.80V, abort active burst or refuse to start!
+    if (g_data.has_data && g_data.battery_voltage > 5.0f && g_data.battery_voltage < 11.80f) {
+        if (g_relay1_inverter) {
+            Serial.printf("[Autarky ⚠️] Battery critical (%.2f V < 11.80 V)! Cutting Inverter to protect battery.\n", g_data.battery_voltage);
+            setPlcRelay(0, false);
+            g_autarkyInBurst = false;
+            g_autarkyCycleStartMs = now; // Delay next attempt by 1 hour
+            setLcdActivity("LOW BATT!", TFT_RED);
+        }
+        return;
+    }
+
+    // 2. Active Burst Window (5 minutes = 300,000 ms)
+    if (g_autarkyInBurst) {
+        if (now - g_autarkyBurstStartMs >= 300000UL) {
+            // 5 minutes are up! Turn off Inverter and go to sleep
+            g_autarkyInBurst = false;
+            setPlcRelay(0, false);
+            Serial.println("[Autarky 💤] 5-minute burst completed. Inverter OFF. Sleeping for 55 minutes.");
+            M5StamPLC.tone(900, 150);
+            setLcdActivity("INV OFF (55m)", TFT_MAROON);
+        }
+    } else {
+        // 3. Sleeping Window (55 minutes, cycle total = 60 minutes = 3,600,000 ms)
+        if (now - g_autarkyCycleStartMs >= 3600000UL || g_autarkyCycleStartMs == 0) {
+            g_autarkyCycleStartMs = now;
+            g_autarkyBurstStartMs = now;
+            g_autarkyInBurst = true;
+            setPlcRelay(0, true);
+            Serial.println("[Autarky ⚡] Hourly cycle triggered! Inverter ON for 5 minutes.");
+            M5StamPLC.tone(1800, 100);
+            setLcdActivity("INV ON (5m)", TFT_GREEN);
+        }
+    }
+}
 
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
@@ -1546,10 +1597,24 @@ void handleRelayApi() {
         int count = server.arg("pulse").toInt();
         triggerStripPulse(count > 0 ? count : 3);
         server.send(200, "application/json", "{\"status\":\"ok\",\"action\":\"pulse\"}");
+    } else if (server.hasArg("autarky")) {
+        String s = server.arg("autarky");
+        g_autarkyMode = (s == "1" || s == "true" || s == "on");
+        if (g_autarkyMode) {
+            g_autarkyCycleStartMs = millis();
+            g_autarkyBurstStartMs = millis();
+            g_autarkyInBurst = true;
+            setPlcRelay(0, true);
+        }
+        char resp[180];
+        snprintf(resp, sizeof(resp), "{\"status\":\"ok\",\"action\":\"autarky\",\"autarky_mode\":%s,\"inverter\":%s}",
+                 g_autarkyMode ? "true" : "false", g_relay1_inverter ? "true" : "false");
+        server.send(200, "application/json", resp);
     } else {
-        char resp[160];
-        snprintf(resp, sizeof(resp), "{\"relay1_inverter\":%s,\"relay2_coil\":%s,\"led_strip\":%s}",
-                 g_relay1_inverter ? "true" : "false", g_relay2_aux ? "true" : "false", g_led_strip_on ? "true" : "false");
+        char resp[220];
+        snprintf(resp, sizeof(resp), "{\"relay1_inverter\":%s,\"relay2_coil\":%s,\"led_strip\":%s,\"autarky_mode\":%s,\"autarky_burst\":%s}",
+                 g_relay1_inverter ? "true" : "false", g_relay2_aux ? "true" : "false", g_led_strip_on ? "true" : "false",
+                 g_autarkyMode ? "true" : "false", g_autarkyInBurst ? "true" : "false");
         server.send(200, "application/json", resp);
     }
 }
@@ -1570,7 +1635,23 @@ void drawLcdHeader(const char* title, const char* pageStr) {
         dsp.setCursor(140, 5);
         dsp.printf(" %s", g_lastActivity.c_str());
     } else {
-        if (g_relay1_inverter) {
+        if (g_autarkyMode) {
+            uint32_t now = millis();
+            if (g_relay1_inverter) {
+                dsp.fillRect(136, 2, 100, 14, TFT_DARKGREEN);
+                dsp.setTextColor(TFT_WHITE, TFT_DARKGREEN);
+                dsp.setCursor(140, 5);
+                uint32_t remBurstSec = (now - g_autarkyBurstStartMs < 300000UL) ? (300000UL - (now - g_autarkyBurstStartMs)) / 1000 : 0;
+                dsp.printf("AUTARK: %us", (unsigned int)remBurstSec);
+            } else {
+                dsp.fillRect(136, 2, 100, 14, TFT_NAVY);
+                dsp.setTextColor(TFT_CYAN, TFT_NAVY);
+                dsp.setCursor(140, 5);
+                uint32_t el = now - g_autarkyCycleStartMs;
+                uint32_t remMin = (el < 3600000UL) ? (3600000UL - el) / 60000UL + 1 : 0;
+                dsp.printf("AUTARK: in %um", (unsigned int)remMin);
+            }
+        } else if (g_relay1_inverter) {
             dsp.fillRect(146, 2, 90, 14, TFT_DARKGREEN);
             dsp.setTextColor(TFT_WHITE, TFT_DARKGREEN);
             dsp.setCursor(150, 5);
@@ -2212,6 +2293,7 @@ void handleLiveApi() {
         "\"wx_temp\":%.1f,\"wx_solar_wm2\":%.1f,\"wx_cloud_pct\":%d,\"wx_rain_mm\":%.2f,\"wx_wind_kmh\":%.1f,\"wx_humidity\":%d,\"wx_pressure\":%.1f,"
         "\"temp_dallas1\":%.1f,\"temp_dallas2\":%.1f,\"temp_plc\":%.1f,\"dallas_count\":%u,"
         "\"relay1_inverter\":%s,\"relay2_coil\":%s,\"led_strip\":%s,"
+        "\"autarky_mode\":%s,\"autarky_burst\":%s,"
         "\"buffered_records\":%u,\"ip\":\"%s\",\"gateway_ip\":\"%s\",\"age_sec\":%lu}",
         d.has_data ? "true" : "false",
         d.solar_power,
@@ -2263,6 +2345,8 @@ void handleLiveApi() {
         g_relay1_inverter ? "true" : "false",
         g_relay2_aux ? "true" : "false",
         g_led_strip_on ? "true" : "false",
+        g_autarkyMode ? "true" : "false",
+        g_autarkyInBurst ? "true" : "false",
         (unsigned int)g_bufferedRecordCount,
         WiFi.localIP().toString().c_str(),
         WiFi.gatewayIP().toString().c_str(),
@@ -3555,6 +3639,61 @@ void checkTelegramUpdates() {
                             } else {
                                 sendTelegramMessage("⚠️ Konnte Wetterdaten von Open-Meteo gerade nicht abrufen.", fromChatId.c_str());
                             }
+                        } else if (cmd.startsWith("/autark")) {
+                            if (cmd.indexOf("off") >= 0 || cmd.indexOf("aus") >= 0 || cmd.indexOf("0") >= 0) {
+                                g_autarkyMode = false;
+                                sendTelegramMessage("🔌 *Autarkie-Modus DEAKTIVIERT:*\nInverter läuft jetzt nur noch auf manuelle Steuerung.", fromChatId.c_str());
+                            } else if (cmd.indexOf("on") >= 0 || cmd.indexOf("ein") >= 0 || cmd.indexOf("1") >= 0) {
+                                g_autarkyMode = true;
+                                g_autarkyCycleStartMs = millis();
+                                g_autarkyBurstStartMs = millis();
+                                g_autarkyInBurst = true;
+                                setPlcRelay(0, true);
+                                sendTelegramMessage("🔋 *Autarkie-Modus AKTIVIERT:*\nInverter läuft ab sofort *5 Minuten pro Stunde*. Der erste 5-Minuten-Zyklus läuft jetzt!", fromChatId.c_str());
+                            } else {
+                                uint32_t now = millis();
+                                unsigned long nextSec = 0;
+                                if (!g_autarkyInBurst) {
+                                    uint32_t elapsed = now - g_autarkyCycleStartMs;
+                                    if (elapsed < 3600000UL) nextSec = (3600000UL - elapsed) / 1000;
+                                } else {
+                                    uint32_t burstElapsed = now - g_autarkyBurstStartMs;
+                                    if (burstElapsed < 300000UL) nextSec = (300000UL - burstElapsed) / 1000;
+                                }
+                                char autarkMsg[420];
+                                snprintf(autarkMsg, sizeof(autarkMsg),
+                                    "🔋 *RandeSolar Autarkie-Status* 🌲\n"
+                                    "━━━━━━━━━━━━━━━━━━━━\n"
+                                    "⚙️ *Modus:* %s\n"
+                                    "⚡ *Inverter:* %s\n"
+                                    "⏱️ *Zyklus:* 5 Min. ON / 55 Min. OFF\n"
+                                    "%s\n"
+                                    "━━━━━━━━━━━━━━━━━━━━\n"
+                                    "Befehle: `/autarky on` | `/autarky off`",
+                                    g_autarkyMode ? "AKTIV (1h / 5 min)" : "AUS (Manuell)",
+                                    g_relay1_inverter ? "230V EINGESCHALTET" : "AUS (0W Standby)",
+                                    g_autarkyInBurst ? ("🟢 *Gerade im 5-Minuten Sync-Fenster!* (Noch " + String(nextSec) + "s)").c_str() : ("⏳ Nächster Sync in: *" + String(nextSec / 60) + " Min. " + String(nextSec % 60) + " Sek.*").c_str()
+                                );
+                                sendTelegramMessage(autarkMsg, fromChatId.c_str());
+                            }
+                        } else if (cmd.startsWith("/inverter") || cmd.startsWith("/inv") || cmd.startsWith("/230v")) {
+                            bool turnOn = true;
+                            if (cmd.indexOf("off") >= 0 || cmd.indexOf("aus") >= 0 || cmd.indexOf("0") >= 0) {
+                                turnOn = false;
+                            } else if (cmd.indexOf("toggle") >= 0) {
+                                turnOn = !g_relay1_inverter;
+                            }
+                            setPlcRelay(0, turnOn);
+                            if (turnOn) {
+                                if (g_autarkyMode) {
+                                    g_autarkyBurstStartMs = millis();
+                                    g_autarkyInBurst = true;
+                                }
+                                sendTelegramMessage("⚡ *Inverter (Relay 1) MANUELL EINGESCHALTET!*\n230V Netz ist aktiv.", fromChatId.c_str());
+                            } else {
+                                g_autarkyInBurst = false;
+                                sendTelegramMessage("💤 *Inverter (Relay 1) MANUELL AUSGESCHALTET!*\n230V Netz stromlos (0W Standby).", fromChatId.c_str());
+                            }
                         } else if (cmd.startsWith("/ping")) {
                             sendTelegramMessage("🏓 *Pong!* RandeSolar ESP32-S3 ist online und empfängt Bluetooth-Telemetrie.", fromChatId.c_str());
                         } else if (cmd.startsWith("/start") || cmd.startsWith("/help") || cmd.startsWith("/hilfe")) {
@@ -3562,6 +3701,8 @@ void checkTelegramUpdates() {
                                 "☀️ *Willkommen beim RandeSolar Bot!* ⚡\n\n"
                                 "Verfügbare Befehle:\n"
                                 "• /status - Technische Zahlen & Messwerte\n"
+                                "• /autarky - Autarkie-Modus (5m/1h) Status & Steuerung 🔋\n"
+                                "• /inverter - Inverter [on/off] manuell schalten ⚡\n"
                                 "• /weather - Lokales Wetter & Solarstrahlung 🌤️\n"
                                 "• /mood - Wie ich mich heute fühle (Tagebuch) 💬\n"
                                 "• /speed - 5G Ookla-Speedtest (TRB500 Gateway) 🚀\n"
@@ -3936,6 +4077,15 @@ void setup() {
         );
         sendTelegramMessage(bootMsg);
     }
+
+    // Initialize Autarky Cycle (First 5-minute active window starts immediately at boot)
+    if (g_autarkyMode) {
+        g_autarkyCycleStartMs = millis();
+        g_autarkyBurstStartMs = millis();
+        g_autarkyInBurst = true;
+        setPlcRelay(0, true);
+        Serial.println("[Autarky 🔋] Initial 5-minute active burst initiated at boot!");
+    }
 }
 
 void loop() {
@@ -4028,6 +4178,9 @@ void loop() {
         lastLcdUpdate = millis();
         renderLcdDashboard();
     }
+
+    // Autarky Timed Inverter Burst Controller (5 min ON every 1 hour)
+    updateAutarkySchedule();
 
     // Inverter Sleep Guard (Undervoltage Protection):
     // If battery drops below 11.50V, automatically open Relay 1 (shut off Inverter)
