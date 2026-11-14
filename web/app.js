@@ -1627,11 +1627,28 @@ async function loadSupabaseHistory(limit = 240, hours = 1) {
     if (netChartInstance) netChartInstance.update('none');
     if (weatherChartInstance) weatherChartInstance.update('none');
 
-    // Populate dashboard cards with the latest record
+    // Always populate dashboard cards with the latest record from Supabase
     const latest = rows[rows.length - 1];
-    if (latest && isDemoMode) {
+    if (latest) {
       isDemoMode = false;
       updateDashboard(latest);
+
+      // Check age of the latest recorded telemetry row
+      if (latest.created_at) {
+        const ptTime = new Date(latest.created_at).getTime();
+        const ageMin = Math.max(0, Math.round((Date.now() - ptTime) / 60000));
+        if (ageMin >= 2) {
+          if (el.statusText) {
+            el.statusText.textContent = `Autarkie Standby (${ageMin}m vor)`;
+          }
+          const moodText = document.getElementById('liveMoodText');
+          if (moodText) {
+            const vStr = latest.battery_voltage ? `${latest.battery_voltage.toFixed(2)}V` : '--V';
+            const wStr = (latest.solar_power !== undefined && latest.solar_power !== null) ? `${latest.solar_power}W` : '--W';
+            moodText.textContent = `»🔋 Autarkie-Modus aktiv: Der 230V-Inverter und 5G-Router schlafen zur Batterieschonung. Letzte Messung vor ${ageMin} Min. (${vStr} • ${wStr}). Nächster automatischer Sync zur vollen Stunde!«`;
+          }
+        }
+      }
     }
     console.log(`[Supabase ⚡] Loaded ${rows.length} historical points for ${currentHours}h!`);
   } catch (err) {
