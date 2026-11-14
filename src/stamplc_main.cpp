@@ -3224,8 +3224,19 @@ void sendTelegramMessage(const String& text, const char* targetChatId) {
         http.addHeader("Content-Type", "application/json");
         String payload = "{\"chat_id\":\"" + String(targetChatId) + "\",\"text\":\"" + escapeJsonString(text) + "\",\"parse_mode\":\"Markdown\"}";
         int code = http.POST(payload);
-        if (code > 0) {
+        if (code == 200) {
             Serial.printf("[Telegram ✈️] Message delivered (HTTP %d)\n", code);
+        } else if (code == 400) {
+            Serial.printf("[Telegram ⚠️] Markdown failed (HTTP 400), retrying plain text...\n");
+            http.end();
+            if (http.begin(secClient, url)) {
+                http.addHeader("Content-Type", "application/json");
+                String plain = "{\"chat_id\":\"" + String(targetChatId) + "\",\"text\":\"" + escapeJsonString(text) + "\"}";
+                int retry = http.POST(plain);
+                Serial.printf("[Telegram ✈️] Plain text result: HTTP %d\n", retry);
+            }
+        } else if (code > 0) {
+            Serial.printf("[Telegram ❌] Send failed HTTP %d\n", code);
         } else {
             Serial.printf("[Telegram ❌] Send failed: %s\n", http.errorToString(code).c_str());
         }
@@ -3299,44 +3310,55 @@ void checkTelegramUpdates() {
 
     WiFiClientSecure secClient;
     secClient.setInsecure();
-    secClient.setTimeout(1200);
+    secClient.setTimeout(3500);
 
     HTTPClient http;
     String url = "https://api.telegram.org/bot" + String(TELEGRAM_BOT_TOKEN) + 
                  "/getUpdates?offset=" + String((long long)(g_lastTelegramUpdateId + 1)) + 
                  "&limit=5&timeout=0";
 
+    String response = "";
     if (http.begin(secClient, url)) {
         int code = http.GET();
         if (code == 200) {
-            String response = http.getString();
-            
-            int idx = 0;
-            while ((idx = response.indexOf("\"update_id\":", idx)) != -1) {
-                int startId = idx + 12;
-                int endId = response.indexOf(",", startId);
-                if (endId != -1) {
-                    int64_t uid = atoll(response.substring(startId, endId).c_str());
-                    if (uid > g_lastTelegramUpdateId) g_lastTelegramUpdateId = uid;
-                }
-                
-                int chatIdx = response.indexOf("\"chat\":{\"id\":", idx);
-                String fromChatId = TELEGRAM_CHAT_ID;
-                if (chatIdx != -1) {
-                    int chatStart = chatIdx + 13;
-                    int chatEnd = response.indexOf(",", chatStart);
-                    if (chatEnd != -1) {
-                        fromChatId = response.substring(chatStart, chatEnd);
-                    }
-                }
+            response = http.getString();
+        } else if (code > 0) {
+            Serial.printf("[Telegram ⚠️] getUpdates HTTP %d\n", code);
+        } else {
+            Serial.printf("[Telegram ⚠️] getUpdates error: %s\n", http.errorToString(code).c_str());
+        }
+        http.end(); // Free TLS session immediately before processing and sending replies
+    }
 
-                int textIdx = response.indexOf("\"text\":\"", idx);
-                if (textIdx != -1) {
-                    int textStart = textIdx + 8;
-                    int textEnd = response.indexOf("\"", textStart);
-                    if (textEnd != -1) {
-                        String cmd = response.substring(textStart, textEnd);
-                        cmd.toLowerCase();
+    if (response.length() == 0) return;
+
+    int idx = 0;
+    while ((idx = response.indexOf("\"update_id\":", idx)) != -1) {
+        int startId = idx + 12;
+        int endId = response.indexOf(",", startId);
+        if (endId != -1) {
+            int64_t uid = atoll(response.substring(startId, endId).c_str());
+            if (uid > g_lastTelegramUpdateId) g_lastTelegramUpdateId = uid;
+        }
+        
+        int chatIdx = response.indexOf("\"chat\":{\"id\":", idx);
+        String fromChatId = TELEGRAM_CHAT_ID;
+        if (chatIdx != -1) {
+            int chatStart = chatIdx + 13;
+            int chatEnd = response.indexOf(",", chatStart);
+            if (chatEnd != -1) {
+                fromChatId = response.substring(chatStart, chatEnd);
+            }
+        }
+
+        int textIdx = response.indexOf("\"text\":\"", idx);
+        if (textIdx != -1) {
+            int textStart = textIdx + 8;
+            int textEnd = response.indexOf("\"", textStart);
+            if (textEnd != -1) {
+                String cmd = response.substring(textStart, textEnd);
+                cmd.toLowerCase();
+                Serial.printf("[Telegram 📩] RX command: %s (Chat %s)\n", cmd.c_str(), fromChatId.c_str());
                         
                         if (cmd.startsWith("/status")) {
                             SolarData d;
@@ -3513,9 +3535,6 @@ void checkTelegramUpdates() {
                     }
                 }
                 idx = response.indexOf("\"update_id\":", idx + 12);
-            }
-        }
-        http.end();
     }
 }
 
@@ -3987,9 +4006,9 @@ void loop() {
 
     uint32_t now = millis();
 
-    // Check Telegram commands every 30 seconds (reduces TLS blocking by 90% for instant button response)
+    // Check Telegram commands every 6 seconds for responsive bot interactions
     static uint32_t lastTelegramCheck = 0;
-    if (now - lastTelegramCheck >= 30000) {
+    if (now - lastTelegramCheck >= 6000) {
         lastTelegramCheck = now;
         checkTelegramUpdates();
     }
