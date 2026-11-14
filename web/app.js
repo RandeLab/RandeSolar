@@ -904,7 +904,7 @@ function initChart() {
             pointHoverRadius: 4,
           },
           {
-            label: 'Probe 1 / Keller (°C)',
+            label: 'Probe 1 / Stübli (°C)',
             data: [],
             borderColor: '#39FF14',
             backgroundColor: 'rgba(57, 255, 20, 0.12)',
@@ -913,11 +913,11 @@ function initChart() {
             fill: false,
             spanGaps: true,
             yAxisID: 'yTemp',
-            pointRadius: 0,
+            pointRadius: 2,
             pointHoverRadius: 5,
           },
           {
-            label: 'Probe 2 / Raum (°C)',
+            label: 'Probe 2 / Keller (°C)',
             data: [],
             borderColor: '#FF2E93',
             backgroundColor: 'rgba(255, 46, 147, 0.12)',
@@ -926,7 +926,7 @@ function initChart() {
             fill: false,
             spanGaps: true,
             yAxisID: 'yTemp',
-            pointRadius: 0,
+            pointRadius: 2,
             pointHoverRadius: 5,
           }
         ]
