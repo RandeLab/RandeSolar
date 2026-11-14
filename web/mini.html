@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📺 M5Stack StamPLC Mini Hardware Display // RandeSolar</title>
+  <link rel="icon" href="./arai-icon.svg" type="image/svg+xml">
+
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@700;800;900&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="./mini.css?v=1.0">
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="mini-header">
+    <div class="logo-badge-group">
+      <a href="./index.html">
+        <img src="./arai-icon.svg" alt="RandeSolar Logo">
+      </a>
+      <div class="logo-titles">
+        <h1><span>📺 StamPLC Mini Display</span></h1>
+        <div class="sub-tag">Virtuelles 1.14" ST7789 Color LCD Hardware Interface (240×135)</div>
+      </div>
+    </div>
+
+    <nav class="nav-links">
+      <a href="./index.html" class="btn-nav">☀️ Solar Studio</a>
+      <a href="./network.html" class="btn-nav">🌐 5G Studio</a>
+      <a href="./wifi.html" class="btn-nav">📶 Wi-Fi</a>
+      <a href="./disco.html" class="btn-nav">🥥 Coco-Disco</a>
+      <a href="./mini.html" class="btn-nav active">📺 Mini Display</a>
+    </nav>
+  </header>
+
+  <!-- M5Stack StamPLC DIN-Rail Enclosure -->
+  <main class="stamplc-enclosure">
+
+    <!-- Top DIN Terminal Screw Blocks -->
+    <div class="din-terminals-top">
+      <div class="terminal-block">
+        <div class="terminal-title">VIN 9–36V DC</div>
+        <div class="terminal-screws">
+          <div class="screw-dot" title="GND"></div>
+          <div class="screw-dot" title="+12V Akkubank"></div>
+        </div>
+      </div>
+      <div class="terminal-block">
+        <div class="terminal-title">RELAY 1 (INV)</div>
+        <div class="terminal-screws">
+          <div class="screw-dot" title="COM"></div>
+          <div class="screw-dot" title="NO (Inverter Remote)"></div>
+        </div>
+      </div>
+      <div class="terminal-block">
+        <div class="terminal-title">RELAY 2 (AUX)</div>
+        <div class="terminal-screws">
+          <div class="screw-dot" title="COM"></div>
+          <div class="screw-dot" title="NC (12V LED Strip)"></div>
+        </div>
+      </div>
+      <div class="terminal-block">
+        <div class="terminal-title">PORT A (GROVE)</div>
+        <div class="terminal-screws">
+          <div class="screw-dot" title="GPIO 1 (1-Wire)"></div>
+          <div class="screw-dot" title="GPIO 2 / 5V / GND"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Silkscreen Branding -->
+    <div class="stamplc-branding">
+      <div class="silkscreen-logo">
+        <span class="m5-red">M5STACK</span> StamPLC
+      </div>
+      <div class="silkscreen-specs">
+        ESP32-S3FN8 • ST7789v2 1.14" TFT
+      </div>
+    </div>
+
+    <!-- ST7789 Screen Housing & WS2812 RGB LED -->
+    <div class="screen-housing">
+      <div class="screen-top-bar">
+        <span class="screen-label">ST7789 COLOR DISPLAY • 240×135</span>
+        <div class="ws2812-indicator-wrap" title="Onboard WS2812 Status LED (GPIO 48)">
+          <span>LED (GPIO 48)</span>
+          <div id="ws2812Led" class="ws2812-pip"></div>
+        </div>
+      </div>
+
+      <div class="st7789-frame">
+        <canvas id="lcdCanvas" width="240" height="135"></canvas>
+      </div>
+    </div>
+
+    <!-- 3 Physical Industrial Pushbuttons -->
+    <div class="physical-buttons-deck">
+      <div class="btn-slot">
+        <button id="btnA" class="push-btn btn-a" onclick="handleButtonA()" title="Taste A drücken (Inverter / Kontext)">
+          [ A ]
+        </button>
+        <span id="subLabelA" class="btn-sub-label">[A] INVERTER: OFF</span>
+      </div>
+
+      <div class="btn-slot">
+        <button id="btnB" class="push-btn btn-b" onclick="handleButtonB()" title="Taste B drücken (Nächste Seite / Next Page)">
+          [ B ]
+        </button>
+        <span id="subLabelB" class="btn-sub-label">[B] NEXT SCREEN (0/5)</span>
+      </div>
+
+      <div class="btn-slot">
+        <button id="btnC" class="push-btn btn-c" onclick="handleButtonC()" title="Taste C drücken (LED Strip / Refresh)">
+          [ C ]
+        </button>
+        <span id="subLabelC" class="btn-sub-label">[C] 12V STRIP: ON</span>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Quick Screen Switcher -->
+  <div class="quick-screens-bar">
+    <button id="pillP0" class="screen-pill active" onclick="switchToPage(0)">🥥 P0: Coconut</button>
+    <button id="pillP1" class="screen-pill" onclick="switchToPage(1)">☀️ P1: Solar</button>
+    <button id="pillP2" class="screen-pill" onclick="switchToPage(2)">🌐 P2: Network</button>
+    <button id="pillP3" class="screen-pill" onclick="switchToPage(3)">📡 P3: 5G Modem</button>
+    <button id="pillP4" class="screen-pill" onclick="switchToPage(4)">🌦️ P4: Meteo</button>
+    <button id="pillP5" class="screen-pill" onclick="switchToPage(5)">🌡️ P5: Stübli Temp</button>
+  </div>
+
+  <!-- Sound Toggle & Live Status Strip -->
+  <div class="simulator-footer">
+    <button id="btnSound" class="btn-sound" onclick="toggleSound()">🔊 BUZZER: ON</button>
+    <div class="status-info-text">
+      Cloud Sync: <b id="lastSyncInfo">Verbinde mit Supabase...</b>
+    </div>
+    <div class="status-info-text">
+      Ziel: <b>RandeLab StamPLC (857m)</b>
+    </div>
+  </div>
+
+  <!-- Keyboard Shortcuts Guide -->
+  <div class="keyboard-guide">
+    Tastatur: <kbd>A</kbd> Inverter / Action • <kbd>B</kbd> oder <kbd>Leertaste</kbd> Nächste Seite • <kbd>C</kbd> Strip / Refresh • <kbd>0</kbd>–<kbd>5</kbd> Direktwahl
+  </div>
+
+  <script src="./mini.js?v=1.0"></script>
+</body>
+</html>
